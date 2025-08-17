@@ -445,3 +445,5 @@ agent_state/
 
 # Launch settings (may contain API keys)
 Properties/launchSettings.json
+/examples/Properties/launchSettings.json
+/coverage
