@@ -649,7 +649,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - Built with ❤️ for the .NET community
 - Inspired by the Re/Act pattern and OpenAI's function calling
 - Advanced reasoning capabilities based on Chain of Thought and Tree of Thoughts research
-- Designed for production use with comprehensive error handling and monitoring
+- Designed for production use with comprehensive error handling and monitoring.
 
 ---
 
