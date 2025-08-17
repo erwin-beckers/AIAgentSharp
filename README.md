@@ -1,6 +1,6 @@
 # AIAgentSharp
 
-[![Codecov](https://codecov.io/gh/your-username/AIAgentSharp/branch/main/graph/badge.svg)](https://codecov.io/gh/your-username/AIAgentSharp)
+[![codecov](https://codecov.io/gh/erwin-beckers/AIAgentSharp/graph/badge.svg?token=0IIY8VJPIV)](https://codecov.io/gh/erwin-beckers/AIAgentSharp)
 
 A comprehensive, production-ready .NET 8.0 framework for building LLM-powered agents with advanced reasoning capabilities and tool calling. This framework provides a complete solution for creating intelligent agents that can reason, act, and observe using multiple reasoning strategies including Chain of Thought, Tree of Thoughts, and hybrid approaches.
 
