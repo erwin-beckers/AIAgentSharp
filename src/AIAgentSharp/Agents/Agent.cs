@@ -39,6 +39,39 @@ public sealed class Agent : IAgent
         _orchestrator = new AgentOrchestrator(_llm, _store, _config, _logger, _eventManager, _statusManager);
     }
 
+    /// <summary>
+    /// Executes a complete agent run from start to finish, handling the full task execution lifecycle.
+    /// </summary>
+    /// <param name="agentId">Unique identifier for the agent instance.</param>
+    /// <param name="goal">The goal or task description for the agent to accomplish.</param>
+    /// <param name="tools">Collection of tools available to the agent for task execution.</param>
+    /// <param name="ct">Cancellation token for aborting the operation.</param>
+    /// <returns>
+    /// An <see cref="AgentResult"/> containing the execution outcome, final output, and agent state.
+    /// </returns>
+    /// <remarks>
+    /// <para>
+    /// This method orchestrates the complete agent execution flow:
+    /// </para>
+    /// <list type="number">
+    /// <item><description>Initializes or loads agent state</description></item>
+    /// <item><description>Executes steps until completion or max turns reached</description></item>
+    /// <item><description>Handles tool execution and LLM communication</description></item>
+    /// <item><description>Manages state persistence and event emission</description></item>
+    /// <item><description>Returns final result with success/failure status</description></item>
+    /// </list>
+    /// <para>
+    /// The agent will continue executing steps until one of the following conditions is met:
+    /// </para>
+    /// <list type="bullet">
+    /// <item><description>The agent produces a final output (success)</description></item>
+    /// <item><description>The maximum number of turns is reached</description></item>
+    /// <item><description>A cancellation is requested</description></item>
+    /// <item><description>An unrecoverable error occurs</description></item>
+    /// </list>
+    /// </remarks>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="agentId"/>, <paramref name="goal"/>, or <paramref name="tools"/> is null.</exception>
+    /// <exception cref="OperationCanceledException">Thrown when the operation is cancelled via <paramref name="ct"/>.</exception>
     public async Task<AgentResult> RunAsync(string agentId, string goal, IEnumerable<ITool> tools, CancellationToken ct = default)
     {
         _logger.LogInformation($"Starting agent run for {agentId} with goal: {goal}");
@@ -120,6 +153,35 @@ public sealed class Agent : IAgent
         return maxTurnsResult;
     }
 
+    /// <summary>
+    /// Executes a single step of the agent, allowing for incremental task execution and state inspection.
+    /// </summary>
+    /// <param name="agentId">Unique identifier for the agent instance.</param>
+    /// <param name="goal">The goal or task description for the agent to accomplish.</param>
+    /// <param name="tools">Collection of tools available to the agent for task execution.</param>
+    /// <param name="ct">Cancellation token for aborting the operation.</param>
+    /// <returns>
+    /// An <see cref="AgentStepResult"/> containing the step execution outcome and continuation status.
+    /// </returns>
+    /// <remarks>
+    /// <para>
+    /// This method executes one step of the agent's reasoning and action cycle:
+    /// </para>
+    /// <list type="number">
+    /// <item><description>Loads or initializes agent state</description></item>
+    /// <item><description>Builds messages for LLM communication</description></item>
+    /// <item><description>Executes reasoning if enabled</description></item>
+    /// <item><description>Calls the LLM for decision making</description></item>
+    /// <item><description>Executes tools if requested</description></item>
+    /// <item><description>Updates agent state and persists changes</description></item>
+    /// </list>
+    /// <para>
+    /// The method returns a result indicating whether the agent should continue with additional steps
+    /// or has completed its task. This allows for fine-grained control over agent execution.
+    /// </para>
+    /// </remarks>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="agentId"/>, <paramref name="goal"/>, or <paramref name="tools"/> is null.</exception>
+    /// <exception cref="OperationCanceledException">Thrown when the operation is cancelled via <paramref name="ct"/>.</exception>
     public async Task<AgentStepResult> StepAsync(string agentId, string goal, IEnumerable<ITool> tools, CancellationToken ct = default)
     {
         _logger.LogInformation($"Executing single step for agent {agentId}");

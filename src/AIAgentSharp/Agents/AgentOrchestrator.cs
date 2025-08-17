@@ -21,6 +21,7 @@ public sealed class AgentOrchestrator : IAgentOrchestrator
     private readonly IToolExecutor _toolExecutor;
     private readonly ILoopDetector _loopDetector;
     private readonly IMessageBuilder _messageBuilder;
+    private readonly ReasoningManager _reasoningManager;
 
     public AgentOrchestrator(
         ILlmClient llm,
@@ -42,12 +43,56 @@ public sealed class AgentOrchestrator : IAgentOrchestrator
         _toolExecutor = new ToolExecutor(_config, _logger, _eventManager, _statusManager);
         _loopDetector = new LoopDetector(_config, _logger);
         _messageBuilder = new MessageBuilder(_config);
+        _reasoningManager = new ReasoningManager(_llm, _config, _logger, _eventManager, _statusManager);
     }
 
+    /// <summary>
+    /// Executes a single step of the agent's reasoning and action cycle.
+    /// </summary>
+    /// <param name="state">The current agent state containing history and context.</param>
+    /// <param name="tools">Dictionary of available tools indexed by name.</param>
+    /// <param name="ct">Cancellation token for aborting the operation.</param>
+    /// <returns>
+    /// An <see cref="AgentStepResult"/> containing the step execution outcome and continuation status.
+    /// </returns>
+    /// <remarks>
+    /// <para>
+    /// This method orchestrates the core agent step execution logic:
+    /// </para>
+    /// <list type="number">
+    /// <item><description>Performs reasoning if enabled and at decision points</description></item>
+    /// <item><description>Builds messages for LLM communication</description></item>
+    /// <item><description>Attempts function calling if supported</description></item>
+    /// <item><description>Falls back to JSON parsing if function calling fails</description></item>
+    /// <item><description>Processes the LLM response and executes actions</description></item>
+    /// <item><description>Updates agent state with results</description></item>
+    /// </list>
+    /// <para>
+    /// The method handles both function calling and Re/Act pattern execution, with automatic
+    /// fallback mechanisms for robustness.
+    /// </para>
+    /// </remarks>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="state"/> or <paramref name="tools"/> is null.</exception>
+    /// <exception cref="OperationCanceledException">Thrown when the operation is cancelled via <paramref name="ct"/>.</exception>
     public async Task<AgentStepResult> ExecuteStepAsync(AgentState state, IDictionary<string, ITool> tools, CancellationToken ct)
     {
         var turnIndex = state.Turns.Count;
         var turnId = GenerateTurnId(turnIndex);
+
+        // Perform reasoning if enabled and this is a decision point
+        if (ShouldPerformReasoning(state, turnIndex))
+        {
+            var reasoningResult = await PerformReasoningAsync(state, tools, ct);
+            if (reasoningResult.Success)
+            {
+                // Update state with reasoning information
+                UpdateStateWithReasoning(state, reasoningResult);
+                
+                // Enhance the goal with reasoning insights
+                var enhancedGoal = EnhanceGoalWithReasoning(state.Goal, reasoningResult);
+                state.Goal = enhancedGoal;
+            }
+        }
 
         var messages = _messageBuilder.BuildMessages(state, tools);
         ModelMessage? modelMsg;
@@ -465,5 +510,87 @@ public sealed class AgentOrchestrator : IAgentOrchestrator
             default:
                 return "null";
         }
+    }
+
+    private bool ShouldPerformReasoning(AgentState state, int turnIndex)
+    {
+        // Don't perform reasoning if it's disabled
+        if (_config.ReasoningType == ReasoningType.None)
+        {
+            return false;
+        }
+
+        // Perform reasoning at the start of agent execution or when facing complex decisions
+        return turnIndex == 0 || 
+               (turnIndex > 0 && state.Turns.Count > 0 && 
+                state.Turns.Last().ToolResult?.Success == false && 
+                turnIndex % 3 == 0); // Every 3rd turn after failures
+    }
+
+    private async Task<ReasoningResult> PerformReasoningAsync(AgentState state, IDictionary<string, ITool> tools, CancellationToken ct)
+    {
+        try
+        {
+            var context = BuildReasoningContext(state);
+            return await _reasoningManager.ReasonAsync(state.Goal, context, tools, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning($"Reasoning failed: {ex.Message}");
+            return new ReasoningResult
+            {
+                Success = false,
+                Error = ex.Message,
+                ExecutionTimeMs = 0
+            };
+        }
+    }
+
+    private void UpdateStateWithReasoning(AgentState state, ReasoningResult reasoningResult)
+    {
+        state.ReasoningType = reasoningResult.Chain != null ? ReasoningType.ChainOfThought : 
+                             reasoningResult.Tree != null ? ReasoningType.TreeOfThoughts : 
+                             ReasoningType.Hybrid;
+        
+        state.CurrentReasoningChain = reasoningResult.Chain;
+        state.CurrentReasoningTree = reasoningResult.Tree;
+        
+        if (reasoningResult.Metadata != null)
+        {
+            foreach (var kvp in reasoningResult.Metadata)
+            {
+                state.ReasoningMetadata[kvp.Key] = kvp.Value;
+            }
+        }
+    }
+
+    private string EnhanceGoalWithReasoning(string originalGoal, ReasoningResult reasoningResult)
+    {
+        if (string.IsNullOrEmpty(reasoningResult.Conclusion))
+            return originalGoal;
+
+        return $"{originalGoal}\n\nReasoning Insights: {reasoningResult.Conclusion}";
+    }
+
+    private string BuildReasoningContext(AgentState state)
+    {
+        var context = new List<string>();
+        
+        if (state.Turns.Count > 0)
+        {
+            var recentTurns = state.Turns.TakeLast(3).ToList();
+            context.Add("Recent Actions:");
+            foreach (var turn in recentTurns)
+            {
+                if (turn.LlmMessage?.Thoughts != null)
+                    context.Add($"- {turn.LlmMessage.Thoughts}");
+                if (turn.ToolResult?.Success == true)
+                    context.Add($"- Successfully executed: {turn.ToolCall?.Tool}");
+                else if (turn.ToolResult?.Success == false)
+                    context.Add($"- Failed to execute: {turn.ToolCall?.Tool} - {turn.ToolResult?.Error}");
+            }
+        }
+
+        return string.Join("\n", context);
     }
 }

@@ -30,6 +30,31 @@ public sealed class FileAgentStateStore : IAgentStateStore
     /// <param name="agentId">The unique identifier for the agent.</param>
     /// <param name="ct">Cancellation token for the operation.</param>
     /// <returns>The agent state, or null if the file doesn't exist or is invalid.</returns>
+    /// <summary>
+    /// Loads the agent state from a file on disk.
+    /// </summary>
+    /// <param name="agentId">Unique identifier for the agent whose state to load.</param>
+    /// <param name="ct">Cancellation token for aborting the operation.</param>
+    /// <returns>
+    /// The loaded <see cref="AgentState"/> or null if no state file exists or is invalid.
+    /// </returns>
+    /// <remarks>
+    /// <para>
+    /// This method attempts to load the agent state from a JSON file stored on disk:
+    /// </para>
+    /// <list type="number">
+    /// <item><description>Constructs the file path based on the agent ID</description></item>
+    /// <item><description>Checks if the state file exists</description></item>
+    /// <item><description>Reads and deserializes the JSON content</description></item>
+    /// <item><description>Validates the loaded state structure</description></item>
+    /// <item><description>Returns the state or null if loading fails</description></item>
+    /// </list>
+    /// <para>
+    /// The method handles various error conditions gracefully, including missing files,
+    /// corrupted JSON, and invalid state structures, returning null in all error cases.
+    /// </para>
+    /// </remarks>
+    /// <exception cref="OperationCanceledException">Thrown when the operation is cancelled via <paramref name="ct"/>.</exception>
     public async Task<AgentState?> LoadAsync(string agentId, CancellationToken ct = default)
     {
         var filePath = Path.Combine(_directory, $"{agentId}.jsonl");
@@ -85,6 +110,31 @@ public sealed class FileAgentStateStore : IAgentStateStore
         }
     }
 
+    /// <summary>
+    /// Saves the agent state to a file on disk.
+    /// </summary>
+    /// <param name="agentId">Unique identifier for the agent whose state to save.</param>
+    /// <param name="state">The agent state to persist.</param>
+    /// <param name="ct">Cancellation token for aborting the operation.</param>
+    /// <returns>A task representing the asynchronous save operation.</returns>
+    /// <remarks>
+    /// <para>
+    /// This method persists the agent state to a JSON file on disk:
+    /// </para>
+    /// <list type="number">
+    /// <item><description>Creates the directory structure if it doesn't exist</description></item>
+    /// <item><description>Constructs the file path based on the agent ID</description></item>
+    /// <item><description>Serializes the state to JSON format</description></item>
+    /// <item><description>Writes the content to disk atomically</description></item>
+    /// <item><description>Handles file system errors gracefully</description></item>
+    /// </list>
+    /// <para>
+    /// The method uses atomic file operations to ensure data integrity and handles
+    /// various file system scenarios including directory creation and permission issues.
+    /// </para>
+    /// </remarks>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="agentId"/> or <paramref name="state"/> is null.</exception>
+    /// <exception cref="OperationCanceledException">Thrown when the operation is cancelled via <paramref name="ct"/>.</exception>
     public async Task SaveAsync(string agentId, AgentState state, CancellationToken ct = default)
     {
         Directory.CreateDirectory(_directory);

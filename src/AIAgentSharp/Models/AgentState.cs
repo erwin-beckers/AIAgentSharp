@@ -1,3 +1,5 @@
+using AIAgentSharp.Agents.Interfaces;
+
 namespace AIAgentSharp;
 
 /// <summary>
@@ -24,4 +26,24 @@ public sealed class AgentState
     ///     Gets or sets the timestamp when this state was last updated.
     /// </summary>
     public DateTimeOffset UpdatedUtc { get; set; } = DateTimeOffset.UtcNow;
+
+    /// <summary>
+    ///     Gets or sets the current reasoning chain if using Chain of Thought reasoning.
+    /// </summary>
+    public ReasoningChain? CurrentReasoningChain { get; set; }
+
+    /// <summary>
+    ///     Gets or sets the current reasoning tree if using Tree of Thoughts reasoning.
+    /// </summary>
+    public ReasoningTree? CurrentReasoningTree { get; set; }
+
+    /// <summary>
+    ///     Gets or sets the type of reasoning being used.
+    /// </summary>
+    public ReasoningType? ReasoningType { get; set; }
+
+    /// <summary>
+    ///     Gets or sets metadata about reasoning activities.
+    /// </summary>
+    public Dictionary<string, object> ReasoningMetadata { get; set; } = new();
 }

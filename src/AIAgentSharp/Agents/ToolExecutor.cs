@@ -30,6 +30,37 @@ public sealed class ToolExecutor : IToolExecutor
         _toolTimeout = config.ToolTimeout;
     }
 
+    /// <summary>
+    /// Executes a tool with the specified parameters and returns the execution result.
+    /// </summary>
+    /// <param name="toolName">Name of the tool to execute.</param>
+    /// <param name="parameters">Parameters to pass to the tool.</param>
+    /// <param name="tools">Dictionary of available tools indexed by name.</param>
+    /// <param name="agentId">Identifier of the agent executing the tool.</param>
+    /// <param name="turnIndex">Current turn index for event tracking.</param>
+    /// <param name="ct">Cancellation token for aborting the operation.</param>
+    /// <returns>
+    /// A <see cref="ToolExecutionResult"/> containing the execution outcome and output.
+    /// </returns>
+    /// <remarks>
+    /// <para>
+    /// This method handles the complete tool execution lifecycle:
+    /// </para>
+    /// <list type="number">
+    /// <item><description>Validates tool existence and parameters</description></item>
+    /// <item><description>Emits tool call events for monitoring</description></item>
+    /// <item><description>Executes the tool with timeout handling</description></item>
+    /// <item><description>Captures execution metrics and timing</description></item>
+    /// <item><description>Handles errors and exceptions gracefully</description></item>
+    /// <item><description>Returns structured execution results</description></item>
+    /// </list>
+    /// <para>
+    /// The method includes comprehensive error handling and ensures that tool execution
+    /// errors don't crash the agent, allowing for graceful error recovery.
+    /// </para>
+    /// </remarks>
+    /// <exception cref="KeyNotFoundException">Thrown when the specified tool is not found.</exception>
+    /// <exception cref="OperationCanceledException">Thrown when the operation is cancelled or times out.</exception>
     public async Task<ToolExecutionResult> ExecuteToolAsync(string toolName, Dictionary<string, object?> parameters, IDictionary<string, ITool> tools, string agentId, int turnIndex, CancellationToken ct)
     {
         var dedupeId = HashToolCall(toolName, parameters);

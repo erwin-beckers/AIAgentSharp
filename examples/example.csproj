@@ -17,4 +17,8 @@
     <ProjectReference Include="..\src\AIAgentSharp\AIAgentSharp.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Properties\" />
+  </ItemGroup>
+
 </Project>

@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using AIAgentSharp.Agents.Interfaces;
 
 namespace AIAgentSharp;
 
@@ -57,4 +58,28 @@ public sealed class ModelMessage
     /// </summary>
     [JsonPropertyName("progress_pct")]
     public int? ProgressPct { get; set; }
+
+    /// <summary>
+    ///     Optional reasoning chain information for Chain of Thought reasoning.
+    /// </summary>
+    [JsonPropertyName("reasoning_chain")]
+    public ReasoningChain? ReasoningChain { get; set; }
+
+    /// <summary>
+    ///     Optional reasoning tree information for Tree of Thoughts reasoning.
+    /// </summary>
+    [JsonPropertyName("reasoning_tree")]
+    public ReasoningTree? ReasoningTree { get; set; }
+
+    /// <summary>
+    ///     Optional reasoning confidence score (0.0 to 1.0).
+    /// </summary>
+    [JsonPropertyName("reasoning_confidence")]
+    public double? ReasoningConfidence { get; set; }
+
+    /// <summary>
+    ///     Optional reasoning type used for this message.
+    /// </summary>
+    [JsonPropertyName("reasoning_type")]
+    public ReasoningType? ReasoningType { get; set; }
 }

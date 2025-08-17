@@ -8,10 +8,24 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.4">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
     <PackageReference Include="MSTest" Version="3.6.4" />
     <PackageReference Include="Moq" Version="4.20.70" />
   </ItemGroup>
+
+  <PropertyGroup>
+    <CollectCoverage>true</CollectCoverage>
+    <CoverletOutputFormat>cobertura</CoverletOutputFormat>
+    <CoverletOutput>./coverage/</CoverletOutput>
+    <ExcludeByFile>**/*Tests.cs,**/*Test.cs,**/obj/**/*,**/bin/**/*</ExcludeByFile>
+    <ExcludeByAttribute>Obsolete,GeneratedCodeAttribute,CompilerGeneratedAttribute</ExcludeByAttribute>
+    <SingleHit>false</SingleHit>
+    <IncludeTestAssembly>false</IncludeTestAssembly>
+  </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\AIAgentSharp\AIAgentSharp.csproj" />

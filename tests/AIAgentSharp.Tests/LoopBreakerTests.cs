@@ -22,6 +22,9 @@ public sealed class LoopBreakerTests
         {
             { "validation_tool", new ValidationTestTool() }
         };
+        
+        Console.WriteLine($"Setup: MockLlmClient created: {_llmClient.GetHashCode()}");
+        Console.WriteLine($"Setup: Agent created with LLM client: {_agent.GetHashCode()}");
     }
 
     [TestMethod]
@@ -309,6 +312,8 @@ public sealed class LoopBreakerTests
         Assert.IsTrue(agent2LastTurn.LlmMessage.Thoughts.Contains("You're repeating the same failing call"));
     }
 
+
+
     // Helper class for testing
     private class ValidationTestTool : ITool
     {
@@ -356,17 +361,37 @@ public sealed class LoopBreakerTests
 
         public Task<string> CompleteAsync(IEnumerable<LlmMessage> messages, CancellationToken ct = default)
         {
+            // Get the content from the first user message
+            var userMessage = messages.FirstOrDefault(m => m.Role == "user");
+            var prompt = userMessage?.Content ?? "";
+
+            // Handle reasoning-related prompts
+            if (prompt.Contains("analysis") || (prompt.Contains("reasoning") && !prompt.Contains("HISTORY")) || prompt.Contains("Chain of Thought") || 
+                prompt.Contains("Tree of Thoughts") || prompt.Contains("structured thinking"))
+            {
+                // Return a simple reasoning response for reasoning prompts
+                return Task.FromResult(@"{
+                    ""reasoning"": ""Analyzing the problem step by step..."",
+                    ""confidence"": 0.85,
+                    ""insights"": [""insight1"", ""insight2""],
+                    ""conclusion"": ""Proceed with the original plan""
+                }");
+            }
+
+            // Handle regular agent prompts
             if (_responses.Count == 0)
             {
                 throw new InvalidOperationException("No response set. Call SetNextResponse first.");
             }
 
-            return Task.FromResult(_responses.Dequeue());
+            var response = _responses.Dequeue();
+            return Task.FromResult(response);
         }
 
         public void SetNextResponse(string response)
         {
             _responses.Enqueue(response);
+            Console.WriteLine($"MockLlmClient queued response: {response}");
         }
     }
 }

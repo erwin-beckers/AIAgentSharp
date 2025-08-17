@@ -1,6 +1,7 @@
 ﻿using AIAgentSharp;
 using AIAgentSharp.Agents;
 using AIAgentSharp.Examples;
+using Examples;
 
 /// <summary>
 ///     Main program demonstrating the usage of the Agent framework.
@@ -17,6 +18,13 @@ internal class Program
     /// <exception cref="InvalidOperationException">Thrown when OPENAI_API_KEY environment variable is not set.</exception>
     private static async Task Main(string[] args)
     {
+        // Check for reasoning example flag
+        if (args.Contains("--reasoning"))
+        {
+            await ReasoningExample.RunAsync();
+            return;
+        }
+
         // Get OpenAI API key from environment variable
         var apiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY") ?? throw new InvalidOperationException("Set OPENAI_API_KEY env var.");
 

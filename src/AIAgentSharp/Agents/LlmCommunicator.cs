@@ -33,6 +33,28 @@ public sealed class LlmCommunicator : ILlmCommunicator
         _llmTimeout = config.LlmTimeout;
     }
 
+    /// <summary>
+    /// Calls the LLM with function calling support, enabling structured tool invocation.
+    /// </summary>
+    /// <param name="messages">The conversation messages to send to the LLM.</param>
+    /// <param name="functionSpecs">List of function specifications for available tools.</param>
+    /// <param name="agentId">Identifier of the agent making the call.</param>
+    /// <param name="turnIndex">Current turn index for event tracking.</param>
+    /// <param name="ct">Cancellation token for aborting the operation.</param>
+    /// <returns>
+    /// A <see cref="FunctionCallResult"/> containing the LLM response and any function call details.
+    /// </returns>
+    /// <remarks>
+    /// <para>
+    /// This method attempts to use function calling if the LLM client supports it. Function calling
+    /// provides more reliable tool selection and parameter extraction compared to the Re/Act pattern.
+    /// </para>
+    /// <para>
+    /// The method includes timeout handling and event emission for monitoring and debugging purposes.
+    /// </para>
+    /// </remarks>
+    /// <exception cref="InvalidOperationException">Thrown when the LLM client doesn't support function calling.</exception>
+    /// <exception cref="OperationCanceledException">Thrown when the operation is cancelled or times out.</exception>
     public async Task<FunctionCallResult> CallWithFunctionsAsync(IEnumerable<LlmMessage> messages, List<OpenAiFunctionSpec> functionSpecs, string agentId, int turnIndex, CancellationToken ct)
     {
         if (_llm is not IFunctionCallingLlmClient functionClient)
@@ -55,6 +77,35 @@ public sealed class LlmCommunicator : ILlmCommunicator
         return functionResult;
     }
 
+    /// <summary>
+    /// Calls the LLM and parses the response into a structured ModelMessage.
+    /// </summary>
+    /// <param name="messages">The conversation messages to send to the LLM.</param>
+    /// <param name="agentId">Identifier of the agent making the call.</param>
+    /// <param name="turnIndex">Current turn index for event tracking.</param>
+    /// <param name="turnId">Unique identifier for the current turn.</param>
+    /// <param name="state">Current agent state for error handling.</param>
+    /// <param name="ct">Cancellation token for aborting the operation.</param>
+    /// <returns>
+    /// A parsed <see cref="ModelMessage"/> or null if parsing failed.
+    /// </returns>
+    /// <remarks>
+    /// <para>
+    /// This method handles the complete LLM communication cycle:
+    /// </para>
+    /// <list type="number">
+    /// <item><description>Calls the LLM with timeout handling</description></item>
+    /// <item><description>Parses the JSON response</description></item>
+    /// <item><description>Handles parsing errors gracefully</description></item>
+    /// <item><description>Emits events for monitoring</description></item>
+    /// <item><description>Updates agent state with errors if needed</description></item>
+    /// </list>
+    /// <para>
+    /// If JSON parsing fails, the method creates an error turn in the agent state
+    /// and returns null, allowing the agent to continue with error recovery.
+    /// </para>
+    /// </remarks>
+    /// <exception cref="OperationCanceledException">Thrown when the operation is cancelled or times out.</exception>
     public async Task<ModelMessage?> CallLlmAndParseAsync(IEnumerable<LlmMessage> messages, string agentId, int turnIndex, string turnId, AgentState state, CancellationToken ct)
     {
         try

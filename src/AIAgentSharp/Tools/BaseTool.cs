@@ -236,6 +236,32 @@ public abstract class BaseTool<TParams, TResult> : ITool, IToolIntrospect, IFunc
     /// instead of this method to get the benefits of strongly-typed parameters.
     /// </para>
     /// </remarks>
+    /// <summary>
+    /// Invokes the tool with the provided parameters, handling validation, deserialization, and execution.
+    /// </summary>
+    /// <param name="parameters">Dictionary of parameters to pass to the tool.</param>
+    /// <param name="ct">Cancellation token for aborting the operation.</param>
+    /// <returns>
+    /// The result of the tool execution, or null if the operation was cancelled.
+    /// </returns>
+    /// <remarks>
+    /// <para>
+    /// This method provides the complete tool invocation lifecycle:
+    /// </para>
+    /// <list type="number">
+    /// <item><description>Validates required parameters are present</description></item>
+    /// <item><description>Deserializes parameters to strongly-typed objects</description></item>
+    /// <item><description>Applies DataAnnotations validation</description></item>
+    /// <item><description>Calls the abstract <see cref="InvokeTypedAsync(TParams, CancellationToken)"/> method</description></item>
+    /// <item><description>Returns the result for LLM consumption</description></item>
+    /// </list>
+    /// <para>
+    /// Tool implementations should override <see cref="InvokeTypedAsync(TParams, CancellationToken)"/>
+    /// instead of this method to get the benefits of strongly-typed parameters.
+    /// </para>
+    /// </remarks>
+    /// <exception cref="ToolValidationException">Thrown when parameter validation fails.</exception>
+    /// <exception cref="OperationCanceledException">Thrown when the operation is cancelled via <paramref name="ct"/>.</exception>
     public async Task<object?> InvokeAsync(Dictionary<string, object?> parameters, CancellationToken ct = default)
     {
         try

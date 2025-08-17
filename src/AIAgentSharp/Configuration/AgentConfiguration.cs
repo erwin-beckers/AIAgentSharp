@@ -1,3 +1,5 @@
+using AIAgentSharp.Agents.Interfaces;
+
 namespace AIAgentSharp;
 
 /// <summary>
@@ -514,4 +516,175 @@ public sealed class AgentConfiguration
     /// </code>
     /// </example>
     public int MaxToolOutputSize { get; init; } = 2000;
+
+    /// <summary>
+    /// Gets the type of reasoning to use for agent decision making.
+    /// </summary>
+    /// <value>
+    /// The reasoning type. Default is <see cref="ReasoningType.None"/>.
+    /// </value>
+    /// <remarks>
+    /// <para>
+    /// This setting determines the reasoning approach used by the agent for making
+    /// decisions and solving problems. Different reasoning types offer different
+    /// trade-offs between performance, accuracy, and computational complexity.
+    /// </para>
+    /// <para>
+    /// Available reasoning types:
+    /// - <strong>None</strong>: No reasoning (disabled)
+    /// - <strong>ChainOfThought</strong>: Linear step-by-step reasoning
+    /// - <strong>TreeOfThoughts</strong>: Branching exploration of multiple solution paths
+    /// - <strong>Hybrid</strong>: Combination of multiple reasoning approaches
+    /// </para>
+    /// </remarks>
+    /// <example>
+    /// <code>
+    /// var config = new AgentConfiguration { ReasoningType = ReasoningType.TreeOfThoughts };
+    /// </code>
+    /// </example>
+    public ReasoningType ReasoningType { get; init; } = ReasoningType.None;
+
+    /// <summary>
+    /// Gets the maximum number of reasoning steps allowed in a Chain of Thought.
+    /// </summary>
+    /// <value>
+    /// The maximum number of reasoning steps. Default is 10.
+    /// </value>
+    /// <remarks>
+    /// <para>
+    /// This setting limits the number of reasoning steps in a Chain of Thought
+    /// to prevent excessive computation and token usage.
+    /// </para>
+    /// <para>
+    /// Higher values allow for more detailed reasoning but increase costs and
+    /// execution time. Lower values are more efficient but may limit reasoning depth.
+    /// </para>
+    /// </remarks>
+    /// <example>
+    /// <code>
+    /// var config = new AgentConfiguration { MaxReasoningSteps = 15 };
+    /// </code>
+    /// </example>
+    public int MaxReasoningSteps { get; init; } = 10;
+
+    /// <summary>
+    /// Gets the maximum depth allowed in a Tree of Thoughts.
+    /// </summary>
+    /// <value>
+    /// The maximum tree depth. Default is 5.
+    /// </value>
+    /// <remarks>
+    /// <para>
+    /// This setting limits the depth of exploration in Tree of Thoughts reasoning
+    /// to prevent exponential growth in computation.
+    /// </para>
+    /// <para>
+    /// Higher values allow for deeper exploration but increase computational complexity.
+    /// Lower values are more efficient but may miss optimal solutions.
+    /// </para>
+    /// </remarks>
+    /// <example>
+    /// <code>
+    /// var config = new AgentConfiguration { MaxTreeDepth = 8 };
+    /// </code>
+    /// </example>
+    public int MaxTreeDepth { get; init; } = 5;
+
+    /// <summary>
+    /// Gets the maximum number of nodes allowed in a Tree of Thoughts.
+    /// </summary>
+    /// <value>
+    /// The maximum number of tree nodes. Default is 50.
+    /// </value>
+    /// <remarks>
+    /// <para>
+    /// This setting limits the total number of nodes in a Tree of Thoughts
+    /// to prevent excessive memory usage and computation.
+    /// </para>
+    /// <para>
+    /// Higher values allow for more extensive exploration but increase resource usage.
+    /// Lower values are more efficient but may limit solution space exploration.
+    /// </para>
+    /// </remarks>
+    /// <example>
+    /// <code>
+    /// var config = new AgentConfiguration { MaxTreeNodes = 100 };
+    /// </code>
+    /// </example>
+    public int MaxTreeNodes { get; init; } = 50;
+
+    /// <summary>
+    /// Gets the exploration strategy for Tree of Thoughts reasoning.
+    /// </summary>
+    /// <value>
+    /// The exploration strategy. Default is <see cref="ExplorationStrategy.BestFirst"/>.
+    /// </value>
+    /// <remarks>
+    /// <para>
+    /// This setting determines how the Tree of Thoughts explores different solution paths.
+    /// Different strategies offer different trade-offs between exploration and exploitation.
+    /// </para>
+    /// <para>
+    /// Available strategies:
+    /// - <strong>BestFirst</strong>: Explore the most promising paths first (default)
+    /// - <strong>BreadthFirst</strong>: Explore all paths at the same depth before going deeper
+    /// - <strong>DepthFirst</strong>: Explore one path to maximum depth before backtracking
+    /// - <strong>BeamSearch</strong>: Maintain a limited set of most promising paths
+    /// - <strong>MonteCarlo</strong>: Use random sampling for exploration
+    /// </para>
+    /// </remarks>
+    /// <example>
+    /// <code>
+    /// var config = new AgentConfiguration { TreeExplorationStrategy = ExplorationStrategy.BeamSearch };
+    /// </code>
+    /// </example>
+    public ExplorationStrategy TreeExplorationStrategy { get; init; } = ExplorationStrategy.BestFirst;
+
+    /// <summary>
+    /// Gets a value indicating whether to enable reasoning validation.
+    /// </summary>
+    /// <value>
+    /// <c>true</c> if reasoning validation is enabled; otherwise, <c>false</c>.
+    /// Default is <c>true</c>.
+    /// </value>
+    /// <remarks>
+    /// <para>
+    /// When enabled, the agent will validate the quality and completeness of its
+    /// reasoning process to ensure reliable decision making.
+    /// </para>
+    /// <para>
+    /// Validation includes checking for logical consistency, completeness of analysis,
+    /// and confidence levels in conclusions.
+    /// </para>
+    /// </remarks>
+    /// <example>
+    /// <code>
+    /// var config = new AgentConfiguration { EnableReasoningValidation = false };
+    /// </code>
+    /// </example>
+    public bool EnableReasoningValidation { get; init; } = true;
+
+    /// <summary>
+    /// Gets the minimum confidence threshold for accepting reasoning conclusions.
+    /// </summary>
+    /// <value>
+    /// The minimum confidence threshold (0.0 to 1.0). Default is 0.7.
+    /// </value>
+    /// <remarks>
+    /// <para>
+    /// This setting determines the minimum confidence level required for the agent
+    /// to accept and act on its reasoning conclusions.
+    /// </para>
+    /// <para>
+    /// Higher values ensure more reliable decisions but may cause the agent to
+    /// be overly cautious. Lower values allow more aggressive decision making
+    /// but may lead to less reliable outcomes.
+    /// </para>
+    /// </remarks>
+    /// <example>
+    /// <code>
+    /// var config = new AgentConfiguration { MinReasoningConfidence = 0.8 };
+    /// </code>
+    /// </example>
+    public double MinReasoningConfidence { get; init; } = 0.7;
 }
