@@ -28,28 +28,6 @@ jobs:
     - name: Run tests
       run: dotnet test --no-build --verbosity normal --configuration Release --logger trx --results-directory ./test-results
       
-    - name: Publish test results
-      uses: dorny/test-reporter@v1
-      if: always()
-      with:
-        name: MSTest Test Results
-        path: ./test-results/*.trx
-        reporter: trx
-        
-    - name: Upload test results
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: test-results
-        path: ./test-results/
-        retention-days: 30
-        
-    - name: Upload test results to Codecov
-      if: ${{ !cancelled() }}
-      uses: codecov/test-results-action@v1
-      with:
-        token: ${{ secrets.CODECOV_TOKEN }}
-        
   coverage:
     runs-on: ubuntu-latest
     
