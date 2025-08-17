@@ -18,7 +18,7 @@ A comprehensive, production-ready .NET 8.0 framework for building LLM-powered ag
 - **📝 History Management**: Configurable history summarization to manage prompt size
 - **⚡ Performance Optimized**: Efficient token management and prompt optimization
 - **🔒 Thread Safe**: Thread-safe implementations for production use
-- **🧪 Test Coverage**: Comprehensive test suite with 290+ tests
+- **🧪 Test Coverage**: Comprehensive test suite with 400+ tests
 
 ### 🧠 Advanced Reasoning Features
 
@@ -578,7 +578,7 @@ Run the comprehensive test suite:
 dotnet test
 ```
 
-The framework includes 300+ tests covering:
+The framework includes 400+ tests covering:
 - Agent execution and state management
 - Reasoning engines (Chain of Thought, Tree of Thoughts, Hybrid)
 - Tool framework and validation

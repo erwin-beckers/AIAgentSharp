@@ -105,7 +105,11 @@ public sealed class LoopDetector : ILoopDetector
                         break;
                     }
                 }
-                // Continue scanning even if we hit different tools to catch interleaved failures
+                else if (call.Success)
+                {
+                    // Found a successful call for a different tool, reset counter
+                    break;
+                }
             }
 
             return false;

@@ -12,7 +12,7 @@ public sealed class MessageBuilder : IMessageBuilder
 
     public MessageBuilder(AgentConfiguration config)
     {
-        _config = config;
+        _config = config ?? throw new NullReferenceException(nameof(config));
     }
 
     public IEnumerable<LlmMessage> BuildMessages(AgentState state, IDictionary<string, ITool> tools)
@@ -160,6 +160,7 @@ public sealed class MessageBuilder : IMessageBuilder
         }
 
         // Create a truncated copy
+        var previewLength = Math.Max(1, maxOutputSize - 20); // Ensure we have at least 1 character for preview
         var truncatedResult = new ToolExecutionResult
         {
             Success = result.Success,
@@ -169,7 +170,7 @@ public sealed class MessageBuilder : IMessageBuilder
             TurnId = result.TurnId,
             ExecutionTime = result.ExecutionTime,
             CreatedUtc = result.CreatedUtc,
-            Output = new { truncated = true, original_size = outputJson.Length, preview = outputJson.Substring(0, maxOutputSize - 100) + "..." }
+            Output = new { truncated = true, original_size = outputJson.Length, preview = outputJson.Substring(0, previewLength) + "..." }
         };
 
         return truncatedResult;

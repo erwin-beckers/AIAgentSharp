@@ -63,65 +63,81 @@ public static class SchemaGenerator
                 {
                     // For anonymous objects, create a new dictionary with union type
                     var baseType = GetBaseTypeFromSchema(baseSchema);
-                    return new Dictionary<string, object> { ["type"] = new[] { baseType, "null" } };
+                    var result = new Dictionary<string, object> { ["type"] = new[] { baseType, "null" } };
+                    
+                    // Preserve format property for nullable types
+                    if (underlyingType == typeof(DateTime) || underlyingType == typeof(DateTimeOffset))
+                    {
+                        result["format"] = "date-time";
+                    }
+                    else if (underlyingType == typeof(Guid))
+                    {
+                        result["format"] = "uuid";
+                    }
+                    else if (underlyingType == typeof(Uri))
+                    {
+                        result["format"] = "uri";
+                    }
+                    
+                    return result;
                 }
             }
 
             // Handle base types
             if (type == typeof(string))
             {
-                return new { type = new[] { "string", "null" } }; // Assume string is nullable in tool context
+                return new Dictionary<string, object> { ["type"] = new[] { "string", "null" } }; // Assume string is nullable in tool context
             }
 
             if (type == typeof(int) || type == typeof(long))
             {
-                return new { type = "integer" };
+                return new Dictionary<string, object> { ["type"] = "integer" };
             }
 
             if (type == typeof(double) || type == typeof(float) || type == typeof(decimal))
             {
-                return new { type = "number" };
+                return new Dictionary<string, object> { ["type"] = "number" };
             }
 
             if (type == typeof(bool))
             {
-                return new { type = "boolean" };
+                return new Dictionary<string, object> { ["type"] = "boolean" };
             }
 
             if (type == typeof(DateTime) || type == typeof(DateTimeOffset))
             {
-                return new { type = "string", format = "date-time" };
+                return new Dictionary<string, object> { ["type"] = "string", ["format"] = "date-time" };
             }
 
             if (type == typeof(Guid))
             {
-                return new { type = "string", format = "uuid" };
+                return new Dictionary<string, object> { ["type"] = "string", ["format"] = "uuid" };
             }
 
             if (type == typeof(Uri))
             {
-                return new { type = "string", format = "uri" };
+                return new Dictionary<string, object> { ["type"] = new[] { "string", "null" }, ["format"] = "uri" };
             }
 
             // Handle enums
             if (type.IsEnum)
             {
                 var enumValues = Enum.GetValues(type).Cast<object>().Select(v => v.ToString()).ToArray();
-                return new { type = "string", @enum = enumValues };
+                return new Dictionary<string, object> { ["type"] = "string", ["enum"] = enumValues };
             }
 
             // Handle arrays and lists
             if (type.IsArray)
             {
                 var elementType = type.GetElementType()!;
-                return new { type = "array", items = GenerateSchema(elementType, visited) };
+                return new Dictionary<string, object> { ["type"] = "array", ["items"] = GenerateSchema(elementType, visited) };
             }
 
             if (type.IsGenericType && (type.GetGenericTypeDefinition() == typeof(List<>) || type.GetGenericTypeDefinition() == typeof(IList<>) ||
                                        type.GetGenericTypeDefinition() == typeof(IEnumerable<>)))
             {
                 var elementType = type.GetGenericArguments()[0];
-                return new { type = "array", items = GenerateSchema(elementType, visited) };
+                return new Dictionary<string, object> { ["type"] = "array", ["items"] = GenerateSchema(elementType, visited) };
             }
 
             // Handle dictionaries
@@ -132,7 +148,7 @@ public static class SchemaGenerator
 
                 if (keyType == typeof(string))
                 {
-                    return new { type = "object", additionalProperties = GenerateSchema(valueType, visited) };
+                    return new Dictionary<string, object> { ["type"] = "object", ["additionalProperties"] = GenerateSchema(valueType, visited) };
                 }
             }
 
@@ -180,7 +196,7 @@ public static class SchemaGenerator
             }
 
             // Fallback
-            return new { type = "object" };
+            return new Dictionary<string, object> { ["type"] = "object" };
         }
         finally
         {
