@@ -447,3 +447,4 @@ agent_state/
 Properties/launchSettings.json
 /examples/Properties/launchSettings.json
 /coverage
+*.nupkg
