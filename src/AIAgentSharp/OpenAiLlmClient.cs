@@ -2,6 +2,7 @@
 
 using AIAgentSharp;
 using OpenAI.Chat;
+using System.Text.Json;
 
 /// <summary>
 ///     OpenAI LLM client implementation that integrates with the OpenAI SDK.
@@ -42,7 +43,6 @@ public sealed class OpenAiLlmClient : ILlmClient, IFunctionCallingLlmClient
 
     /// <summary>
     ///     Completes a conversation with function calling capabilities.
-    ///     Note: This is a simplified implementation that falls back to regular completion.
     /// </summary>
     /// <param name="messages">The conversation messages to send to the LLM.</param>
     /// <param name="functions">The available functions that the LLM can call.</param>

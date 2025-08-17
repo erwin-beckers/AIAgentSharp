@@ -1,9 +1,11 @@
 ﻿using AIAgentSharp;
+using AIAgentSharp.Agents;
+using AIAgentSharp.Examples;
 
 /// <summary>
 ///     Main program demonstrating the usage of the Agent framework.
 ///     This example shows how to create an agent, configure it, subscribe to events,
-///     and run it with a specific goal and tools.
+///     and run it with a specific goal and tools for travel planning.
 /// </summary>
 internal class Program
 {
@@ -24,9 +26,15 @@ internal class Program
         // Create the appropriate state store
         IAgentStateStore store = useMemoryStore ? new MemoryAgentStateStore() : new FileAgentStateStore("./agent_state");
 
-        // Create LLM client and tools
+        // Create LLM client and travel planning tools
         ILlmClient llm = new OpenAiLlmClient(apiKey);
-        var tools = new List<ITool> { new ConcatTool(), new GetIndicatorTool() };
+        var tools = new List<ITool> 
+        { 
+            new SearchFlightsTool(),
+            new SearchHotelsTool(),
+            new SearchAttractionsTool(),
+            new CalculateTripCostTool()
+        };
 
         // Configure the agent
         var config = new AgentConfiguration
@@ -35,7 +43,7 @@ internal class Program
             UseFunctionCalling = true,
             EmitPublicStatus = true // Enable public status updates
         };
-        var agent = new AIAgentSharp.AIAgentSharp(llm, store, config: config);
+        var agent = new Agent(llm, store, config: config);
 
         // Subscribe to events for real-time monitoring
         agent.RunStarted += (sender, e) => Console.WriteLine($"[EVENT] Run started for {e.AgentId} with goal: {e.Goal}");
@@ -49,7 +57,7 @@ internal class Program
         agent.StatusUpdate += (sender, e) =>
         {
             Console.WriteLine();
-            Console.WriteLine($"🔄 STATUS UPDATE (Turn {e.TurnIndex + 1}): {e.StatusTitle}");
+            Console.WriteLine($"STATUS UPDATE (Turn {e.TurnIndex + 1}): {e.StatusTitle}");
 
             if (!string.IsNullOrEmpty(e.StatusDetails))
             {
@@ -95,17 +103,29 @@ internal class Program
             }
         };
 
-        // Define the goal for the agent
-        var goal = "Draft a minimal risk plan for MNQ using RSI (14) and ATR (14). " +
-                   "First fetch the current RSI and ATR values using the get_indicator tool, then provide a risk assessment.";
+        // Define the travel planning goal for the agent
+        var goal = "Plan a 3-day trip to Paris for a couple with a budget of $2000. " +
+                   "Search for flights from JFK to CDG, find a hotel for 3 nights, and suggest activities. " +
+                   "Create a complete itinerary with costs and ensure it stays within budget.";
+
+        Console.WriteLine("🌍 AI Travel Planning Agent");
+        Console.WriteLine("==========================");
+        Console.WriteLine($"Goal: {goal}");
+        Console.WriteLine();
 
         // Run the agent
-        var result = await agent.RunAsync("demo-session-1", goal, tools);
+        var result = await agent.RunAsync("travel-planning-session", goal, tools);
 
         // Display the final results
-        Console.WriteLine("=== RUN RESULT ===");
+        Console.WriteLine();
+        Console.WriteLine("=== TRAVEL PLANNING RESULT ===");
         Console.WriteLine($"Succeeded: {result.Succeeded}");
-        Console.WriteLine($"Error:     {result.Error}");
-        Console.WriteLine($"Final:     {result.FinalOutput}");
+        if (!string.IsNullOrEmpty(result.Error))
+        {
+            Console.WriteLine($"Error:     {result.Error}");
+        }
+        Console.WriteLine();
+        Console.WriteLine("📋 FINAL ITINERARY:");
+        Console.WriteLine(result.FinalOutput);
     }
 }

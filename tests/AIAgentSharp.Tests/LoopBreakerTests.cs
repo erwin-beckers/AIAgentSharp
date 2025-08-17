@@ -1,11 +1,12 @@
 using System.Text.Json;
+using AIAgentSharp.Agents;
 
 namespace AIAgentSharp.Tests;
 
 [TestClass]
 public sealed class LoopBreakerTests
 {
-    private AIAgentSharp _agent = null!;
+    private Agent _agent = null!;
     private MockLlmClient _llmClient = null!;
     private MemoryAgentStateStore _stateStore = null!;
     private Dictionary<string, ITool> _tools = null!;
@@ -16,7 +17,7 @@ public sealed class LoopBreakerTests
         _llmClient = new MockLlmClient();
         _stateStore = new MemoryAgentStateStore();
         var config = new AgentConfiguration { UseFunctionCalling = false };
-        _agent = new AIAgentSharp(_llmClient, _stateStore, config: config);
+        _agent = new Agent(_llmClient, _stateStore, config: config);
         _tools = new Dictionary<string, ITool>
         {
             { "validation_tool", new ValidationTestTool() }

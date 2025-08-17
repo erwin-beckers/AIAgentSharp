@@ -271,10 +271,10 @@ agent.RunCompleted += (sender, e) =>
 
 For comprehensive documentation, see:
 
-- **[Complete API Documentation](DOCUMENTATION.md)** - Detailed documentation covering all components, architecture, and usage examples
-- **[API Reference](DOCUMENTATION.md#api-reference)** - Complete API reference with examples
-- **[Advanced Features](DOCUMENTATION.md#advanced-features)** - Loop detection, history summarization, and more
-- **[Performance Considerations](DOCUMENTATION.md#performance-considerations)** - Optimization tips and best practices
+- **[Complete API Documentation](../DOCUMENTATION.md)** - Detailed documentation covering all components, architecture, and usage examples
+- **[API Reference](../DOCUMENTATION.md#api-reference)** - Complete API reference with examples
+- **[Advanced Features](../DOCUMENTATION.md#advanced-features)** - Loop detection, history summarization, and more
+- **[Performance Considerations](../DOCUMENTATION.md#performance-considerations)** - Optimization tips and best practices
 
 ## 🔧 Configuration
 
@@ -330,7 +330,7 @@ The framework includes 280+ tests covering:
 
 ## 🤝 Contributing
 
-We welcome contributions! Please see our [Contributing Guidelines](DOCUMENTATION.md#contributing) for details.
+We welcome contributions! Please see our [Contributing Guidelines](../DOCUMENTATION.md#contributing) for details.
 
 ### Development Setup
 
@@ -357,7 +357,7 @@ We welcome contributions! Please see our [Contributing Guidelines](DOCUMENTATION
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License - see the [LICENSE](../LICENSE) file for details.
 
 ## 🙏 Acknowledgments
 

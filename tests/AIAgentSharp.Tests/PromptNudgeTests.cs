@@ -1,3 +1,5 @@
+using AIAgentSharp.Agents;
+
 namespace AIAgentSharp.Tests;
 
 [TestClass]
@@ -27,7 +29,8 @@ public sealed class PromptNudgeTests
         };
 
         // Act
-        var messages = AIAgentSharp.BuildMessages(state, tools, new AgentConfiguration()).ToList();
+        var messageBuilder = new MessageBuilder(new AgentConfiguration());
+        var messages = messageBuilder.BuildMessages(state, tools).ToList();
 
         // Assert
         Assert.AreEqual(2, messages.Count); // System and user messages
@@ -53,7 +56,8 @@ public sealed class PromptNudgeTests
         };
 
         // Act
-        var messages = AIAgentSharp.BuildMessages(state, tools, new AgentConfiguration()).ToList();
+        var messageBuilder = new MessageBuilder(new AgentConfiguration());
+        var messages = messageBuilder.BuildMessages(state, tools).ToList();
         var userMessage = messages[1];
 
         // Assert - The nudge should appear near the end of the message

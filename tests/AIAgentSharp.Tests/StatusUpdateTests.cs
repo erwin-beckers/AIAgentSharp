@@ -1,9 +1,11 @@
+using AIAgentSharp.Agents;
+
 namespace AIAgentSharp.Tests;
 
 [TestClass]
 public sealed class StatusUpdateTests
 {
-    private AIAgentSharp _agent = null!;
+    private Agent _agent = null!;
     private MockLlmClient _llm = null!;
     private TestLogger _logger = null!;
     private List<AgentStatusEventArgs> _statusEvents = null!;
@@ -23,7 +25,7 @@ public sealed class StatusUpdateTests
     {
         // Arrange
         var config = new AgentConfiguration { EmitPublicStatus = false };
-        _agent = new AIAgentSharp(_llm, _store, _logger, config);
+        _agent = new Agent(_llm, _store, _logger, config);
         _agent.StatusUpdate += (sender, e) => _statusEvents.Add(e);
 
         // Act
@@ -39,7 +41,7 @@ public sealed class StatusUpdateTests
     {
         // Arrange
         var config = new AgentConfiguration { EmitPublicStatus = true };
-        _agent = new AIAgentSharp(_llm, _store, _logger, config);
+        _agent = new Agent(_llm, _store, _logger, config);
         _agent.StatusUpdate += (sender, e) => _statusEvents.Add(e);
 
         // Act
@@ -57,7 +59,7 @@ public sealed class StatusUpdateTests
     {
         // Arrange
         var config = new AgentConfiguration { EmitPublicStatus = true };
-        _agent = new AIAgentSharp(_llm, _store, _logger, config);
+        _agent = new Agent(_llm, _store, _logger, config);
         _agent.StatusUpdate += (sender, e) => _statusEvents.Add(e);
 
         var response = @"{
@@ -87,7 +89,7 @@ public sealed class StatusUpdateTests
     {
         // Arrange
         var config = new AgentConfiguration { EmitPublicStatus = true };
-        _agent = new AIAgentSharp(_llm, _store, _logger, config);
+        _agent = new Agent(_llm, _store, _logger, config);
         _agent.StatusUpdate += (sender, e) => _statusEvents.Add(e);
 
         var longTitle = new string('x', 100); // Over 60 char limit
@@ -122,7 +124,7 @@ public sealed class StatusUpdateTests
     {
         // Arrange
         var config = new AgentConfiguration { EmitPublicStatus = true };
-        _agent = new AIAgentSharp(_llm, _store, _logger, config);
+        _agent = new Agent(_llm, _store, _logger, config);
         _agent.StatusUpdate += (sender, e) => _statusEvents.Add(e);
 
         // Act - LLM response without status fields
@@ -140,7 +142,7 @@ public sealed class StatusUpdateTests
     {
         // Arrange
         var config = new AgentConfiguration { EmitPublicStatus = true };
-        _agent = new AIAgentSharp(_llm, _store, _logger, config);
+        _agent = new Agent(_llm, _store, _logger, config);
         _agent.StatusUpdate += (sender, e) => _statusEvents.Add(e);
 
         var tool = new RequiredParamTool();
@@ -161,21 +163,21 @@ public sealed class StatusUpdateTests
     {
         // Arrange
         var config = new AgentConfiguration { EmitPublicStatus = true };
-        _agent = new AIAgentSharp(_llm, _store, _logger, config);
+        _agent = new Agent(_llm, _store, _logger, config);
         _agent.StatusUpdate += (sender, e) => _statusEvents.Add(e);
 
-        var tool = new ConcatTool();
+        var tool = new MockConcatTool();
         var tools = new[] { tool };
 
         // Act - Valid tool call
-        _llm.SetResponse(@"{""thoughts"":""test"",""action"":""tool_call"",""action_input"":{""tool"":""concat"",""params"":{""items"":[""hello"",""world""]}}}");
+        _llm.SetResponse(@"{""thoughts"":""test"",""action"":""tool_call"",""action_input"":{""tool"":""concat"",""params"":{""strings"":[""hello"",""world""]}}}");
         var result = _agent.StepAsync("test-agent", "test goal", tools).Result;
 
         // Assert
         Assert.IsTrue(result.ExecutedTool, "Tool should still be executed");
         Assert.IsTrue(result.Continue, "Should continue execution");
         Assert.IsNotNull(result.ToolResult, "Should have tool result");
-        Assert.IsTrue(result.ToolResult!.Success, "Tool should succeed");
+        Assert.IsTrue(result.ToolResult.Success, "Tool should succeed");
     }
 
     [TestMethod]
@@ -183,7 +185,7 @@ public sealed class StatusUpdateTests
     {
         // Arrange
         var config = new AgentConfiguration { EmitPublicStatus = true };
-        _agent = new AIAgentSharp(_llm, _store, _logger, config);
+        _agent = new Agent(_llm, _store, _logger, config);
 
         // Add event handler that throws exception
         _agent.StatusUpdate += (sender, e) => throw new InvalidOperationException("Test exception");
@@ -206,7 +208,8 @@ public sealed class StatusUpdateTests
         var tools = new Dictionary<string, ITool>();
 
         // Act
-        var messages = AIAgentSharp.BuildMessages(state, tools, config).ToList();
+        var messageBuilder = new MessageBuilder(config);
+        var messages = messageBuilder.BuildMessages(state, tools).ToList();
 
         // Assert
         var userMessage = messages.FirstOrDefault(m => m.Role == "user");
@@ -225,7 +228,8 @@ public sealed class StatusUpdateTests
         var tools = new Dictionary<string, ITool>();
 
         // Act
-        var messages = AIAgentSharp.BuildMessages(state, tools, config).ToList();
+        var messageBuilder = new MessageBuilder(config);
+        var messages = messageBuilder.BuildMessages(state, tools).ToList();
 
         // Assert
         var userMessage = messages.FirstOrDefault(m => m.Role == "user");

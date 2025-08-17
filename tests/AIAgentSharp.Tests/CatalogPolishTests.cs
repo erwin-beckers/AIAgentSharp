@@ -1,4 +1,5 @@
 using System.Text.Json;
+using AIAgentSharp.Agents;
 
 namespace AIAgentSharp.Tests;
 
@@ -6,35 +7,31 @@ namespace AIAgentSharp.Tests;
 public sealed class CatalogPolishTests
 {
     [TestMethod]
-    public void ConcatTool_Describe_ContainsRequiredAndExample()
+    public void MockConcatTool_Describe_ContainsRequiredAndExample()
     {
         // Arrange
-        var tool = new ConcatTool();
+        var tool = new MockConcatTool();
 
         // Act
         var description = tool.Describe();
 
         // Assert
-        Assert.IsTrue(description.Contains("\"required\":[\"items\"]"));
-        Assert.IsTrue(description.Contains("\"example\":[\"hello\",\"world\"]"));
-        Assert.IsTrue(description.Contains("\"example\":\", \""));
+        Assert.IsTrue(description.Contains("\"required\":[\"strings\"]"));
+        Assert.IsTrue(description.Contains("\"type\":\"array\""));
     }
 
     [TestMethod]
-    public void GetIndicatorTool_Describe_ContainsRequiredEnumAndExample()
+    public void MockValidationTool_Describe_ContainsRequiredAndExample()
     {
         // Arrange
-        var tool = new GetIndicatorTool();
+        var tool = new MockValidationTool();
 
         // Act
         var description = tool.Describe();
 
         // Assert
-        Assert.IsTrue(description.Contains("\"required\":[\"indicator\",\"period\",\"symbol\"]"));
-        // No longer an enum, now a string type
-        Assert.IsTrue(description.Contains("\"example\":\"MNQ\""));
-        Assert.IsTrue(description.Contains("\"example\":\"RSI\""));
-        Assert.IsTrue(description.Contains("\"example\":14"));
+        Assert.IsTrue(description.Contains("\"required\":[\"input\",\"rules\"]"));
+        Assert.IsTrue(description.Contains("\"type\":[\"string\",\"null\"]"));
     }
 
     [TestMethod]
@@ -50,100 +47,87 @@ public sealed class CatalogPolishTests
 
         var tools = new Dictionary<string, ITool>
         {
-            { "concat", new ConcatTool() },
-            { "get_indicator", new GetIndicatorTool() }
+            { "concat", new MockConcatTool() },
+            { "validate_input", new MockValidationTool() }
         };
 
         // Act
-        var messages = AIAgentSharp.BuildMessages(state, tools, new AgentConfiguration()).ToList();
+        var messageBuilder = new MessageBuilder(new AgentConfiguration());
+        var messages = messageBuilder.BuildMessages(state, tools).ToList();
         var userMessage = messages[1];
 
         // Assert
         Assert.IsTrue(userMessage.Content.Contains("concat:"));
-        Assert.IsTrue(userMessage.Content.Contains("get_indicator:"));
+        Assert.IsTrue(userMessage.Content.Contains("validate_input:"));
         Assert.IsTrue(userMessage.Content.Contains("\"required\""));
-        Assert.IsTrue(userMessage.Content.Contains("\"example\":"));
-        // No longer checking for enum since indicator is now a string
     }
 
     [TestMethod]
-    public void ToolCatalog_ConcatTool_CompleteDescription()
+    public void ToolCatalog_MockConcatTool_CompleteDescription()
     {
         // Arrange
-        var tool = new ConcatTool();
+        var tool = new MockConcatTool();
 
         // Act
         var description = tool.Describe();
 
         // Assert - Check for all required elements
         Assert.IsTrue(description.Contains("\"name\":\"concat\""));
-        Assert.IsTrue(description.Contains("\"description\":\"Concatenate strings with a separator.\""));
+        Assert.IsTrue(description.Contains("\"description\":\"Concatenate multiple strings together\""));
         Assert.IsTrue(description.Contains("\"type\":\"array\""));
-        Assert.IsTrue(description.Contains("\"type\":\"string\""));
-        Assert.IsTrue(description.Contains("\"required\":[\"items\"]"));
-        Assert.IsTrue(description.Contains("\"example\":[\"hello\",\"world\"]"));
-        Assert.IsTrue(description.Contains("\"example\":\", \""));
+        Assert.IsTrue(description.Contains("\"required\":[\"strings\"]"));
     }
 
     [TestMethod]
-    public void ToolCatalog_GetIndicatorTool_CompleteDescription()
+    public void ToolCatalog_MockValidationTool_CompleteDescription()
     {
         // Arrange
-        var tool = new GetIndicatorTool();
+        var tool = new MockValidationTool();
 
         // Act
         var description = tool.Describe();
 
         // Assert - Check for all required elements
-        Assert.IsTrue(description.Contains("\"name\":\"get_indicator\""));
-        Assert.IsTrue(description.Contains("\"description\":\"Fetch a single indicator value for a symbol.\""));
-        Assert.IsTrue(description.Contains("\"type\":[\"string\",\"null\"]") || description.Contains("\"type\":\"string\""));
-        Assert.IsTrue(description.Contains("\"type\":\"integer\""));
-        // No longer an enum, now a string type
-        Assert.IsTrue(description.Contains("\"minimum\":1"));
-        Assert.IsTrue(description.Contains("\"required\":[\"indicator\",\"period\",\"symbol\"]"));
-        Assert.IsTrue(description.Contains("\"example\":\"MNQ\""));
-        Assert.IsTrue(description.Contains("\"example\":\"RSI\""));
-        Assert.IsTrue(description.Contains("\"example\":14"));
+        Assert.IsTrue(description.Contains("\"name\":\"validate_input\""));
+        Assert.IsTrue(description.Contains("\"description\":\"Validate input data with custom rules\""));
+        Assert.IsTrue(description.Contains("\"type\":[\"string\",\"null\"]"));
+        Assert.IsTrue(description.Contains("\"required\":[\"input\",\"rules\"]"));
     }
 
     [TestMethod]
     public void ToolCatalog_JsonSchema_ConsistentWithDescribe()
     {
         // Arrange
-        var concatTool = new ConcatTool();
-        var indicatorTool = new GetIndicatorTool();
+        var concatTool = new MockConcatTool();
+        var validationTool = new MockValidationTool();
 
         // Act
         var concatSchema = concatTool.GetJsonSchema();
-        var indicatorSchema = indicatorTool.GetJsonSchema();
+        var validationSchema = validationTool.GetJsonSchema();
 
         // Assert - Verify that the JSON schema is consistent with the Describe method
         var concatSchemaJson = JsonSerializer.Serialize(concatSchema);
-        var indicatorSchemaJson = JsonSerializer.Serialize(indicatorSchema);
+        var validationSchemaJson = JsonSerializer.Serialize(validationSchema);
 
         Assert.IsTrue(concatSchemaJson.Contains("\"required\""));
-        Assert.IsTrue(indicatorSchemaJson.Contains("\"required\""));
-        // No longer an enum, now a string type
-        Assert.IsTrue(indicatorSchemaJson.Contains("\"minimum\""));
+        Assert.IsTrue(validationSchemaJson.Contains("\"required\""));
     }
 
     [TestMethod]
     public void ToolCatalog_Examples_AreValid()
     {
         // Arrange
-        var concatTool = new ConcatTool();
-        var indicatorTool = new GetIndicatorTool();
+        var concatTool = new MockConcatTool();
+        var validationTool = new MockValidationTool();
 
-        // Act & Assert - Verify that the examples in the descriptions are valid
+        // Act & Assert - Verify that the descriptions are valid
         var concatDescription = concatTool.Describe();
-        var indicatorDescription = indicatorTool.Describe();
+        var validationDescription = validationTool.Describe();
 
-        // Check that examples are properly formatted JSON
-        Assert.IsTrue(concatDescription.Contains("\"example\":[\"hello\",\"world\"]"));
-        Assert.IsTrue(concatDescription.Contains("\"example\":\", \""));
-        Assert.IsTrue(indicatorDescription.Contains("\"example\":\"MNQ\""));
-        Assert.IsTrue(indicatorDescription.Contains("\"example\":\"RSI\""));
-        Assert.IsTrue(indicatorDescription.Contains("\"example\":14"));
+        // Check that descriptions are properly formatted JSON
+        Assert.IsTrue(concatDescription.Contains("\"name\":\"concat\""));
+        Assert.IsTrue(validationDescription.Contains("\"name\":\"validate_input\""));
     }
+
+
 }

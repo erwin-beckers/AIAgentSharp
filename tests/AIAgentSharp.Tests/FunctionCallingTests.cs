@@ -1,4 +1,5 @@
 using System.Text.Json;
+using AIAgentSharp.Agents;
 
 namespace AIAgentSharp.Tests;
 
@@ -9,21 +10,21 @@ public class FunctionCallingTests
     public void Tools_ImplementIFunctionSchemaProvider()
     {
         // Arrange & Act
-        var concatTool = new ConcatTool();
-        var indicatorTool = new GetIndicatorTool();
+        var concatTool = new MockConcatTool();
+        var validationTool = new MockValidationTool();
 
         // Assert
         Assert.IsTrue(concatTool is IFunctionSchemaProvider);
-        Assert.IsTrue(indicatorTool is IFunctionSchemaProvider);
+        Assert.IsTrue(validationTool is IFunctionSchemaProvider);
         Assert.AreEqual("concat", concatTool.Name);
-        Assert.AreEqual("get_indicator", indicatorTool.Name);
+        Assert.AreEqual("validate_input", validationTool.Name);
     }
 
     [TestMethod]
-    public void ConcatTool_GetJsonSchema_ReturnsValidSchema()
+    public void MockConcatTool_GetJsonSchema_ReturnsValidSchema()
     {
         // Arrange
-        var tool = new ConcatTool();
+        var tool = new MockConcatTool();
 
         // Act
         var schema = tool.GetJsonSchema();
@@ -36,22 +37,20 @@ public class FunctionCallingTests
 
         Assert.AreEqual("object", root.GetProperty("type").GetString());
         Assert.IsTrue(root.TryGetProperty("properties", out var properties));
-        Assert.IsTrue(properties.TryGetProperty("items", out var items));
-        Assert.IsTrue(properties.TryGetProperty("sep", out var sep));
+        Assert.IsTrue(properties.TryGetProperty("strings", out var strings));
 
-        Assert.AreEqual("array", items.GetProperty("type").GetString());
-        Assert.AreEqual("string", sep.GetProperty("type").GetString());
+        Assert.AreEqual("array", strings.GetProperty("type").GetString());
 
         var required = root.GetProperty("required");
         Assert.AreEqual(1, required.GetArrayLength());
-        Assert.AreEqual("items", required[0].GetString());
+        Assert.AreEqual("strings", required[0].GetString());
     }
 
     [TestMethod]
-    public void GetIndicatorTool_GetJsonSchema_ReturnsValidSchema()
+    public void MockValidationTool_GetJsonSchema_ReturnsValidSchema()
     {
         // Arrange
-        var tool = new GetIndicatorTool();
+        var tool = new MockValidationTool();
 
         // Act
         var schema = tool.GetJsonSchema();
@@ -63,50 +62,33 @@ public class FunctionCallingTests
 
         Assert.AreEqual("object", root.GetProperty("type").GetString());
         Assert.IsTrue(root.TryGetProperty("properties", out var properties));
-        Assert.IsTrue(properties.TryGetProperty("symbol", out var symbol));
-        Assert.IsTrue(properties.TryGetProperty("indicator", out var indicator));
-        Assert.IsTrue(properties.TryGetProperty("period", out var period));
+        Assert.IsTrue(properties.TryGetProperty("input", out var inputParam));
+        Assert.IsTrue(properties.TryGetProperty("rules", out var rulesParam));
 
-        // Handle union types for nullable strings
-        var symbolType = symbol.GetProperty("type");
-        var indicatorType = indicator.GetProperty("type");
-        var periodType = period.GetProperty("type");
-
-        // Check if they are union types (arrays) or simple types (strings)
-        if (symbolType.ValueKind == JsonValueKind.Array)
+        var inputType = inputParam.GetProperty("type");
+        if (inputType.ValueKind == JsonValueKind.Array)
         {
-            var symbolTypes = symbolType.EnumerateArray().ToArray();
-            Assert.IsTrue(symbolTypes.Any(t => t.GetString() == "string"));
+            var inputTypes = inputType.EnumerateArray().ToArray();
+            Assert.IsTrue(inputTypes.Any(t => t.GetString() == "string"));
         }
         else
         {
-            Assert.AreEqual("string", symbolType.GetString());
+            Assert.AreEqual("string", inputType.GetString());
         }
 
-        if (indicatorType.ValueKind == JsonValueKind.Array)
-        {
-            var indicatorTypes = indicatorType.EnumerateArray().ToArray();
-            Assert.IsTrue(indicatorTypes.Any(t => t.GetString() == "string"));
-        }
-        else
-        {
-            Assert.AreEqual("string", indicatorType.GetString());
-        }
-
-        Assert.AreEqual("integer", periodType.GetString());
+        Assert.AreEqual("array", rulesParam.GetProperty("type").GetString());
 
         var required = root.GetProperty("required");
-        Assert.AreEqual(3, required.GetArrayLength());
-        Assert.IsTrue(required.EnumerateArray().Any(r => r.GetString() == "symbol"));
-        Assert.IsTrue(required.EnumerateArray().Any(r => r.GetString() == "indicator"));
-        Assert.IsTrue(required.EnumerateArray().Any(r => r.GetString() == "period"));
+        Assert.AreEqual(2, required.GetArrayLength());
+        Assert.IsTrue(required.EnumerateArray().Any(r => r.GetString() == "input"));
+        Assert.IsTrue(required.EnumerateArray().Any(r => r.GetString() == "rules"));
     }
 
     [TestMethod]
-    public void StatefulAgent_NormalizeFunctionCallToReact_WithAssistantContent()
+    public void LlmCommunicator_NormalizeFunctionCallToReact_WithAssistantContent()
     {
         // Arrange
-        var agent = new AIAgentSharp(new DelegateLlmClient((_, _) => Task.FromResult("")), new MemoryAgentStateStore());
+        var llmCommunicator = new LlmCommunicator(new DelegateLlmClient((_, _) => Task.FromResult("")), new AgentConfiguration(), new ConsoleLogger(), new EventManager(new ConsoleLogger()), new StatusManager(new AgentConfiguration(), new EventManager(new ConsoleLogger())));
         var functionResult = new FunctionCallResult
         {
             HasFunctionCall = true,
@@ -116,7 +98,7 @@ public class FunctionCallingTests
         };
 
         // Act
-        var modelMsg = agent.NormalizeFunctionCallToReact(functionResult, 0);
+        var modelMsg = llmCommunicator.NormalizeFunctionCallToReact(functionResult, 0);
 
         // Assert
         Assert.AreEqual("I need to check the RSI value for MNQ to assess market conditions.", modelMsg.Thoughts);
@@ -129,34 +111,34 @@ public class FunctionCallingTests
     }
 
     [TestMethod]
-    public void StatefulAgent_NormalizeFunctionCallToReact_WithoutAssistantContent()
+    public void LlmCommunicator_NormalizeFunctionCallToReact_WithoutAssistantContent()
     {
         // Arrange
-        var agent = new AIAgentSharp(new DelegateLlmClient((_, _) => Task.FromResult("")), new MemoryAgentStateStore());
+        var llmCommunicator = new LlmCommunicator(new DelegateLlmClient((_, _) => Task.FromResult("")), new AgentConfiguration(), new ConsoleLogger(), new EventManager(new ConsoleLogger()), new StatusManager(new AgentConfiguration(), new EventManager(new ConsoleLogger())));
         var functionResult = new FunctionCallResult
         {
             HasFunctionCall = true,
             FunctionName = "concat",
-            FunctionArgumentsJson = "{\"items\":[\"hello\",\"world\"]}",
+            FunctionArgumentsJson = "{\"strings\":[\"hello\",\"world\"]}",
             AssistantContent = ""
         };
 
         // Act
-        var modelMsg = agent.NormalizeFunctionCallToReact(functionResult, 0);
+        var modelMsg = llmCommunicator.NormalizeFunctionCallToReact(functionResult, 0);
 
         // Assert
         Assert.AreEqual("Calling concat to advance the plan.", modelMsg.Thoughts);
         Assert.AreEqual(AgentAction.ToolCall, modelMsg.Action);
         Assert.AreEqual("concat", modelMsg.ActionInput.Tool);
         Assert.IsNotNull(modelMsg.ActionInput.Params);
-        Assert.IsTrue(modelMsg.ActionInput.Params.ContainsKey("items"));
+        Assert.IsTrue(modelMsg.ActionInput.Params.ContainsKey("strings"));
     }
 
     [TestMethod]
-    public void StatefulAgent_NormalizeFunctionCallToReact_InvalidArguments()
+    public void LlmCommunicator_NormalizeFunctionCallToReact_InvalidArguments()
     {
         // Arrange
-        var agent = new AIAgentSharp(new DelegateLlmClient((_, _) => Task.FromResult("")), new MemoryAgentStateStore());
+        var llmCommunicator = new LlmCommunicator(new DelegateLlmClient((_, _) => Task.FromResult("")), new AgentConfiguration(), new ConsoleLogger(), new EventManager(new ConsoleLogger()), new StatusManager(new AgentConfiguration(), new EventManager(new ConsoleLogger())));
         var functionResult = new FunctionCallResult
         {
             HasFunctionCall = true,
@@ -167,7 +149,7 @@ public class FunctionCallingTests
 
         // Act & Assert
         var ex = Assert.ThrowsException<ArgumentException>(() =>
-            agent.NormalizeFunctionCallToReact(functionResult, 0));
+            llmCommunicator.NormalizeFunctionCallToReact(functionResult, 0));
         Assert.IsTrue(ex.Message.Contains("Failed to parse function arguments"));
     }
 
@@ -177,8 +159,8 @@ public class FunctionCallingTests
         // Arrange
         var mockClient = new MockFunctionCallingLlmClient();
         var config = new AgentConfiguration { UseFunctionCalling = false };
-        var agent = new AIAgentSharp(mockClient, new MemoryAgentStateStore(), config: config);
-        var tools = new List<ITool> { new ConcatTool() };
+        var agent = new Agent(mockClient, new MemoryAgentStateStore(), config: config);
+        var tools = new List<ITool> { new MockConcatTool() };
 
         // Act
         var result = agent.StepAsync("test", "Test goal", tools).Result;
@@ -196,7 +178,7 @@ public class FunctionCallingTests
         // Arrange
         var mockClient = new MockFunctionCallingLlmClient();
         var config = new AgentConfiguration { UseFunctionCalling = true };
-        var agent = new AIAgentSharp(mockClient, new MemoryAgentStateStore(), config: config);
+        var agent = new Agent(mockClient, new MemoryAgentStateStore(), config: config);
         var nonSchemaTool = new NonSchemaTool();
         var tools = new List<ITool> { nonSchemaTool };
 
@@ -216,8 +198,8 @@ public class FunctionCallingTests
         // Arrange
         var mockClient = new MockFunctionCallingLlmClient { SupportsFunctionCalling = false };
         var config = new AgentConfiguration { UseFunctionCalling = true };
-        var agent = new AIAgentSharp(mockClient, new MemoryAgentStateStore(), config: config);
-        var tools = new List<ITool> { new ConcatTool() };
+        var agent = new Agent(mockClient, new MemoryAgentStateStore(), config: config);
+        var tools = new List<ITool> { new MockConcatTool() };
 
         // Act
         var result = agent.StepAsync("test", "Test goal", tools).Result;
@@ -238,11 +220,11 @@ public class FunctionCallingTests
             SupportsFunctionCalling = true,
             ShouldReturnFunctionCall = true,
             FunctionName = "concat",
-            FunctionArguments = "{\"items\":[\"hello\",\"world\"]}"
+            FunctionArguments = "{\"strings\":[\"hello\",\"world\"]}"
         };
         var config = new AgentConfiguration { UseFunctionCalling = true };
-        var agent = new AIAgentSharp(mockClient, new MemoryAgentStateStore(), config: config);
-        var tools = new List<ITool> { new ConcatTool() };
+        var agent = new Agent(mockClient, new MemoryAgentStateStore(), config: config);
+        var tools = new List<ITool> { new MockConcatTool() };
 
         // Act
         var result = agent.StepAsync("test", "Test goal", tools).Result;
@@ -267,8 +249,8 @@ public class FunctionCallingTests
             FunctionArguments = "invalid json"
         };
         var config = new AgentConfiguration { UseFunctionCalling = true };
-        var agent = new AIAgentSharp(mockClient, new MemoryAgentStateStore(), config: config);
-        var tools = new List<ITool> { new ConcatTool() };
+        var agent = new Agent(mockClient, new MemoryAgentStateStore(), config: config);
+        var tools = new List<ITool> { new MockConcatTool() };
 
         // Act
         var result = agent.StepAsync("test", "Test goal", tools).Result;
@@ -294,8 +276,8 @@ public class FunctionCallingTests
             FunctionArguments = "{\"param\":\"value\"}"
         };
         var config = new AgentConfiguration { UseFunctionCalling = true };
-        var agent = new AIAgentSharp(mockClient, new MemoryAgentStateStore(), config: config);
-        var tools = new List<ITool> { new ConcatTool() };
+        var agent = new Agent(mockClient, new MemoryAgentStateStore(), config: config);
+        var tools = new List<ITool> { new MockConcatTool() };
 
         // Act
         var result = agent.StepAsync("test", "Test goal", tools).Result;
@@ -317,12 +299,12 @@ public class FunctionCallingTests
         {
             SupportsFunctionCalling = true,
             ShouldReturnFunctionCall = true,
-            FunctionName = "get_indicator",
-            FunctionArguments = "{\"symbol\":\"MNQ\",\"indicator\":\"RSI\",\"period\":14}"
+            FunctionName = "validate_input",
+            FunctionArguments = "{\"input\":\"test_value\",\"rules\":[\"rule1\"]}"
         };
         var config = new AgentConfiguration { UseFunctionCalling = true };
-        var agent = new AIAgentSharp(mockClient, new MemoryAgentStateStore(), config: config);
-        var tools = new List<ITool> { new GetIndicatorTool() };
+        var agent = new Agent(mockClient, new MemoryAgentStateStore(), config: config);
+        var tools = new List<ITool> { new MockValidationTool() };
 
         // Act - First call
         var result1 = agent.StepAsync("test", "Test goal", tools).Result;
@@ -348,13 +330,13 @@ public class FunctionCallingTests
         {
             SupportsFunctionCalling = true,
             ShouldReturnFunctionCall = true,
-            FunctionName = "get_indicator",
-            FunctionArguments = "{\"symbol\":\"MNQ\",\"indicator\":\"RSI\",\"period\":14}",
-            AssistantContent = "I need to check the RSI value for MNQ to assess market conditions."
+            FunctionName = "validate_input",
+            FunctionArguments = "{\"input\":\"test_value\",\"rules\":[\"rule1\"]}",
+            AssistantContent = "I need to validate the test parameters."
         };
         var config = new AgentConfiguration { UseFunctionCalling = true };
-        var agent = new AIAgentSharp(mockClient, new MemoryAgentStateStore(), config: config);
-        var tools = new List<ITool> { new GetIndicatorTool() };
+        var agent = new Agent(mockClient, new MemoryAgentStateStore(), config: config);
+        var tools = new List<ITool> { new MockValidationTool() };
 
         // Act
         var result = agent.StepAsync("test", "Test goal", tools).Result;
@@ -363,13 +345,13 @@ public class FunctionCallingTests
         Assert.IsTrue(result.Continue);
         Assert.IsTrue(result.ExecutedTool);
         Assert.IsNotNull(result.LlmMessage);
-        Assert.AreEqual("I need to check the RSI value for MNQ to assess market conditions.", result.LlmMessage.Thoughts);
+        Assert.AreEqual("I need to validate the test parameters.", result.LlmMessage.Thoughts);
         Assert.AreEqual(AgentAction.ToolCall, result.LlmMessage.Action);
         Assert.IsNotNull(result.LlmMessage.ActionInput);
-        Assert.AreEqual("get_indicator", result.LlmMessage.ActionInput.Tool);
+        Assert.AreEqual("validate_input", result.LlmMessage.ActionInput.Tool);
         Assert.IsNotNull(result.ToolResult);
         Assert.IsTrue(result.ToolResult.Success);
-        Assert.AreEqual("get_indicator", result.ToolResult.Tool);
+        Assert.AreEqual("validate_input", result.ToolResult.Tool);
     }
 
     // Helper classes for testing

@@ -1,11 +1,12 @@
 using System.Text.Json;
+using AIAgentSharp.Agents;
 
 namespace AIAgentSharp.Tests;
 
 [TestClass]
 public class ToolAgnosticValidationTests
 {
-    private AIAgentSharp _agent = null!;
+    private Agent _agent = null!;
     private MockLlmClient _llmClient = null!;
     private MemoryAgentStateStore _stateStore = null!;
     private Dictionary<string, ITool> _tools = null!;
@@ -17,13 +18,13 @@ public class ToolAgnosticValidationTests
         _llmClient = new MockLlmClient();
         _tools = new Dictionary<string, ITool>
         {
-            ["get_indicator"] = new GetIndicatorTool(),
-            ["validation_tool"] = new ValidationTestTool(),
+            ["validate_input"] = new MockValidationTool(),
+            ["test_validation_tool"] = new ValidationTestTool(),
             ["schema_tool"] = new SchemaTestTool(),
-            ["concat"] = new ConcatTool()
+            ["concat"] = new MockConcatTool()
         };
         var config = new AgentConfiguration { UseFunctionCalling = false };
-        _agent = new AIAgentSharp(_llmClient, _stateStore, config: config);
+        _agent = new Agent(_llmClient, _stateStore, config: config);
     }
 
     [TestMethod]
@@ -56,7 +57,7 @@ public class ToolAgnosticValidationTests
             Action = AgentAction.ToolCall,
             ActionInput = new ActionInput
             {
-                Tool = "validation_tool",
+                Tool = "test_validation_tool",
                 Params = new Dictionary<string, object?> { ["invalid_param"] = "value" }
             }
         });
@@ -123,11 +124,11 @@ public class ToolAgnosticValidationTests
         // First call - fails (missing required params)
         _llmClient.SetNextResponse(new ModelMessage
         {
-            Thoughts = "First call to validation_tool",
+            Thoughts = "First call to test_validation_tool",
             Action = AgentAction.ToolCall,
             ActionInput = new ActionInput
             {
-                Tool = "validation_tool",
+                Tool = "test_validation_tool",
                 Params = new Dictionary<string, object?> { ["invalid_param"] = "value" } // Missing required params
             }
         });
@@ -138,11 +139,11 @@ public class ToolAgnosticValidationTests
         // Second call - succeeds
         _llmClient.SetNextResponse(new ModelMessage
         {
-            Thoughts = "Second call to validation_tool with all params",
+            Thoughts = "Second call to test_validation_tool with all params",
             Action = AgentAction.ToolCall,
             ActionInput = new ActionInput
             {
-                Tool = "validation_tool",
+                Tool = "test_validation_tool",
                 Params = new Dictionary<string, object?>
                 {
                     ["required_param"] = "value"
@@ -155,11 +156,11 @@ public class ToolAgnosticValidationTests
         // Third call - should dedupe the successful call
         _llmClient.SetNextResponse(new ModelMessage
         {
-            Thoughts = "Third call to validation_tool with same params",
+            Thoughts = "Third call to test_validation_tool with same params",
             Action = AgentAction.ToolCall,
             ActionInput = new ActionInput
             {
-                Tool = "validation_tool",
+                Tool = "test_validation_tool",
                 Params = new Dictionary<string, object?>
                 {
                     ["required_param"] = "value"
@@ -193,11 +194,11 @@ public class ToolAgnosticValidationTests
         // First call - succeeds
         _llmClient.SetNextResponse(new ModelMessage
         {
-            Thoughts = "First call to validation_tool",
+            Thoughts = "First call to test_validation_tool",
             Action = AgentAction.ToolCall,
             ActionInput = new ActionInput
             {
-                Tool = "validation_tool",
+                Tool = "test_validation_tool",
                 Params = new Dictionary<string, object?> { ["required_param"] = "value" }
             }
         });
@@ -205,7 +206,8 @@ public class ToolAgnosticValidationTests
         var result1 = _agent.StepAsync(state.AgentId, state.Goal, _tools.Values).Result;
 
         // Simulate time passing by manually setting the result to be old
-        var oldResult = result1.ToolResult!;
+        var oldResult = result1.ToolResult;
+        Assert.IsNotNull(oldResult);
         var oldCreatedUtc = oldResult.CreatedUtc;
 
         // Use reflection to set the CreatedUtc to be old (more than 5 minutes ago)
@@ -215,11 +217,11 @@ public class ToolAgnosticValidationTests
         // Second call - should NOT dedupe because the result is too old
         _llmClient.SetNextResponse(new ModelMessage
         {
-            Thoughts = "Second call to validation_tool with same params",
+            Thoughts = "Second call to test_validation_tool with same params",
             Action = AgentAction.ToolCall,
             ActionInput = new ActionInput
             {
-                Tool = "validation_tool",
+                Tool = "test_validation_tool",
                 Params = new Dictionary<string, object?> { ["required_param"] = "value" }
             }
         });
@@ -293,23 +295,27 @@ public class ToolAgnosticValidationTests
     }
 
     [TestMethod]
-    public async Task GetIndicatorTool_InvokeTypedAsync_RespectsCancellation()
+    public async Task MockValidationTool_InvokeTypedAsync_RespectsCancellation()
     {
         // Arrange
-        var tool = new GetIndicatorTool();
-        var parameters = new GetIndicatorParams
+        var tool = new MockValidationTool();
+        var parameters = new MockValidationParams
         {
-            Symbol = "MNQ",
-            Indicator = "RSI",
-            Period = 14
+            Input = "test input",
+            Rules = new[] { "rule1", "rule2" }
         };
         var cts = new CancellationTokenSource();
         cts.Cancel(); // Cancel immediately
 
         // Act & Assert
-        await Assert.ThrowsExceptionAsync<OperationCanceledException>(async () =>
+        await Assert.ThrowsExceptionAsync<TaskCanceledException>(async () =>
         {
-            await tool.InvokeTypedAsync(parameters, cts.Token);
+            var parametersDict = new Dictionary<string, object?>
+            {
+                ["input"] = parameters.Input,
+                ["rules"] = parameters.Rules
+            };
+            await tool.InvokeAsync(parametersDict, cts.Token);
         });
     }
 }
@@ -318,7 +324,7 @@ public class ToolAgnosticValidationTests
 public class ValidationTestTool : ITool
 {
     public string Description => "A tool that throws ToolValidationException for testing";
-    public string Name => "validation_tool";
+    public string Name => "test_validation_tool";
 
     public Task<object?> InvokeAsync(Dictionary<string, object?> parameters, CancellationToken ct = default)
     {

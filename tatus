@@ -1,0 +1,147 @@
+[1mdiff --git a/AIAgentSharp.sln b/AIAgentSharp.sln[m
+[1mindex 0b7a868..b97259f 100644[m
+[1m--- a/AIAgentSharp.sln[m
+[1m+++ b/AIAgentSharp.sln[m
+[36m@@ -1,9 +1,9 @@[m
+ ﻿[m
+ Microsoft Visual Studio Solution File, Format Version 12.00[m
+ # Visual Studio Version 17[m
+[31m-VisualStudioVersion = 17.14.36408.4 d17.14[m
+[32m+[m[32mVisualStudioVersion = 17.14.36408.4[m
+ MinimumVisualStudioVersion = 10.0.40219.1[m
+[31m-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "example", "examples\example.csproj", "{BACE4B62-B1A3-C3DC-6B64-403353019CF3}"[m
+[32m+[m[32mProject("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Example", "examples\Example.csproj", "{BACE4B62-B1A3-C3DC-6B64-403353019CF3}"[m
+ EndProject[m
+ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AIAgentSharp", "src\AIAgentSharp\AIAgentSharp.csproj", "{63B8E975-F2AA-4109-ABC1-7D6FB8CA8F45}"[m
+ EndProject[m
+[1mdiff --git a/README.md b/README.md[m
+[1mindex dabd7ff..86e37d4 100644[m
+[1m--- a/README.md[m
+[1m+++ b/README.md[m
+[36m@@ -1,6 +1,6 @@[m
+[31m-# Agent Framework[m
+[32m+[m[32m# AIAgentSharp[m
+ [m
+[31m-A comprehensive, production-ready framework for building LLM-powered agents with tool calling capabilities in C#. This framework provides a complete solution for creating intelligent agents that can reason, act, and observe using the Re/Act pattern or function calling.[m
+[32m+[m[32mA comprehensive, production-ready .NET 8.0 framework for building LLM-powered agents with tool calling capabilities. This framework provides a complete solution for creating intelligent agents that can reason, act, and observe using the Re/Act pattern or function calling.[m
+ [m
+ ## 🚀 Features[m
+ [m
+[36m@@ -15,32 +15,74 @@[m [mA comprehensive, production-ready framework for building LLM-powered agents with[m
+ - **📝 History Management**: Configurable history summarization to manage prompt size[m
+ - **⚡ Performance Optimized**: Efficient token management and prompt optimization[m
+ - **🔒 Thread Safe**: Thread-safe implementations for production use[m
+[31m-- **🧪 Test Coverage**: Comprehensive test suite with 255+ tests[m
+[32m+[m[32m- **🧪 Test Coverage**: Comprehensive test suite with 280+ tests[m
+ [m
+[31m-## 🏗️ Architecture[m
+[32m+[m[32m### 🔧 Advanced Tool Features[m
+ [m
+[31m-The framework is built around several key components:[m
+[32m+[m[32m- **Strongly-Typed Tools**: Full type safety with `BaseTool<TParams, TResult>` and automatic validation[m
+[32m+[m[32m- **Tool Deduplication Control**: Tools can opt out of deduplication or set custom TTL via `IDedupeControl`[m
+[32m+[m[32m- **Automatic Schema Generation**: Complete JSON schema generation from C# types with validation attributes[m
+[32m+[m[32m- **Tool Field Attributes**: Rich metadata support with `ToolFieldAttribute` and `ToolParamsAttribute`[m
+[32m+[m[32m- **Tool Introspection**: Tools can provide detailed descriptions for LLM consumption[m
+[32m+[m[32m- **Parameter Validation**: Comprehensive validation with DataAnnotations and custom error messages[m
+ [m
+[31m-- **`StatefulAgent`**: The main agent implementation that orchestrates reasoning and tool execution[m
+[31m-- **`ITool` Interface**: Extensible tool system with automatic schema generation[m
+[31m-- **`BaseTool<TParams, TResult>`**: Base class for strongly-typed tools with validation[m
+[31m-- **`IAgentStateStore`**: Pluggable state persistence layer[m
+[31m-- **`ILlmClient`**: Abstract LLM client interface for different providers[m
+[31m-- **Event System**: Comprehensive event system for monitoring and integration[m
+[32m+[m[32m### 🎯 Advanced Execution Features[m
+[32m+[m
+[32m+[m[32m- **Step-by-Step Execution**: Execute individual agent steps with `StepAsync()` for fine-grained control[m
+[32m+[m[32m- **Loop Detection & Prevention**: Intelligent loop breaker with configurable failure thresholds[m
+[32m+[m[32m- **History Summarization**: Automatic summarization of older turns to manage token usage efficiently[m
+[32m+[m[32m- **Tool Result Caching**: Smart caching with configurable staleness thresholds[m
+[32m+[m[32m- **Consecutive Failure Detection**: Prevents infinite loops from repeated tool failures[m
+[32m+[m[32m- **Cancellation Support**: Full cancellation token support throughout the execution pipeline[m
+[32m+[m
+[32m+[m[32m### 📊 Advanced Monitoring & Events[m
+[32m+[m
+[32m+[m[32m- **Comprehensive Event System**: 9 different event types for complete execution monitoring[m
+[32m+[m[32m- **Public Status Updates**: UI-friendly status updates without exposing internal reasoning[m
+[32m+[m[32m- **Progress Tracking**: Real-time progress percentage and detailed status information[m
+[32m+[m[32m- **Execution Time Tracking**: Detailed timing for LLM calls and tool executions[m
+[32m+[m[32m- **Turn-level Monitoring**: Complete visibility into each agent turn and decision[m
+[32m+[m[32m- **Error Recovery**: Graceful handling of failures with detailed error information[m
+[32m+[m
+[32m+[m[32m### ⚙️ Advanced Configuration[m
+[32m+[m
+[32m+[m[32m- **Granular Field Size Limits**: Separate configurable limits for thoughts, final output, and summaries[m
+[32m+[m[32m- **Configurable Timeouts**: Separate timeouts for LLM and tool calls[m
+[32m+[m[32m- **Token Management**: Automatic prompt optimization and size management[m
+[32m+[m[32m- **Function Calling Toggle**: Can switch between Re/Act and function calling modes[m
+[32m+[m[32m- **Immutable Configuration**: Type-safe configuration with init-only properties[m
+[32m+[m
+[32m+[m[32m### 🔒 Production-Ready Features[m
+[32m+[m
+[32m+[m[32m- **Thread Safety**: All components are thread-safe for production use[m
+[32m+[m[32m- **Structured Logging**: Comprehensive logging with multiple log levels[m
+[32m+[m[32m- **Error Handling**: Robust error handling with detailed exception information[m
+[32m+[m[32m- **State Persistence**: Multiple state store implementations (memory, file-based)[m
+[32m+[m[32m- **Performance Optimization**: Advanced caching and token management strategies[m
+ [m
+ ## 📦 Installation[m
+ [m
+[32m+[m[32m### NuGet Package[m
+[32m+[m
+[32m+[m[32mThe easiest way to get started is to install the NuGet package:[m
+[32m+[m
+[32m+[m[32m```bash[m
+[32m+[m[32mdotnet add package AIAgentSharp[m
+[32m+[m[32m```[m
+[32m+[m
+ ### Prerequisites[m
+ [m
+ - .NET 8.0 or later[m
+ - OpenAI API key (or other LLM provider)[m
+ [m
+[31m-### Setup[m
+[32m+[m[32m### Manual Installation[m
+[32m+[m
+[32m+[m[32mIf you prefer to build from source:[m
+ [m
+ 1. **Clone the repository**:[m
+    ```bash[m
+    git clone <repository-url>[m
+[31m-   cd Agent[m
+[32m+[m[32m   cd AIAgentSharp[m
+    ```[m
+ [m
+ 2. **Set your OpenAI API key**:[m
+[36m@@ -59,20 +101,38 @@[m [mThe framework is built around several key components:[m
+ [m
+ 4. **Run the example**:[m
+    ```bash[m
+[31m-   dotnet run --project Agent[m
+[32m+[m[32m   dotnet run --project examples[m
+    ```[m
+ [m
+[32m+[m[32m## 🏗️ Architecture[m
+[32m+[m
+[32m+[m[32mThe framework is built around several key components:[m
+[32m+[m
+[32m+[m[32m- **`Agent`**: The main agent implementation that orchestrates reasoning and tool execution[m
+[32m+[m[32m- **`ITool` Interface**: Extensible tool system with automatic schema generation[m
+[32m+[m[32m- **`BaseTool<TParams, TResult>`**: Base class for strongly-typed tools with validation[m
+[32m+[m[32m- **`IAgentStateStore`**: Pluggable state persistence layer[m
+[32m+[m[32m- **`ILlmClient`**: Abstract LLM client interface for different providers[m
+[32m+[m[32m- **Event System**: Comprehensive event system for monitoring and integration[m
+[32m+[m
+ ## 🚀 Quick Start[m
+ [m
+ ### Basic Usage[m
+ [m
+ ```csharp[m
+[31m-using Agent.Shared;[m
+[32m+[m[32musing AIAgentSharp.Agents;[m
+[32m+[m[32musing AIAgentSharp.Examples;[m
+ [m
+ // Create components[m
+[31m-var llm = new OpenAiLlmClient(apiKey, "gpt-5-nano");[m
+[32m+[m[32mvar llm = new OpenAiLlmClient(apiKey);[m
+ var st

@@ -1,9 +1,10 @@
 using System.Text.Json;
+using AIAgentSharp.Agents;
 
 namespace AIAgentSharp.Tests;
 
 [TestClass]
-public sealed class StatefulAgentTests
+public sealed class AgentTests
 {
     [TestMethod]
     public void Constructor_ValidParameters_CreatesInstance()
@@ -13,7 +14,7 @@ public sealed class StatefulAgentTests
         var stateStore = new MemoryAgentStateStore();
 
         // Act
-        var agent = new AIAgentSharp(llmClient, stateStore);
+        var agent = new Agent(llmClient, stateStore);
 
         // Assert
         Assert.IsNotNull(agent);
@@ -28,7 +29,7 @@ public sealed class StatefulAgentTests
         var logger = new ConsoleLogger();
 
         // Act
-        var agent = new AIAgentSharp(llmClient, stateStore, logger);
+        var agent = new Agent(llmClient, stateStore, logger);
 
         // Assert
         Assert.IsNotNull(agent);
@@ -50,7 +51,7 @@ public sealed class StatefulAgentTests
             LlmTimeout = llmTimeout,
             ToolTimeout = toolTimeout
         };
-        var agent = new AIAgentSharp(llmClient, stateStore, config: config);
+        var agent = new Agent(llmClient, stateStore, config: config);
 
         // Assert
         Assert.IsNotNull(agent);
@@ -63,7 +64,7 @@ public sealed class StatefulAgentTests
         var stateStore = new MemoryAgentStateStore();
 
         // Act & Assert
-        Assert.ThrowsException<ArgumentNullException>(() => new AIAgentSharp(null!, stateStore));
+        Assert.ThrowsException<ArgumentNullException>(() => new Agent(null!, stateStore));
     }
 
     [TestMethod]
@@ -73,7 +74,7 @@ public sealed class StatefulAgentTests
         var llmClient = new DelegateLlmClient((messages, ct) => Task.FromResult("test"));
 
         // Act & Assert
-        Assert.ThrowsException<ArgumentNullException>(() => new AIAgentSharp(llmClient, null!));
+        Assert.ThrowsException<ArgumentNullException>(() => new Agent(llmClient, null!));
     }
 
     [TestMethod]
@@ -82,7 +83,7 @@ public sealed class StatefulAgentTests
         // Arrange
         var llmClient = new DelegateLlmClient((messages, ct) => Task.FromResult("test"));
         var stateStore = new MemoryAgentStateStore();
-        var agent = new AIAgentSharp(llmClient, stateStore);
+        var agent = new Agent(llmClient, stateStore);
 
         // Act
         var result = await agent.StepAsync("test-agent", "test goal", new ITool[0]);
@@ -101,7 +102,7 @@ public sealed class StatefulAgentTests
         // Arrange
         var llmClient = new DelegateLlmClient((messages, ct) => Task.FromResult("test"));
         var stateStore = new MemoryAgentStateStore();
-        var agent = new AIAgentSharp(llmClient, stateStore);
+        var agent = new Agent(llmClient, stateStore);
 
         // Create initial state
         await agent.StepAsync("test-agent", "original goal", new ITool[0]);
@@ -127,16 +128,15 @@ public sealed class StatefulAgentTests
             ""action_input"": {
                 ""tool"": ""concat"",
                 ""params"": {
-                    ""items"": [""hello"", ""world""],
-                    ""sep"": "" ""
+                    ""strings"": [""hello"", ""world""]
                 }
             }
         }";
 
         var llmClient = new DelegateLlmClient((messages, ct) => Task.FromResult(llmResponse));
         var stateStore = new MemoryAgentStateStore();
-        var agent = new AIAgentSharp(llmClient, stateStore);
-        var tools = new ITool[] { new ConcatTool() };
+        var agent = new Agent(llmClient, stateStore);
+        var tools = new ITool[] { new MockConcatTool() };
 
         // Act
         var result = await agent.StepAsync("test-agent", "test goal", tools);
@@ -167,7 +167,7 @@ public sealed class StatefulAgentTests
 
         var llmClient = new DelegateLlmClient((messages, ct) => Task.FromResult(llmResponse));
         var stateStore = new MemoryAgentStateStore();
-        var agent = new AIAgentSharp(llmClient, stateStore);
+        var agent = new Agent(llmClient, stateStore);
 
         // Act
         var result = await agent.StepAsync("test-agent", "test goal", new ITool[0]);
@@ -176,9 +176,11 @@ public sealed class StatefulAgentTests
         Assert.IsNotNull(result);
         Assert.IsTrue(result.ExecutedTool);
         Assert.IsNotNull(result.ToolResult);
-        Assert.IsFalse(result.ToolResult.Success);
-        Assert.IsNotNull(result.ToolResult.Error);
-        Assert.IsTrue(result.ToolResult.Error.Contains("not found"));
+        var toolResult = result.ToolResult;
+        if (toolResult == null) throw new InvalidOperationException("ToolResult should not be null");
+        Assert.IsFalse(toolResult.Success);
+        Assert.IsNotNull(toolResult.Error);
+        Assert.IsTrue(toolResult.Error.Contains("not found"));
     }
 
     [TestMethod]
@@ -187,7 +189,7 @@ public sealed class StatefulAgentTests
         // Arrange
         var llmClient = new DelegateLlmClient((messages, ct) => Task.FromResult("invalid json"));
         var stateStore = new MemoryAgentStateStore();
-        var agent = new AIAgentSharp(llmClient, stateStore);
+        var agent = new Agent(llmClient, stateStore);
 
         // Act
         var result = await agent.StepAsync("test-agent", "test goal", new ITool[0]);
@@ -213,7 +215,7 @@ public sealed class StatefulAgentTests
 
         var llmClient = new DelegateLlmClient((messages, ct) => Task.FromResult(llmResponse));
         var stateStore = new MemoryAgentStateStore();
-        var agent = new AIAgentSharp(llmClient, stateStore);
+        var agent = new Agent(llmClient, stateStore);
 
         // Act
         var result = await agent.StepAsync("test-agent", "test goal", new ITool[0]);
@@ -238,7 +240,7 @@ public sealed class StatefulAgentTests
 
         var llmClient = new DelegateLlmClient((messages, ct) => Task.FromResult(llmResponse));
         var stateStore = new MemoryAgentStateStore();
-        var agent = new AIAgentSharp(llmClient, stateStore);
+        var agent = new Agent(llmClient, stateStore);
 
         // Act
         var result = await agent.StepAsync("test-agent", "test goal", new ITool[0]);
@@ -265,7 +267,7 @@ public sealed class StatefulAgentTests
 
         var llmClient = new DelegateLlmClient((messages, ct) => Task.FromResult(llmResponse));
         var stateStore = new MemoryAgentStateStore();
-        var agent = new AIAgentSharp(llmClient, stateStore);
+        var agent = new Agent(llmClient, stateStore);
 
         // Act
         var result = await agent.StepAsync("test-agent", "test goal", new ITool[0]);
@@ -293,7 +295,7 @@ public sealed class StatefulAgentTests
             MaxTurns = 50,
             LlmTimeout = TimeSpan.FromMilliseconds(100)
         };
-        var agent = new AIAgentSharp(llmClient, stateStore, config: config);
+        var agent = new Agent(llmClient, stateStore, config: config);
 
         // Act
         var result = await agent.StepAsync("test-agent", "test goal", new ITool[0]);
@@ -327,7 +329,7 @@ public sealed class StatefulAgentTests
             LlmTimeout = TimeSpan.FromMinutes(1),
             ToolTimeout = TimeSpan.FromMilliseconds(100)
         };
-        var agent = new AIAgentSharp(llmClient, stateStore, config: config);
+        var agent = new Agent(llmClient, stateStore, config: config);
 
         // Act
         var result = await agent.StepAsync("test-agent", "test goal", new ITool[] { slowTool });
@@ -361,7 +363,7 @@ public sealed class StatefulAgentTests
 
         var llmClient = new DelegateLlmClient((messages, ct) => Task.FromResult(llmResponse));
         var stateStore = new MemoryAgentStateStore();
-        var agent = new AIAgentSharp(llmClient, stateStore);
+        var agent = new Agent(llmClient, stateStore);
 
         // Act
         var result = await agent.StepAsync("test-agent", "test goal", new ITool[] { typedTool });
@@ -394,7 +396,7 @@ public sealed class StatefulAgentTests
 
         var llmClient = new DelegateLlmClient((messages, ct) => Task.FromResult(llmResponse));
         var stateStore = new MemoryAgentStateStore();
-        var agent = new AIAgentSharp(llmClient, stateStore);
+        var agent = new Agent(llmClient, stateStore);
 
         // Act
         var result = await agent.StepAsync("test-agent", "test goal", new ITool[] { typedTool });
@@ -415,7 +417,7 @@ public sealed class StatefulAgentTests
         var llmClient = new DelegateLlmClient((messages, ct) => Task.FromResult("test"));
         var stateStore = new MemoryAgentStateStore();
         var config = new AgentConfiguration { MaxTurns = 3 };
-        var agent = new AIAgentSharp(llmClient, stateStore, config: config);
+        var agent = new Agent(llmClient, stateStore, config: config);
 
         // Act
         var result = await agent.RunAsync("test-agent", "test goal", new ITool[0]);
@@ -433,7 +435,7 @@ public sealed class StatefulAgentTests
         // Arrange
         var llmClient = new DelegateLlmClient((messages, ct) => Task.FromResult("test"));
         var stateStore = new MemoryAgentStateStore();
-        var agent = new AIAgentSharp(llmClient, stateStore);
+        var agent = new Agent(llmClient, stateStore);
 
         // First step
         var firstResult = await agent.StepAsync("test-agent", "test goal", new ITool[0]);
@@ -470,7 +472,7 @@ public sealed class StatefulAgentTests
             LlmTimeout = TimeSpan.FromMinutes(1),
             ToolTimeout = TimeSpan.FromMilliseconds(100)
         };
-        var agent = new AIAgentSharp(llmClient, stateStore, config: config);
+        var agent = new Agent(llmClient, stateStore, config: config);
 
         // Act - This should trigger a deadline exceeded (not cancellation)
         var result = await agent.StepAsync("test-agent", "test goal", new ITool[] { slowTool });
@@ -498,7 +500,7 @@ public sealed class StatefulAgentTests
             LlmTimeout = TimeSpan.FromMinutes(1),
             ToolTimeout = TimeSpan.FromMinutes(1)
         };
-        var agent = new AIAgentSharp(llmClient, stateStore, config: config);
+        var agent = new Agent(llmClient, stateStore, config: config);
         var tools = new List<ITool>();
 
         // Act
@@ -508,13 +510,18 @@ public sealed class StatefulAgentTests
         Assert.IsTrue(result.Continue);
         Assert.IsFalse(result.ExecutedTool);
         Assert.IsNotNull(result.ToolResult);
-        Assert.IsFalse(result.ToolResult.Success);
-        Assert.IsNotNull(result.ToolResult);
-        Assert.IsTrue(result.ToolResult.Error!.Contains("LLM call failed"));
-        Assert.IsTrue(result.ToolResult.Error!.Contains("Internal server error"));
+        var toolResult = result.ToolResult;
+        Assert.IsNotNull(toolResult);
+        Assert.IsFalse(toolResult.Success);
+        Assert.IsNotNull(toolResult);
+        Assert.IsNotNull(toolResult.Error);
+        Assert.IsTrue(toolResult.Error.Contains("LLM call failed"));
+        Assert.IsTrue(toolResult.Error.Contains("Internal server error"));
         Assert.AreEqual(1, result.State.Turns.Count);
         Assert.IsNotNull(result.State.Turns[0].ToolResult);
-        Assert.IsFalse(result.State.Turns[0].ToolResult!.Success);
+        var stateToolResult = result.State.Turns[0].ToolResult;
+        Assert.IsNotNull(stateToolResult);
+        Assert.IsFalse(stateToolResult.Success);
     }
 
     [TestMethod]
@@ -531,7 +538,7 @@ public sealed class StatefulAgentTests
         };
 
         // Act
-        var agent = new AIAgentSharp(llmClient, stateStore, config: config);
+        var agent = new Agent(llmClient, stateStore, config: config);
 
         // Assert
         Assert.IsNotNull(agent);
@@ -564,21 +571,22 @@ public sealed class StatefulAgentTests
         var tools = new Dictionary<string, ITool>();
 
         // Act
-        var messages = AIAgentSharp.BuildMessages(state, tools, config).ToList();
+        var messageBuilder = new MessageBuilder(config);
+        var messages = messageBuilder.BuildMessages(state, tools).ToList();
         var userMessage = messages[1];
 
         // Assert
         Assert.IsNotNull(userMessage.Content);
-        Assert.IsTrue(userMessage.Content!.Contains("SUMMARY:"));
-        Assert.IsTrue(userMessage.Content!.Contains("LLM:"));
-        Assert.IsTrue(userMessage.Content!.Contains("Recent turn 2"));
-        Assert.IsTrue(userMessage.Content!.Contains("Recent turn 3"));
+        Assert.IsTrue(userMessage.Content.Contains("SUMMARY:"));
+        Assert.IsTrue(userMessage.Content.Contains("LLM:"));
+        Assert.IsTrue(userMessage.Content.Contains("Recent turn 2"));
+        Assert.IsTrue(userMessage.Content.Contains("Recent turn 3"));
         // The first 3 turns should be summarized, not shown in full detail
         // Check that old turns appear in summary format, not full JSON format
-        Assert.IsTrue(userMessage.Content!.Contains("SUMMARY: LLM: plan - Old turn 1"));
-        Assert.IsTrue(userMessage.Content!.Contains("SUMMARY: LLM: plan - Old turn 2"));
-        Assert.IsFalse(userMessage.Content!.Contains("\"thoughts\":\"Old turn 1\""));
-        Assert.IsFalse(userMessage.Content!.Contains("\"thoughts\":\"Old turn 2\""));
+        Assert.IsTrue(userMessage.Content.Contains("SUMMARY: LLM: plan - Old turn 1"));
+        Assert.IsTrue(userMessage.Content.Contains("SUMMARY: LLM: plan - Old turn 2"));
+        Assert.IsFalse(userMessage.Content.Contains("\"thoughts\":\"Old turn 1\""));
+        Assert.IsFalse(userMessage.Content.Contains("\"thoughts\":\"Old turn 2\""));
     }
 
     [TestMethod]
@@ -625,10 +633,13 @@ public sealed class StatefulAgentTests
 
         // Act
         var result = JsonUtil.ParseStrict(json);
-        var largeNumberValue = result.ActionInput.Params!["large_number"];
+        Assert.IsNotNull(result.ActionInput.Params);
+        var paramsDict = result.ActionInput.Params;
+        var largeNumberValue = paramsDict["large_number"];
 
         // Assert - The value should be preserved as JsonElement in this context
         // since ParseStrict doesn't convert parameters to native types
+        Assert.IsNotNull(largeNumberValue);
         Assert.AreEqual(largeNumber.ToString(), largeNumberValue.ToString());
     }
 
@@ -660,8 +671,8 @@ public sealed class StatefulAgentTests
         };
 
         // Act
-        var hash1 = AIAgentSharp.HashToolCall(tool, params1);
-        var hash2 = AIAgentSharp.HashToolCall(tool, params2);
+        var hash1 = AgentOrchestrator.HashToolCall(tool, params1);
+        var hash2 = AgentOrchestrator.HashToolCall(tool, params2);
 
         // Assert
         Assert.AreEqual(hash1, hash2, "Hashes should be identical for logically equivalent parameters");
@@ -691,8 +702,8 @@ public sealed class StatefulAgentTests
         };
 
         // Act
-        var hash1 = AIAgentSharp.HashToolCall(tool, params1);
-        var hash2 = AIAgentSharp.HashToolCall(tool, params2);
+        var hash1 = AgentOrchestrator.HashToolCall(tool, params1);
+        var hash2 = AgentOrchestrator.HashToolCall(tool, params2);
 
         // Assert
         Assert.AreNotEqual(hash1, hash2, "Hashes should be different for different parameter values");
@@ -713,7 +724,7 @@ public sealed class StatefulAgentTests
 
         var llmClient = new DelegateLlmClient((messages, ct) => Task.FromResult(llmResponse));
         var stateStore = new MemoryAgentStateStore();
-        var agent = new AIAgentSharp(llmClient, stateStore);
+        var agent = new Agent(llmClient, stateStore);
 
         var nonDedupedTool = new NonDedupedTool();
         var tools = new[] { nonDedupedTool };
@@ -727,6 +738,8 @@ public sealed class StatefulAgentTests
         // Assert
         Assert.IsTrue(result1.ExecutedTool);
         Assert.IsTrue(result2.ExecutedTool);
+        Assert.IsNotNull(result1.ToolResult);
+        Assert.IsNotNull(result2.ToolResult);
         Assert.IsTrue(result1.ToolResult.Success);
         Assert.IsTrue(result2.ToolResult.Success);
         // Should not dedupe, so both calls should have different execution times
@@ -748,7 +761,7 @@ public sealed class StatefulAgentTests
 
         var llmClient = new DelegateLlmClient((messages, ct) => Task.FromResult(llmResponse));
         var stateStore = new MemoryAgentStateStore();
-        var agent = new AIAgentSharp(llmClient, stateStore);
+        var agent = new Agent(llmClient, stateStore);
 
         var customTtlTool = new CustomTtlTool();
         var tools = new[] { customTtlTool };
@@ -762,6 +775,8 @@ public sealed class StatefulAgentTests
         // Assert
         Assert.IsTrue(result1.ExecutedTool);
         Assert.IsTrue(result2.ExecutedTool);
+        Assert.IsNotNull(result1.ToolResult);
+        Assert.IsNotNull(result2.ToolResult);
         Assert.IsTrue(result1.ToolResult.Success);
         Assert.IsTrue(result2.ToolResult.Success);
         // Should dedupe due to short TTL, so both calls should have the same execution time
@@ -769,10 +784,10 @@ public sealed class StatefulAgentTests
     }
 
     [TestMethod]
-    public void ConcatTool_Schema_IncludesAdditionalPropertiesFalse()
+    public void MockConcatTool_Schema_IncludesAdditionalPropertiesFalse()
     {
         // Arrange
-        var concatTool = new ConcatTool();
+        var concatTool = new MockConcatTool();
 
         // Act
         var schema = concatTool.GetJsonSchema();
@@ -780,7 +795,7 @@ public sealed class StatefulAgentTests
 
         // Assert
         Assert.IsTrue(schemaJson.Contains("\"additionalProperties\":false"),
-            "ConcatTool schema should include additionalProperties = false");
+            "MockConcatTool schema should include additionalProperties = false");
     }
 
     private class SlowTool : ITool

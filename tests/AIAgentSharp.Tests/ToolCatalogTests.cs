@@ -1,4 +1,5 @@
 using System.Text.Json;
+using AIAgentSharp.Agents;
 
 namespace AIAgentSharp.Tests;
 
@@ -6,10 +7,10 @@ namespace AIAgentSharp.Tests;
 public class ToolCatalogTests
 {
     [TestMethod]
-    public void ConcatTool_ImplementsIToolIntrospect()
+    public void MockConcatTool_ImplementsIToolIntrospect()
     {
         // Arrange & Act
-        var tool = new ConcatTool();
+        var tool = new MockConcatTool();
 
         // Assert
         Assert.IsTrue(tool is IToolIntrospect);
@@ -17,10 +18,10 @@ public class ToolCatalogTests
     }
 
     [TestMethod]
-    public void ConcatTool_Describe_ReturnsValidJson()
+    public void MockConcatTool_Describe_ReturnsValidJson()
     {
         // Arrange
-        var tool = new ConcatTool();
+        var tool = new MockConcatTool();
 
         // Act
         var description = tool.Describe();
@@ -34,35 +35,41 @@ public class ToolCatalogTests
         var root = jsonDoc.RootElement;
 
         Assert.AreEqual("concat", root.GetProperty("name").GetString());
-        Assert.AreEqual("Concatenate strings with a separator.", root.GetProperty("description").GetString());
+        Assert.AreEqual("Concatenate multiple strings together", root.GetProperty("description").GetString());
 
         var paramsObj = root.GetProperty("params");
         var properties = paramsObj.GetProperty("properties");
-        Assert.IsTrue(properties.TryGetProperty("items", out var items));
-        Assert.IsTrue(properties.TryGetProperty("sep", out var sep));
+        Assert.IsTrue(properties.TryGetProperty("strings", out var strings));
 
-        Assert.AreEqual("array", items.GetProperty("type").GetString());
-        Assert.AreEqual("string", items.GetProperty("items").GetProperty("type").GetString());
-
-        Assert.AreEqual("string", sep.GetProperty("type").GetString());
+        Assert.AreEqual("array", strings.GetProperty("type").GetString());
+        var stringsItemsType = strings.GetProperty("items").GetProperty("type");
+        if (stringsItemsType.ValueKind == JsonValueKind.Array)
+        {
+            var stringsItemsTypes = stringsItemsType.EnumerateArray().ToArray();
+            Assert.IsTrue(stringsItemsTypes.Any(t => t.GetString() == "string"));
+        }
+        else
+        {
+            Assert.AreEqual("string", stringsItemsType.GetString());
+        }
     }
 
     [TestMethod]
-    public void GetIndicatorTool_ImplementsIToolIntrospect()
+    public void MockValidationTool_ImplementsIToolIntrospect()
     {
         // Arrange & Act
-        var tool = new GetIndicatorTool();
+        var tool = new MockValidationTool();
 
         // Assert
         Assert.IsTrue(tool is IToolIntrospect);
-        Assert.AreEqual("get_indicator", tool.Name);
+        Assert.AreEqual("validate_input", tool.Name);
     }
 
     [TestMethod]
-    public void GetIndicatorTool_Describe_ReturnsValidJson()
+    public void MockValidationTool_Describe_ReturnsValidJson()
     {
         // Arrange
-        var tool = new GetIndicatorTool();
+        var tool = new MockValidationTool();
 
         // Act
         var description = tool.Describe();
@@ -75,60 +82,53 @@ public class ToolCatalogTests
         var jsonDoc = JsonDocument.Parse(description);
         var root = jsonDoc.RootElement;
 
-        Assert.AreEqual("get_indicator", root.GetProperty("name").GetString());
-        Assert.AreEqual("Fetch a single indicator value for a symbol.", root.GetProperty("description").GetString());
+        Assert.AreEqual("validate_input", root.GetProperty("name").GetString());
+        Assert.AreEqual("Validate input data with custom rules", root.GetProperty("description").GetString());
 
         var paramsObj = root.GetProperty("params");
 
         // The params object is a JSON schema, so properties are nested
         var properties = paramsObj.GetProperty("properties");
-        Assert.IsTrue(properties.TryGetProperty("symbol", out var symbol));
-        Assert.IsTrue(properties.TryGetProperty("indicator", out var indicator));
-        Assert.IsTrue(properties.TryGetProperty("period", out var period));
+        Assert.IsTrue(properties.TryGetProperty("input", out var input));
+        Assert.IsTrue(properties.TryGetProperty("rules", out var rules));
 
-        // Verify symbol parameter (now a union type)
-        var symbolType = symbol.GetProperty("type");
-
-        if (symbolType.ValueKind == JsonValueKind.Array)
+        // Verify input parameter (handle union type)
+        var inputType = input.GetProperty("type");
+        if (inputType.ValueKind == JsonValueKind.Array)
         {
-            var symbolTypes = symbolType.EnumerateArray().ToArray();
-            Assert.IsTrue(symbolTypes.Any(t => t.GetString() == "string"));
+            var inputTypes = inputType.EnumerateArray().ToArray();
+            Assert.IsTrue(inputTypes.Any(t => t.GetString() == "string"));
         }
         else
         {
-            Assert.AreEqual("string", symbolType.GetString());
+            Assert.AreEqual("string", inputType.GetString());
         }
 
-        // Verify indicator parameter (now a union type)
-        var indicatorType = indicator.GetProperty("type");
-
-        if (indicatorType.ValueKind == JsonValueKind.Array)
+        // Verify rules parameter
+        Assert.AreEqual("array", rules.GetProperty("type").GetString());
+        var rulesItemsType = rules.GetProperty("items").GetProperty("type");
+        if (rulesItemsType.ValueKind == JsonValueKind.Array)
         {
-            var indicatorTypes = indicatorType.EnumerateArray().ToArray();
-            Assert.IsTrue(indicatorTypes.Any(t => t.GetString() == "string"));
+            var rulesItemsTypes = rulesItemsType.EnumerateArray().ToArray();
+            Assert.IsTrue(rulesItemsTypes.Any(t => t.GetString() == "string"));
         }
         else
         {
-            Assert.AreEqual("string", indicatorType.GetString());
+            Assert.AreEqual("string", rulesItemsType.GetString());
         }
-
-        // Verify period parameter
-        Assert.AreEqual("integer", period.GetProperty("type").GetString());
-        Assert.AreEqual(1, period.GetProperty("minimum").GetInt32());
 
         // Verify required fields
         var required = paramsObj.GetProperty("required");
-        Assert.AreEqual(3, required.GetArrayLength());
-        Assert.IsTrue(required.EnumerateArray().Any(r => r.GetString() == "symbol"));
-        Assert.IsTrue(required.EnumerateArray().Any(r => r.GetString() == "indicator"));
-        Assert.IsTrue(required.EnumerateArray().Any(r => r.GetString() == "period"));
+        Assert.AreEqual(2, required.GetArrayLength());
+        Assert.IsTrue(required.EnumerateArray().Any(r => r.GetString() == "input"));
+        Assert.IsTrue(required.EnumerateArray().Any(r => r.GetString() == "rules"));
     }
 
     [TestMethod]
-    public void GetIndicatorTool_Describe_DoesNotIncludeReturnsSection()
+    public void MockValidationTool_Describe_DoesNotIncludeReturnsSection()
     {
         // Arrange
-        var tool = new GetIndicatorTool();
+        var tool = new MockValidationTool();
 
         // Act
         var description = tool.Describe();
@@ -154,12 +154,12 @@ public class ToolCatalogTests
 
         var tools = new Dictionary<string, ITool>
         {
-            ["concat"] = new ConcatTool(),
-            ["get_indicator"] = new GetIndicatorTool()
+            ["concat"] = new MockConcatTool(),
+            ["validate_input"] = new MockValidationTool()
         };
 
         // Act
-        var messages = AIAgentSharp.BuildMessages(state, tools, new AgentConfiguration());
+        var messages = new MessageBuilder(new AgentConfiguration()).BuildMessages(state, tools);
 
         // Assert
         Assert.AreEqual(2, messages.Count());
@@ -169,7 +169,7 @@ public class ToolCatalogTests
         var content = userMessage.Content;
         Assert.IsTrue(content.Contains("TOOL CATALOG"));
         Assert.IsTrue(content.Contains("concat:"));
-        Assert.IsTrue(content.Contains("get_indicator:"));
+        Assert.IsTrue(content.Contains("validate_input:"));
         Assert.IsTrue(content.Contains("GOAL:"));
         Assert.IsTrue(content.Contains("HISTORY"));
     }
@@ -187,19 +187,19 @@ public class ToolCatalogTests
 
         var tools = new Dictionary<string, ITool>
         {
-            ["concat"] = new ConcatTool(),
-            ["get_indicator"] = new GetIndicatorTool()
+            ["concat"] = new MockConcatTool(),
+            ["validate_input"] = new MockValidationTool()
         };
 
         // Act
-        var messages = AIAgentSharp.BuildMessages(state, tools, new AgentConfiguration());
+        var messages = new MessageBuilder(new AgentConfiguration()).BuildMessages(state, tools);
         var content = messages.Last().Content;
 
         // Assert
         Assert.IsTrue(content.Contains("concat: {\"name\":\"concat\""));
-        Assert.IsTrue(content.Contains("get_indicator: {\"name\":\"get_indicator\""));
-        Assert.IsTrue(content.Contains("\"description\":\"Concatenate strings with a separator.\""));
-        Assert.IsTrue(content.Contains("\"description\":\"Fetch a single indicator value for a symbol.\""));
+        Assert.IsTrue(content.Contains("validate_input: {\"name\":\"validate_input\""));
+        Assert.IsTrue(content.Contains("\"description\":\"Concatenate multiple strings together\""));
+        Assert.IsTrue(content.Contains("\"description\":\"Validate input data with custom rules\""));
     }
 
     [TestMethod]
@@ -220,7 +220,7 @@ public class ToolCatalogTests
         };
 
         // Act
-        var messages = AIAgentSharp.BuildMessages(state, tools, new AgentConfiguration());
+        var messages = new MessageBuilder(new AgentConfiguration()).BuildMessages(state, tools);
         var content = messages.Last().Content;
 
         // Assert
@@ -240,11 +240,11 @@ public class ToolCatalogTests
 
         var tools = new Dictionary<string, ITool>
         {
-            ["concat"] = new ConcatTool()
+            ["concat"] = new MockConcatTool()
         };
 
         // Act
-        var messages = AIAgentSharp.BuildMessages(state, tools, new AgentConfiguration());
+        var messages = new MessageBuilder(new AgentConfiguration()).BuildMessages(state, tools);
         var content = messages.Last().Content;
 
         // Assert
@@ -283,11 +283,11 @@ public class ToolCatalogTests
 
         var tools = new Dictionary<string, ITool>
         {
-            ["concat"] = new ConcatTool()
+            ["concat"] = new MockConcatTool()
         };
 
         // Act
-        var messages = AIAgentSharp.BuildMessages(state, tools, new AgentConfiguration());
+        var messages = new MessageBuilder(new AgentConfiguration()).BuildMessages(state, tools);
         var content = messages.Last().Content;
 
         // Assert
@@ -300,7 +300,7 @@ public class ToolCatalogTests
     public void ToolCatalog_JsonSchema_IsValid()
     {
         // Arrange
-        var tools = new ITool[] { new ConcatTool(), new GetIndicatorTool() };
+        var tools = new ITool[] { new MockConcatTool(), new MockValidationTool() };
 
         // Act & Assert
         foreach (var tool in tools)
@@ -326,62 +326,63 @@ public class ToolCatalogTests
     }
 
     [TestMethod]
-    public void ToolCatalog_IndicatorType_IsString()
+    public void ToolCatalog_ValidationRulesType_IsArray()
     {
         // Arrange
-        var tool = new GetIndicatorTool();
+        var tool = new MockValidationTool();
 
         // Act
         var description = tool.Describe();
         var jsonDoc = JsonDocument.Parse(description);
-        var indicatorParam = jsonDoc.RootElement.GetProperty("params").GetProperty("properties").GetProperty("indicator");
+        var rulesParam = jsonDoc.RootElement.GetProperty("params").GetProperty("properties").GetProperty("rules");
 
-        // Assert - handle union type for nullable string
-        var indicatorType = indicatorParam.GetProperty("type");
+        // Assert - rules should be an array of strings
+        var rulesType = rulesParam.GetProperty("type");
+        Assert.AreEqual("array", rulesType.GetString());
 
-        if (indicatorType.ValueKind == JsonValueKind.Array)
+        var itemsType = rulesParam.GetProperty("items").GetProperty("type");
+        if (itemsType.ValueKind == JsonValueKind.Array)
         {
-            var indicatorTypes = indicatorType.EnumerateArray().ToArray();
-            Assert.IsTrue(indicatorTypes.Any(t => t.GetString() == "string"));
+            var itemsTypes = itemsType.EnumerateArray().ToArray();
+            Assert.IsTrue(itemsTypes.Any(t => t.GetString() == "string"));
         }
         else
         {
-            Assert.AreEqual("string", indicatorType.GetString());
+            Assert.AreEqual("string", itemsType.GetString());
         }
 
-        // Check that indicator is in the required array
+        // Check that rules is in the required array
         var requiredArray = jsonDoc.RootElement.GetProperty("params").GetProperty("required");
         var requiredFields = requiredArray.EnumerateArray().Select(v => v.GetString()).ToArray();
-        Assert.IsTrue(requiredFields.Contains("indicator"));
+        Assert.IsTrue(requiredFields.Contains("rules"));
     }
 
     [TestMethod]
     public void ToolCatalog_RequiredFields_AreCorrect()
     {
         // Arrange
-        var concatTool = new ConcatTool();
-        var indicatorTool = new GetIndicatorTool();
+        var concatTool = new MockConcatTool();
+        var validationTool = new MockValidationTool();
 
         // Act
         var concatDesc = JsonDocument.Parse(concatTool.Describe());
-        var indicatorDesc = JsonDocument.Parse(indicatorTool.Describe());
+        var validationDesc = JsonDocument.Parse(validationTool.Describe());
 
-        // Assert - ConcatTool (uses required array at top level)
+        // Assert - MockConcatTool (uses required array at top level)
         var concatParams = concatDesc.RootElement.GetProperty("params");
         var concatRequiredArray = concatParams.GetProperty("required");
         var concatRequiredFields = concatRequiredArray.EnumerateArray().Select(v => v.GetString()).ToArray();
 
-        Assert.IsTrue(concatRequiredFields.Contains("items"));
+        Assert.IsTrue(concatRequiredFields.Contains("strings"));
         Assert.IsFalse(concatRequiredFields.Contains("sep"));
 
-        // Assert - GetIndicatorTool (uses required array at top level)
-        var indicatorParams = indicatorDesc.RootElement.GetProperty("params");
-        var requiredArray = indicatorParams.GetProperty("required");
+        // Assert - MockValidationTool (uses required array at top level)
+        var validationParams = validationDesc.RootElement.GetProperty("params");
+        var requiredArray = validationParams.GetProperty("required");
         var requiredFields = requiredArray.EnumerateArray().Select(v => v.GetString()).ToArray();
 
-        Assert.IsTrue(requiredFields.Contains("symbol"));
-        Assert.IsTrue(requiredFields.Contains("indicator"));
-        Assert.IsTrue(requiredFields.Contains("period"));
+        Assert.IsTrue(requiredFields.Contains("input"));
+        Assert.IsTrue(requiredFields.Contains("rules"));
     }
 
     [TestMethod]
@@ -398,7 +399,7 @@ public class ToolCatalogTests
         var tools = new Dictionary<string, ITool>();
 
         // Act
-        var messages = AIAgentSharp.BuildMessages(state, tools, new AgentConfiguration());
+        var messages = new MessageBuilder(new AgentConfiguration()).BuildMessages(state, tools);
         var content = messages.Last().Content;
 
         // Assert
@@ -406,7 +407,7 @@ public class ToolCatalogTests
         Assert.IsTrue(content.Contains("HISTORY"));
         // Should not contain any tool descriptions
         Assert.IsFalse(content.Contains("concat:"));
-        Assert.IsFalse(content.Contains("get_indicator:"));
+        Assert.IsFalse(content.Contains("validate_input:"));
     }
 
     [TestMethod]
@@ -422,12 +423,12 @@ public class ToolCatalogTests
 
         var tools = new Dictionary<string, ITool>
         {
-            ["concat"] = new ConcatTool(),
+            ["concat"] = new MockConcatTool(),
             ["basic_tool"] = new NonIntrospectTool()
         };
 
         // Act
-        var messages = AIAgentSharp.BuildMessages(state, tools, new AgentConfiguration());
+        var messages = new MessageBuilder(new AgentConfiguration()).BuildMessages(state, tools);
         var content = messages.Last().Content;
 
         // Assert
@@ -450,12 +451,11 @@ public class ToolCatalogTests
                     Index = 0,
                     ToolCall = new ToolCallRequest
                     {
-                        Tool = "get_indicator",
+                        Tool = "validate_input",
                         Params = new Dictionary<string, object?>
                         {
-                            ["symbol"] = "MNQ",
-                            ["indicator"] = "RSI",
-                            ["period"] = 14
+                            ["input"] = "test data",
+                            ["rules"] = new[] { "rule1", "rule2" }
                         }
                     },
                     ToolResult = new ToolExecutionResult
@@ -469,26 +469,26 @@ public class ToolCatalogTests
 
         var tools = new Dictionary<string, ITool>
         {
-            ["get_indicator"] = new GetIndicatorTool()
+            ["validate_input"] = new MockValidationTool()
         };
 
         // Act
-        var messages = AIAgentSharp.BuildMessages(state, tools, new AgentConfiguration());
+        var messages = new MessageBuilder(new AgentConfiguration()).BuildMessages(state, tools);
         var content = messages.Last().Content;
 
         // Assert
         Assert.IsTrue(content.Contains("TOOL_CALL:"));
         Assert.IsTrue(content.Contains("TOOL_RESULT:"));
-        Assert.IsTrue(content.Contains("get_indicator"));
-        Assert.IsTrue(content.Contains("MNQ"));
-        Assert.IsTrue(content.Contains("RSI"));
+        Assert.IsTrue(content.Contains("validate_input"));
+        Assert.IsTrue(content.Contains("test data"));
+        Assert.IsTrue(content.Contains("rule1"));
     }
 
     [TestMethod]
     public void ToolCatalog_JsonSchema_ConsistentFormat()
     {
         // Arrange
-        var tools = new ITool[] { new ConcatTool(), new GetIndicatorTool() };
+        var tools = new ITool[] { new MockConcatTool(), new MockValidationTool() };
 
         // Act & Assert
         foreach (var tool in tools)
@@ -523,31 +523,41 @@ public class ToolCatalogTests
     public void ToolCatalog_ParameterConstraints_AreValid()
     {
         // Arrange
-        var tool = new GetIndicatorTool();
+        var tool = new MockValidationTool();
 
         // Act
         var description = tool.Describe();
         var jsonDoc = JsonDocument.Parse(description);
-        var periodParam = jsonDoc.RootElement.GetProperty("params").GetProperty("properties").GetProperty("period");
+        var inputParam = jsonDoc.RootElement.GetProperty("params").GetProperty("properties").GetProperty("input");
 
         // Assert
-        Assert.IsTrue(periodParam.TryGetProperty("minimum", out var minimum));
-        Assert.AreEqual(1, minimum.GetInt32());
-        Assert.IsTrue(minimum.GetInt32() > 0);
+        var inputType = inputParam.GetProperty("type");
+        if (inputType.ValueKind == JsonValueKind.Array)
+        {
+            var inputTypes = inputType.EnumerateArray().ToArray();
+            Assert.IsTrue(inputTypes.Any(t => t.GetString() == "string"));
+        }
+        else
+        {
+            Assert.AreEqual("string", inputType.GetString());
+        }
+        Assert.IsTrue(inputParam.TryGetProperty("minLength", out var minLength));
+        Assert.AreEqual(1, minLength.GetInt32());
+        Assert.IsTrue(minLength.GetInt32() > 0);
     }
 
     [TestMethod]
     public void ToolCatalog_ReturnsSection_IsOptional()
     {
         // Arrange
-        var concatTool = new ConcatTool();
+        var concatTool = new MockConcatTool();
 
         // Act
         var description = concatTool.Describe();
         var jsonDoc = JsonDocument.Parse(description);
         var root = jsonDoc.RootElement;
 
-        // Assert - ConcatTool does not have returns section (it's optional)
+        // Assert - MockConcatTool does not have returns section (it's optional)
         Assert.IsFalse(root.TryGetProperty("returns", out var returns));
     }
 
@@ -564,11 +574,11 @@ public class ToolCatalogTests
 
         var tools = new Dictionary<string, ITool>
         {
-            ["concat"] = new ConcatTool()
+            ["concat"] = new MockConcatTool()
         };
 
         // Act
-        var messages = AIAgentSharp.BuildMessages(state, tools, new AgentConfiguration());
+        var messages = new MessageBuilder(new AgentConfiguration()).BuildMessages(state, tools);
 
         // Assert
         Assert.AreEqual(2, messages.Count());
@@ -576,6 +586,8 @@ public class ToolCatalogTests
         Assert.AreEqual("system", systemMessage.Role);
         Assert.IsTrue(systemMessage.Content.Contains("MODEL OUTPUT CONTRACT"));
     }
+
+
 
     // Helper class for testing non-introspect tools
     private class NonIntrospectTool : ITool

@@ -235,7 +235,7 @@ public sealed class BaseToolTests
         public override string Name => "test_tool";
         public override string Description => "Test tool for unit testing";
 
-        public override Task<object> InvokeTypedAsync(TestParams parameters, CancellationToken ct = default)
+        protected override Task<object> InvokeTypedAsync(TestParams parameters, CancellationToken ct = default)
         {
             return Task.FromResult<object>(new
             {
