@@ -449,3 +449,4 @@ Properties/launchSettings.json
 /coverage
 *.nupkg
 /coverage-report
+/test-results

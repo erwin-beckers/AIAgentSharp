@@ -697,28 +697,27 @@ public class TreeOfThoughtsEngineTests
         var context = "Test context";
         var tools = new Dictionary<string, ITool>();
 
-        // Setup a simple response that should work for basic functionality
-        _mockLlmClient.Setup(x => x.CompleteAsync(It.IsAny<List<LlmMessage>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new LlmCompletionResult 
-            { 
-                Content = "{\"thought\": \"Initial hypothesis for solving the problem\", \"thought_type\": \"Hypothesis\"}" 
-            });
+        // Provide a full sequence of responses matching the engine's expected flow
+        _mockLlmClient
+            .SetupSequence(x => x.CompleteAsync(It.IsAny<List<LlmMessage>>(), It.IsAny<CancellationToken>()))
+            // Root thought
+            .ReturnsAsync(new LlmCompletionResult { Content = "{\"thought\":\"Initial hypothesis for solving the problem\",\"thought_type\":\"Hypothesis\"}" })
+            // Evaluation of root
+            .ReturnsAsync(new LlmCompletionResult { Content = "{\"score\":0.82,\"reasoning\":\"solid\"}" })
+            // Child generation
+            .ReturnsAsync(new LlmCompletionResult { Content = "{\"children\":[{\"thought\":\"Option A\",\"thought_type\":\"Analysis\",\"estimated_score\":0.7},{\"thought\":\"Option B\",\"thought_type\":\"Alternative\",\"estimated_score\":0.6}]}" })
+            // Conclusion
+            .ReturnsAsync(new LlmCompletionResult { Content = "{\"conclusion\":\"Final answer\"}" });
 
         // Act
         var result = await _engine.ReasonAsync(goal, context, tools);
 
-        // Debug output
-        if (!result.Success)
-        {
-            Console.WriteLine($"Test failed with error: {result.Error}");
-        }
-
-        // Assert - Just verify the basic structure is created, even if exploration fails
-        Assert.IsNotNull(result);
-        Assert.IsTrue(result.ExecutionTimeMs > 0);
+        // Assert - With a complete response sequence, the engine should succeed
+        Assert.IsTrue(result.Success, result.Error);
         Assert.IsNotNull(result.Tree);
         Assert.AreEqual(goal, result.Tree!.Goal);
-        // Note: We don't assert Success because the exploration might fail due to complex LLM requirements
+        Assert.AreEqual("Final answer", result.Conclusion);
+        Assert.IsTrue(result.Tree.NodeCount >= 1);
     }
 
     #endregion
