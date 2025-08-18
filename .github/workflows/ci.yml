@@ -49,18 +49,20 @@ jobs:
     - name: Run tests with coverage
       run: |
         dotnet test --no-build --verbosity normal --configuration Release --collect:"XPlat Code Coverage" --results-directory ./coverage
+        echo "Coverage test completed"
+        Get-ChildItem -Path "." -Recurse -Filter "*.xml" | Where-Object { $_.Name -like "*coverage*" } | Select-Object FullName
       env:
         COVERLET_OUTPUT_FORMAT: cobertura
         
     - name: Find coverage file
       run: |
-        find ./coverage -name "*.xml" -type f
-        ls -la ./coverage/
+        Get-ChildItem -Path "./coverage" -Recurse -Filter "*.xml" | Select-Object FullName
+        Get-ChildItem -Path "./coverage" -Recurse | Select-Object Name, FullName
         
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4
       with:
-        file: ./coverage/**/coverage.cobertura.xml
+        file: ./coverage/**/coverage.cobertura.xml,./**/coverage.cobertura.xml
         flags: unittests
         name: codecov-umbrella
         fail_ci_if_error: false
