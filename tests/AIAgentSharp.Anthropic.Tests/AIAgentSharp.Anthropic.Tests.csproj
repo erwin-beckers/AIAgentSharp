@@ -12,9 +12,23 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
     <PackageReference Include="MSTest.TestAdapter" Version="3.6.4" />
     <PackageReference Include="MSTest.TestFramework" Version="3.6.4" />
-    <PackageReference Include="coverlet.collector" Version="6.0.1" />
+    <PackageReference Include="coverlet.collector" Version="6.0.4">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
     <PackageReference Include="Moq" Version="4.20.70" />
   </ItemGroup>
+
+  <PropertyGroup>
+    <CollectCoverage>true</CollectCoverage>
+    <CoverletOutputFormat>cobertura</CoverletOutputFormat>
+    <CoverletOutput>./coverage/</CoverletOutput>
+    <ExcludeByFile>**/*Tests.cs,**/*Test.cs,**/obj/**/*,**/bin/**/*,**/tests/**/*,**/TestResults/**/*,**/coverage/**/*,**/nupkg/**/*,**/examples/**/*,**/*.md,**/*.yml,**/*.yaml,**/*.json,**/*.xml,**/*.txt,**/*.ps1,**/*.sh,**/*.bat,**/*.cmd,**/*.gitignore,**/*.editorconfig,**/*.gitattributes,**/*.vsconfig,**/*.sln,**/*.csproj,**/*.props,**/*.targets,**/*.nuspec,**/*.nupkg,**/*.dll,**/*.exe,**/*.pdb,**/AIAgentSharp.Tests/**/*,**/tests/AIAgentSharp.Tests/**/*</ExcludeByFile>
+    <ExcludeByAttribute>Obsolete,GeneratedCodeAttribute,CompilerGeneratedAttribute</ExcludeByAttribute>
+    <SingleHit>false</SingleHit>
+    <IncludeTestAssembly>false</IncludeTestAssembly>
+    <Include>src/AIAgentSharp.Anthropic/**/*.cs</Include>
+  </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="../../src/AIAgentSharp.Anthropic/AIAgentSharp.Anthropic.csproj" />
