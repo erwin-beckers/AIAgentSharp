@@ -18,7 +18,6 @@
 
   <ItemGroup>
     <ProjectReference Include="../../src/AIAgentSharp.Anthropic/AIAgentSharp.Anthropic.csproj" />
-    <ProjectReference Include="../AIAgentSharp.Tests/AIAgentSharp.Tests.csproj" />
   </ItemGroup>
 
 </Project>
