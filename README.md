@@ -81,18 +81,37 @@ A comprehensive, production-ready .NET 8.0 framework for building LLM-powered ag
 
 ## 📦 Installation
 
-### Quick Start with NuGet Package
+### Available NuGet Packages
 
-The easiest way to get started is to install the NuGet package:
+| Package | Version | Description |
+|---------|---------|-------------|
+| `AIAgentSharp` | ![NuGet](https://img.shields.io/nuget/v/AIAgentSharp) | Core framework with abstract LLM interfaces, reasoning engines, and tool framework |
+| `AIAgentSharp.OpenAI` | ![NuGet](https://img.shields.io/nuget/v/AIAgentSharp.OpenAI) | OpenAI integration package with `OpenAiLlmClient` implementation |
 
+### Multiple LLM Provider Support
+
+AIAgentSharp supports multiple LLM providers through a flexible architecture:
+
+- **AIAgentSharp** - Core framework with abstract LLM interfaces
+- **AIAgentSharp.OpenAI** - OpenAI integration package
+- **Custom LLM Providers** - Implement `ILlmClient` for your preferred provider
+
+### Quick Start with NuGet Packages
+
+#### Core Framework
 ```bash
 dotnet add package AIAgentSharp
+```
+
+#### OpenAI Integration
+```bash
+dotnet add package AIAgentSharp.OpenAI
 ```
 
 ### Prerequisites
 
 - .NET 8.0 or later
-- OpenAI API key (or other LLM provider)
+- LLM provider API key (OpenAI, Anthropic, etc.)
 
 ### Basic Setup
 
@@ -102,9 +121,10 @@ dotnet add package AIAgentSharp
    cd MyAgentApp
    ```
 
-2. **Install the package**:
+2. **Install the packages**:
    ```bash
    dotnet add package AIAgentSharp
+   dotnet add package AIAgentSharp.OpenAI
    ```
 
 3. **Add required using statements** to your `Program.cs`:
@@ -112,6 +132,7 @@ dotnet add package AIAgentSharp
    using AIAgentSharp.Agents;
    using AIAgentSharp.StateStores;
    using AIAgentSharp.Examples;
+   using AIAgentSharp.OpenAI;
    ```
 
 4. **Set up your API key**:
@@ -123,7 +144,7 @@ dotnet add package AIAgentSharp
    export OPENAI_API_KEY=your-api-key-here
    ```
 
-5. **Create a basic agent**:
+5. **Create a basic agent with OpenAI**:
    ```csharp
    var llm = new OpenAiLlmClient(Environment.GetEnvironmentVariable("OPENAI_API_KEY")!);
    var store = new MemoryAgentStateStore();
@@ -132,6 +153,28 @@ dotnet add package AIAgentSharp
    var result = await agent.RunAsync("my-agent", "Hello, how are you?", new List<ITool>());
    Console.WriteLine(result.FinalOutput);
    ```
+
+### Using Different LLM Providers
+
+#### OpenAI Integration
+```csharp
+using AIAgentSharp.OpenAI;
+
+var llm = new OpenAiLlmClient(apiKey);
+var agent = new Agent(llm, store);
+```
+
+#### Custom LLM Provider
+```csharp
+// Implement ILlmClient for your preferred provider
+public class MyCustomLlmClient : ILlmClient
+{
+    // Implementation details...
+}
+
+var llm = new MyCustomLlmClient();
+var agent = new Agent(llm, store);
+```
 
 ### Manual Installation
 
@@ -174,7 +217,29 @@ The framework is built around several key components:
 - **`BaseTool<TParams, TResult>`**: Base class for strongly-typed tools with validation
 - **`IAgentStateStore`**: Pluggable state persistence layer
 - **`ILlmClient`**: Abstract LLM client interface for different providers
+- **`OpenAiLlmClient`**: OpenAI integration implementation
 - **Event System**: Comprehensive event system for monitoring and integration
+
+### Multi-Provider Architecture
+
+AIAgentSharp uses a clean separation between the core framework and LLM provider implementations:
+
+```
+AIAgentSharp (Core Framework)
+├── ILlmClient (Abstract Interface)
+├── Agent (Provider-agnostic)
+├── Reasoning Engines
+└── Tool Framework
+
+AIAgentSharp.OpenAI (Provider Implementation)
+├── OpenAiLlmClient (ILlmClient implementation)
+├── OpenAiConfiguration
+└── OpenAI-specific utilities
+
+Custom Providers
+├── YourCustomLlmClient (ILlmClient implementation)
+└── Provider-specific configuration
+```
 
 ## 🚀 Quick Start
 
@@ -183,6 +248,7 @@ The framework is built around several key components:
 ```csharp
 using AIAgentSharp.Agents;
 using AIAgentSharp.Examples;
+using AIAgentSharp.OpenAI;
 
 // Create components
 var llm = new OpenAiLlmClient(apiKey);

@@ -1,6 +1,4 @@
 using AIAgentSharp.Agents;
-using AIAgentSharp;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace AIAgentSharp.Tests.Agents;
 

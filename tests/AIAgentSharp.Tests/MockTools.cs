@@ -1,4 +1,3 @@
-using AIAgentSharp;
 using System.ComponentModel.DataAnnotations;
 
 namespace AIAgentSharp.Tests;

@@ -1,6 +1,7 @@
 ﻿using AIAgentSharp;
 using AIAgentSharp.Agents;
 using AIAgentSharp.Examples;
+using AIAgentSharp.OpenAI;
 using Examples;
 
 /// <summary>

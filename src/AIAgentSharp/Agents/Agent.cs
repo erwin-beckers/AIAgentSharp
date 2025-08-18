@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using AIAgentSharp.Agents.Interfaces;
 
 namespace AIAgentSharp.Agents;

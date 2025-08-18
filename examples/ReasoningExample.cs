@@ -2,6 +2,7 @@ using AIAgentSharp;
 using AIAgentSharp.Agents;
 using AIAgentSharp.Agents.Interfaces;
 using AIAgentSharp.Examples;
+using AIAgentSharp.OpenAI;
 
 namespace Examples;
 

@@ -1,6 +1,5 @@
 using AIAgentSharp.Agents;
 using AIAgentSharp.Agents.Interfaces;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 
 namespace AIAgentSharp.Tests.Agents;

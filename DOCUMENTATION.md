@@ -10,17 +10,33 @@
 6. [LLM Integration](#llm-integration)
 7. [Event System](#event-system)
 8. [Configuration](#configuration)
-9. [Usage Examples](#usage-examples)
-10. [Advanced Features](#advanced-features)
-11. [Testing](#testing)
-12. [Performance Considerations](#performance-considerations)
-13. [Error Handling](#error-handling)
-14. [API Reference](#api-reference)
-15. [Contributing](#contributing)
+9. [Installation and Setup](#installation-and-setup)
+10. [Usage Examples](#usage-examples)
+11. [Advanced Features](#advanced-features)
+12. [Testing](#testing)
+13. [Performance Considerations](#performance-considerations)
+14. [Error Handling](#error-handling)
+15. [API Reference](#api-reference)
+16. [Contributing](#contributing)
 
 ## Project Overview
 
 **AIAgentSharp** is a comprehensive, production-ready .NET 8.0 framework for building LLM-powered agents with tool calling capabilities. The framework implements the Re/Act (Reasoning and Acting) pattern and supports OpenAI-style function calling, providing a complete solution for creating intelligent agents that can reason, act, and observe.
+
+### Multiple LLM Provider Support
+
+AIAgentSharp supports multiple LLM providers through a flexible architecture:
+
+- **AIAgentSharp** - Core framework with abstract LLM interfaces, reasoning engines, and tool framework
+- **AIAgentSharp.OpenAI** - OpenAI integration package with `OpenAiLlmClient` implementation
+- **Custom LLM Providers** - Implement `ILlmClient` for your preferred provider
+
+### Available NuGet Packages
+
+| Package | Version | Description |
+|---------|---------|-------------|
+| `AIAgentSharp` | ![NuGet](https://img.shields.io/nuget/v/AIAgentSharp) | Core framework with abstract LLM interfaces, reasoning engines, and tool framework |
+| `AIAgentSharp.OpenAI` | ![NuGet](https://img.shields.io/nuget/v/AIAgentSharp.OpenAI) | OpenAI integration package with `OpenAiLlmClient` implementation |
 
 ### Key Features
 
@@ -40,22 +56,47 @@
 
 ```
 AIAgentSharp/
-├── src/AIAgentSharp/           # Main library source
+├── src/AIAgentSharp/           # Core framework source
 │   ├── Agents/                 # Core agent implementation
 │   ├── Contracts/              # Interface definitions
 │   ├── Models/                 # Data models and DTOs
 │   ├── Tools/                  # Tool framework
 │   ├── Configuration/          # Configuration classes
 │   ├── Events/                 # Event system
-│   ├── Llm/                    # LLM integration
+│   ├── Llm/                    # LLM integration interfaces
 │   ├── StateStores/            # State persistence
 │   ├── Schema/                 # Schema generation
 │   ├── Validation/             # Validation framework
 │   ├── Utils/                  # Utility classes
 │   └── Logging/                # Logging infrastructure
+├── src/AIAgentSharp.OpenAI/    # OpenAI integration package
+│   ├── OpenAiLlmClient.cs      # OpenAI LLM client implementation
+│   ├── OpenAiConfiguration.cs  # OpenAI-specific configuration
+│   └── README.md               # OpenAI package documentation
 ├── examples/                   # Usage examples
 ├── tests/                      # Comprehensive test suite
 └── docs/                       # Documentation
+```
+
+### Multi-Provider Architecture
+
+AIAgentSharp uses a clean separation between the core framework and LLM provider implementations:
+
+```
+AIAgentSharp (Core Framework)
+├── ILlmClient (Abstract Interface)
+├── Agent (Provider-agnostic)
+├── Reasoning Engines
+└── Tool Framework
+
+AIAgentSharp.OpenAI (Provider Implementation)
+├── OpenAiLlmClient (ILlmClient implementation)
+├── OpenAiConfiguration
+└── OpenAI-specific utilities
+
+Custom Providers
+├── YourCustomLlmClient (ILlmClient implementation)
+└── Provider-specific configuration
 ```
 
 ## Architecture
@@ -415,7 +456,7 @@ public sealed class AgentState
 
 ## LLM Integration
 
-The framework supports multiple LLM providers through the `ILlmClient` interface.
+The framework supports multiple LLM providers through the `ILlmClient` interface, with a clean separation between the core framework and provider implementations.
 
 ### ILlmClient Interface
 
@@ -426,32 +467,103 @@ public interface ILlmClient
 }
 ```
 
-### Built-in LLM Clients
+### Available LLM Providers
 
-#### OpenAiLlmClient
+#### AIAgentSharp.OpenAI Package
+
+The `AIAgentSharp.OpenAI` package provides OpenAI integration:
 
 ```csharp
-public class OpenAiLlmClient : ILlmClient
+using AIAgentSharp.OpenAI;
+
+// Basic usage
+var llm = new OpenAiLlmClient(apiKey);
+
+// With custom configuration
+var config = new OpenAiConfiguration
 {
-    private readonly OpenAIClient _client;
+    Model = "gpt-4o-mini",
+    Temperature = 0.1f,
+    MaxTokens = 4000,
+    EnableFunctionCalling = true
+};
+var llm = new OpenAiLlmClient(apiKey, config);
+```
+
+#### OpenAiLlmClient Features
+
+```csharp
+public sealed class OpenAiLlmClient : ILlmClient, IFunctionCallingLlmClient
+{
+    // Constructor overloads
+    public OpenAiLlmClient(string apiKey, string model = "gpt-4o-mini", ILogger? logger = null);
+    public OpenAiLlmClient(string apiKey, OpenAiConfiguration configuration, ILogger? logger = null);
+    
+    // Function calling support
+    public async Task<FunctionCallResult> CompleteWithFunctionsAsync(
+        IEnumerable<LlmMessage> messages, 
+        IEnumerable<OpenAiFunctionSpec> functions, 
+        CancellationToken ct = default);
+}
+```
+
+#### OpenAiConfiguration Options
+
+```csharp
+public sealed class OpenAiConfiguration
+{
+    public string Model { get; init; } = "gpt-4o-mini";
+    public int MaxTokens { get; init; } = 4000;
+    public float Temperature { get; init; } = 0.1f;
+    public float TopP { get; init; } = 1.0f;
+    public float FrequencyPenalty { get; init; } = 0.0f;
+    public float PresencePenalty { get; init; } = 0.0f;
+    public bool EnableStreaming { get; init; } = false;
+    public TimeSpan RequestTimeout { get; init; } = TimeSpan.FromMinutes(2);
+    public int MaxRetries { get; init; } = 3;
+    public TimeSpan RetryDelay { get; init; } = TimeSpan.FromSeconds(1);
+    public bool EnableFunctionCalling { get; init; } = true;
+    public string? OrganizationId { get; init; }
+    public string? ApiBaseUrl { get; init; }
+    
+    // Factory methods for common use cases
+    public static OpenAiConfiguration CreateForAgentReasoning();
+    public static OpenAiConfiguration CreateForCreativeTasks();
+    public static OpenAiConfiguration CreateForCostEfficiency();
+}
+```
+
+#### Custom LLM Provider Implementation
+
+You can implement your own LLM provider by implementing the `ILlmClient` interface:
+
+```csharp
+public class AnthropicLlmClient : ILlmClient
+{
+    private readonly string _apiKey;
     private readonly string _model;
     
-    public OpenAiLlmClient(string apiKey, string model = "gpt-4")
+    public AnthropicLlmClient(string apiKey, string model = "claude-3-sonnet-20240229")
     {
-        _client = new OpenAIClient(apiKey);
+        _apiKey = apiKey;
         _model = model;
     }
     
     public async Task<string> CompleteAsync(IEnumerable<LlmMessage> messages, CancellationToken ct = default)
     {
-        var chatMessages = messages.Select(m => new ChatMessage(m.Role, m.Content)).ToList();
-        var response = await _client.GetChatCompletionsAsync(_model, chatMessages, ct);
-        return response.Value.Choices[0].Message.Content;
+        // Implement Anthropic API integration
+        // Convert messages to Anthropic format
+        // Make API call and return response
+        throw new NotImplementedException("Implement Anthropic API integration");
     }
 }
+
+// Usage
+var llm = new AnthropicLlmClient(apiKey);
+var agent = new Agent(llm, store);
 ```
 
-#### DelegateLlmClient
+#### DelegateLlmClient (Testing/Development)
 
 ```csharp
 public class DelegateLlmClient : ILlmClient
@@ -551,7 +663,7 @@ agent.StatusUpdate += (sender, e) =>
 
 ## Configuration
 
-The `AgentConfiguration` class provides extensive configuration options:
+The `AgentConfiguration` class provides extensive configuration options including advanced reasoning settings:
 
 ```csharp
 public sealed class AgentConfiguration
@@ -583,8 +695,105 @@ public sealed class AgentConfiguration
     public int MaxThoughtsLength { get; init; } = 20000;
     public int MaxFinalLength { get; init; } = 50000;
     public int MaxSummaryLength { get; init; } = 40000;
+    
+    // Reasoning Configuration
+    public ReasoningType ReasoningType { get; init; } = ReasoningType.None;
+    public int MaxReasoningSteps { get; init; } = 10;
+    public int MaxTreeDepth { get; init; } = 5;
+    public int MaxTreeNodes { get; init; } = 50;
+    public ExplorationStrategy TreeExplorationStrategy { get; init; } = ExplorationStrategy.BestFirst;
+    public bool EnableReasoningValidation { get; init; } = true;
+    public double MinReasoningConfidence { get; init; } = 0.7;
 }
 ```
+
+### Reasoning Configuration Options
+
+#### Chain of Thought Configuration
+```csharp
+var cotConfig = new AgentConfiguration
+{
+    ReasoningType = ReasoningType.ChainOfThought,
+    MaxReasoningSteps = 10,
+    EnableReasoningValidation = true,
+    MinReasoningConfidence = 0.7
+};
+```
+
+#### Tree of Thoughts Configuration
+```csharp
+var totConfig = new AgentConfiguration
+{
+    ReasoningType = ReasoningType.TreeOfThoughts,
+    MaxTreeDepth = 6,
+    MaxTreeNodes = 80,
+    TreeExplorationStrategy = ExplorationStrategy.BestFirst,
+    EnableReasoningValidation = true,
+    MinReasoningConfidence = 0.6
+};
+```
+
+#### Hybrid Reasoning Configuration
+```csharp
+var hybridConfig = new AgentConfiguration
+{
+    ReasoningType = ReasoningType.Hybrid,
+    MaxReasoningSteps = 6,
+    MaxTreeDepth = 4,
+    MaxTreeNodes = 50,
+    TreeExplorationStrategy = ExplorationStrategy.BeamSearch,
+    EnableReasoningValidation = true,
+    MinReasoningConfidence = 0.65
+};
+```
+
+## Installation and Setup
+
+### Prerequisites
+
+- .NET 8.0 or later
+- LLM provider API key (OpenAI, Anthropic, etc.)
+
+### NuGet Package Installation
+
+#### Core Framework
+```bash
+dotnet add package AIAgentSharp
+```
+
+#### OpenAI Integration
+```bash
+dotnet add package AIAgentSharp.OpenAI
+```
+
+### Manual Installation
+
+If you prefer to build from source:
+
+1. **Clone the repository**:
+   ```bash
+   git clone <repository-url>
+   cd AIAgentSharp
+   ```
+
+2. **Set your API key**:
+   ```bash
+   # Windows
+   set OPENAI_API_KEY=your-api-key-here
+   
+   # Linux/macOS
+   export OPENAI_API_KEY=your-api-key-here
+   ```
+
+3. **Build the project**:
+   ```bash
+   dotnet build
+   ```
+
+4. **Run the example**:
+   ```bash
+   dotnet run --project examples
+   ```
 
 ## Usage Examples
 
@@ -592,6 +801,7 @@ public sealed class AgentConfiguration
 
 ```csharp
 using AIAgentSharp.Agents;
+using AIAgentSharp.OpenAI;
 
 // Create components
 var llm = new OpenAiLlmClient(apiKey);
@@ -624,6 +834,28 @@ var result = await agent.RunAsync("travel-agent", "Plan a 3-day trip to Paris fo
 
 Console.WriteLine($"Success: {result.Succeeded}");
 Console.WriteLine($"Output: {result.FinalOutput}");
+```
+
+### Using Different LLM Providers
+
+#### OpenAI Integration
+```csharp
+using AIAgentSharp.OpenAI;
+
+var llm = new OpenAiLlmClient(apiKey);
+var agent = new Agent(llm, store);
+```
+
+#### Custom LLM Provider
+```csharp
+// Implement ILlmClient for your preferred provider
+public class MyCustomLlmClient : ILlmClient
+{
+    // Implementation details...
+}
+
+var llm = new MyCustomLlmClient();
+var agent = new Agent(llm, store);
 ```
 
 ### Step-by-Step Execution
@@ -684,6 +916,71 @@ public class DatabaseStateStore : IAgentStateStore
 ```
 
 ## Advanced Features
+
+### Advanced Reasoning Engines
+
+AIAgentSharp supports multiple reasoning strategies for complex problem-solving:
+
+#### Chain of Thought (CoT) Reasoning
+
+Sequential step-by-step reasoning for complex problem decomposition:
+
+```csharp
+var config = new AgentConfiguration
+{
+    ReasoningType = ReasoningType.ChainOfThought,
+    MaxReasoningSteps = 10,
+    EnableReasoningValidation = true,
+    MinReasoningConfidence = 0.7
+};
+
+var agent = new Agent(llm, store, config: config);
+```
+
+#### Tree of Thoughts (ToT) Reasoning
+
+Multi-branch exploration of solution paths with configurable exploration strategies:
+
+```csharp
+var config = new AgentConfiguration
+{
+    ReasoningType = ReasoningType.TreeOfThoughts,
+    MaxTreeDepth = 6,
+    MaxTreeNodes = 80,
+    TreeExplorationStrategy = ExplorationStrategy.BestFirst,
+    EnableReasoningValidation = true,
+    MinReasoningConfidence = 0.6
+};
+
+var agent = new Agent(llm, store, config: config);
+```
+
+#### Hybrid Reasoning
+
+Combination of multiple reasoning approaches for optimal results:
+
+```csharp
+var config = new AgentConfiguration
+{
+    ReasoningType = ReasoningType.Hybrid,
+    MaxReasoningSteps = 6,
+    MaxTreeDepth = 4,
+    MaxTreeNodes = 50,
+    TreeExplorationStrategy = ExplorationStrategy.BeamSearch,
+    EnableReasoningValidation = true,
+    MinReasoningConfidence = 0.65
+};
+
+var agent = new Agent(llm, store, config: config);
+```
+
+#### Exploration Strategies
+
+- **BestFirst**: Explore the most promising paths first (default)
+- **BreadthFirst**: Explore all paths at the same depth before going deeper
+- **DepthFirst**: Explore one path to maximum depth before backtracking
+- **BeamSearch**: Maintain a limited set of most promising paths
+- **MonteCarlo**: Use random sampling for exploration
 
 ### Loop Detection
 

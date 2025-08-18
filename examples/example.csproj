@@ -14,11 +14,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="OpenAI" Version="2.3.0" />
-  </ItemGroup>
-
-  <ItemGroup>
     <ProjectReference Include="..\src\AIAgentSharp\AIAgentSharp.csproj" />
+    <ProjectReference Include="..\src\AIAgentSharp.OpenAI\AIAgentSharp.OpenAI.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,6 +1,5 @@
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace AIAgentSharp.Tests;
 
