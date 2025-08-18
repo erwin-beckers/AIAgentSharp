@@ -68,4 +68,4 @@ jobs:
         token: ${{ secrets.CODECOV_TOKEN }}
         path_to_write_report: ./coverage/codecov_report.txt
         coverage_command: custom
-        custom_flags: --source src/ --exclude tests/ --exclude examples/ --exclude **/*.Tests.cs
+        custom_flags: --source src/ --exclude tests/ --exclude examples/ --exclude **/*.Tests.cs --exclude **/*.Tests.csproj --exclude **/TestResults/ --exclude **/obj/ --exclude **/bin/ --exclude **/coverage/ --exclude **/nupkg/

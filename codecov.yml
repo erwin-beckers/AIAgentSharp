@@ -33,7 +33,9 @@ parsers:
       subroutine: no
 
 ignore:
+  # Test files and directories
   - "tests/"
+  - "**/tests/"
   - "**/*.Tests.cs"
   - "**/*.Tests.csproj"
   - "**/TestResults/"
@@ -42,6 +44,7 @@ ignore:
   - "**/coverage/"
   - "**/nupkg/"
   - "**/examples/"
+  # Configuration and documentation files
   - "**/*.md"
   - "**/*.yml"
   - "**/*.yaml"
@@ -62,6 +65,7 @@ ignore:
   - "**/*.targets"
   - "**/*.nuspec"
   - "**/*.nupkg"
+  # Binary and generated files
   - "**/*.dll"
   - "**/*.exe"
   - "**/*.pdb"
