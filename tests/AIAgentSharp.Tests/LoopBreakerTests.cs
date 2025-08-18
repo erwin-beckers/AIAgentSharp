@@ -6,10 +6,10 @@ namespace AIAgentSharp.Tests;
 [TestClass]
 public class LoopBreakerTests
 {
-    private MockLlmClient _mockLlmClient;
-    private MemoryAgentStateStore _stateStore;
-    private IMetricsCollector _metricsCollector;
-    private Agent _agent;
+    private MockLlmClient _mockLlmClient = null!;
+    private MemoryAgentStateStore _stateStore = null!;
+    private IMetricsCollector _metricsCollector = null!;
+    private Agent _agent = null!;
 
     [TestInitialize]
     public void Setup()
@@ -40,7 +40,7 @@ public class LoopBreakerTests
         Assert.IsFalse(result.Succeeded);
         // The loop detection is working (we can see the warnings in the logs), but the agent continues until MaxTurns
         // The current implementation adds controller turns rather than stopping execution
-        Assert.IsTrue(result.Error.Contains("max steps") || result.Error.Contains("Max turns"));
+        Assert.IsTrue(result.Error?.Contains("max steps") == true || result.Error?.Contains("Max turns") == true);
     }
 
     [TestMethod]
@@ -88,7 +88,7 @@ public class LoopBreakerTests
         Assert.IsFalse(result.Succeeded);
         // The loop detection is working (we can see the warnings in the logs), but the agent continues until MaxTurns
         // The current implementation adds controller turns rather than stopping execution
-        Assert.IsTrue(result.Error.Contains("max steps") || result.Error.Contains("Max turns"));
+        Assert.IsTrue(result.Error?.Contains("max steps") == true || result.Error?.Contains("Max turns") == true);
     }
 
     [TestMethod]
@@ -113,7 +113,7 @@ public class LoopBreakerTests
         Assert.IsFalse(result.Succeeded);
         // The loop detection is working (we can see the warnings in the logs), but the agent continues until MaxTurns
         // The current implementation adds controller turns rather than stopping execution
-        Assert.IsTrue(result.Error.Contains("max steps") || result.Error.Contains("Max turns"));
+        Assert.IsTrue(result.Error?.Contains("max steps") == true || result.Error?.Contains("Max turns") == true);
     }
 
     [TestMethod]
@@ -162,7 +162,7 @@ public class LoopBreakerTests
         Assert.IsFalse(result.Succeeded);
         // The current loop detection only works with failed tool calls, not successful ones
         // The deduplication mechanism reuses successful results, preventing loop detection
-        Assert.IsTrue(result.Error.Contains("max steps") || result.Error.Contains("Max turns"));
+        Assert.IsTrue(result.Error?.Contains("max steps") == true || result.Error?.Contains("Max turns") == true);
     }
 
     [TestMethod]
@@ -236,7 +236,7 @@ public class LoopBreakerTests
         Assert.IsFalse(result.Succeeded);
         // The loop detection is working (we can see the warnings in the logs), but the agent continues until MaxTurns
         // The current implementation adds controller turns rather than stopping execution
-        Assert.IsTrue(result.Error.Contains("max steps") || result.Error.Contains("Max turns"));
+        Assert.IsTrue(result.Error?.Contains("max steps") == true || result.Error?.Contains("Max turns") == true);
     }
 
     private class MockLlmClient : ILlmClient
@@ -266,3 +266,4 @@ public class LoopBreakerTests
         }
     }
 }
+

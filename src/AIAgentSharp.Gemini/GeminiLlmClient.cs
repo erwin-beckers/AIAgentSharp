@@ -141,7 +141,7 @@ public sealed class GeminiLlmClient : ILlmClient
         var content = geminiResponse.Candidates[0].Content.Parts[0].Text;
 
         // Extract JSON from markdown code blocks if present
-        var extractedContent = ExtractJsonFromMarkdown(content);
+        var extractedContent = ExtractJsonFromMarkdown(content ?? string.Empty);
 
         return new LlmCompletionResult
         {
@@ -222,7 +222,7 @@ public sealed class GeminiLlmClient : ILlmClient
         var content = candidate.Content.Parts[0].Text;
 
         // Extract JSON from markdown code blocks if present
-        var extractedContent = ExtractJsonFromMarkdown(content);
+        var extractedContent = ExtractJsonFromMarkdown(content ?? string.Empty);
 
         var result = new FunctionCallResult
         {

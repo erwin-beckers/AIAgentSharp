@@ -8,13 +8,13 @@ namespace AIAgentSharp.Tests.Agents;
 [TestClass]
 public class LlmCommunicatorTests
 {
-    private Mock<ILlmClient> _mockLlmClient;
-    private Mock<IEventManager> _mockEventManager;
-    private Mock<IStatusManager> _mockStatusManager;
-    private Mock<ILogger> _mockLogger;
-    private IMetricsCollector _metricsCollector;
-    private AgentConfiguration _config;
-    private LlmCommunicator _communicator;
+    private Mock<ILlmClient> _mockLlmClient = null!;
+    private Mock<IEventManager> _mockEventManager = null!;
+    private Mock<IStatusManager> _mockStatusManager = null!;
+    private Mock<ILogger> _mockLogger = null!;
+    private IMetricsCollector _metricsCollector = null!;
+    private AgentConfiguration _config = null!;
+    private LlmCommunicator _communicator = null!;
 
     [TestInitialize]
     public void Setup()

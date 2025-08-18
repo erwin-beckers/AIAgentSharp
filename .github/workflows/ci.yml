@@ -66,3 +66,6 @@ jobs:
         fail_ci_if_error: false
         verbose: true
         token: ${{ secrets.CODECOV_TOKEN }}
+        path_to_write_report: ./coverage/codecov_report.txt
+        coverage_command: custom
+        custom_flags: --source src/ --exclude tests/ --exclude examples/ --exclude **/*.Tests.cs

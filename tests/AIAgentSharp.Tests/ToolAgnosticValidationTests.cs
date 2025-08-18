@@ -6,10 +6,10 @@ namespace AIAgentSharp.Tests;
 [TestClass]
 public class ToolAgnosticValidationTests
 {
-    private MockLlmClient _mockLlmClient;
-    private MemoryAgentStateStore _stateStore;
-    private IMetricsCollector _metricsCollector;
-    private Agent _agent;
+    private MockLlmClient _mockLlmClient = null!;
+    private MemoryAgentStateStore _stateStore = null!;
+    private IMetricsCollector _metricsCollector = null!;
+    private Agent _agent = null!;
 
     [TestInitialize]
     public void Setup()
@@ -37,7 +37,7 @@ public class ToolAgnosticValidationTests
 
         // Assert
         Assert.IsTrue(result.Succeeded);
-        Assert.IsTrue(result.FinalOutput.Contains("8"));
+        Assert.IsTrue(result.FinalOutput?.Contains("8"));
     }
 
     [TestMethod]
@@ -59,7 +59,7 @@ public class ToolAgnosticValidationTests
 
         // Assert
         Assert.IsFalse(result.Succeeded);
-        Assert.IsTrue(result.Error.Contains("tool") || result.Error.Contains("not found"));
+        Assert.IsTrue(result.Error?.Contains("tool") == true || result.Error?.Contains("not found") == true);
     }
 
     [TestMethod]
@@ -80,7 +80,7 @@ public class ToolAgnosticValidationTests
 
         // Assert
         Assert.IsFalse(result.Succeeded);
-        Assert.IsTrue(result.Error.Contains("parameter") || result.Error.Contains("required") || result.Error.Contains("Max turns") || result.Error.Contains("without completion"));
+        Assert.IsTrue(result.Error?.Contains("parameter") == true || result.Error?.Contains("required") == true || result.Error?.Contains("Max turns") == true || result.Error?.Contains("without completion") == true);
     }
 
     [TestMethod]
@@ -101,7 +101,7 @@ public class ToolAgnosticValidationTests
 
         // Assert
         Assert.IsFalse(result.Succeeded);
-        Assert.IsTrue(result.Error.Contains("parameter") || result.Error.Contains("invalid"));
+        Assert.IsTrue(result.Error?.Contains("parameter") == true || result.Error?.Contains("invalid") == true);
     }
 
     [TestMethod]
@@ -121,7 +121,7 @@ public class ToolAgnosticValidationTests
 
         // Assert
         Assert.IsFalse(result.Succeeded);
-        Assert.IsTrue(result.Error.Contains("divide by zero") || result.Error.Contains("error"));
+        Assert.IsTrue(result.Error?.Contains("divide by zero") == true || result.Error?.Contains("error") == true);
     }
 
     [TestMethod]
@@ -142,7 +142,7 @@ public class ToolAgnosticValidationTests
 
         // Assert
         Assert.IsTrue(result.Succeeded);
-        Assert.IsTrue(result.FinalOutput.Contains("16"));
+        Assert.IsTrue(result.FinalOutput?.Contains("16"));
     }
 
     [TestMethod]
@@ -163,7 +163,7 @@ public class ToolAgnosticValidationTests
 
         // Assert
         Assert.IsFalse(result.Succeeded);
-        Assert.IsTrue(result.Error.Contains("tool") || result.Error.Contains("not found"));
+        Assert.IsTrue(result.Error?.Contains("tool") == true || result.Error?.Contains("not found") == true);
     }
 
     [TestMethod]
@@ -183,7 +183,7 @@ public class ToolAgnosticValidationTests
 
         // Assert
         Assert.IsTrue(result.Succeeded);
-        Assert.IsTrue(result.FinalOutput.Contains("6"));
+        Assert.IsTrue(result.FinalOutput?.Contains("6"));
     }
 
     [TestMethod]
@@ -203,7 +203,7 @@ public class ToolAgnosticValidationTests
 
         // Assert
         Assert.IsTrue(result.Succeeded);
-        Assert.IsTrue(result.FinalOutput.Contains("8"));
+        Assert.IsTrue(result.FinalOutput?.Contains("8"));
     }
 
     [TestMethod]
@@ -222,7 +222,7 @@ public class ToolAgnosticValidationTests
 
         // Assert
         Assert.IsTrue(result.Succeeded);
-        Assert.IsTrue(result.FinalOutput.Contains("42"));
+        Assert.IsTrue(result.FinalOutput?.Contains("42"));
     }
 
     public class MockLlmClient : ILlmClient
@@ -257,3 +257,5 @@ public class ToolAgnosticValidationTests
 public static class StatefulAgentExtensions
 {
 }
+
+

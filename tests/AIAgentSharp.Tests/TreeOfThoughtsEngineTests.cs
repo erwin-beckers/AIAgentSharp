@@ -8,13 +8,13 @@ namespace AIAgentSharp.Tests;
 [TestClass]
 public class TreeOfThoughtsEngineTests
 {
-    private Mock<ILlmClient> _mockLlmClient;
-    private Mock<IEventManager> _mockEventManager;
-    private Mock<IStatusManager> _mockStatusManager;
-    private Mock<IMetricsCollector> _mockMetricsCollector;
-    private AgentConfiguration _config;
-    private TreeOfThoughtsEngine _engine;
-    private ILogger _logger;
+    private Mock<ILlmClient> _mockLlmClient = null!;
+    private Mock<IEventManager> _mockEventManager = null!;
+    private Mock<IStatusManager> _mockStatusManager = null!;
+    private Mock<IMetricsCollector> _mockMetricsCollector = null!;
+    private AgentConfiguration _config = null!;
+    private TreeOfThoughtsEngine _engine = null!;
+    private ILogger _logger = null!;
 
     [TestInitialize]
     public void Setup()

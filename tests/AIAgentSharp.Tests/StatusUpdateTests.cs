@@ -6,10 +6,10 @@ namespace AIAgentSharp.Tests;
 [TestClass]
 public class StatusUpdateTests
 {
-    private MockLlmClient _mockLlmClient;
-    private MemoryAgentStateStore _stateStore;
-    private IMetricsCollector _metricsCollector;
-    private Agent _agent;
+    private MockLlmClient _mockLlmClient = null!;
+    private MemoryAgentStateStore _stateStore = null!;
+    private IMetricsCollector _metricsCollector = null!;
+    private Agent _agent = null!;
 
     [TestInitialize]
     public void Setup()

@@ -1,0 +1,111 @@
+codecov:
+  require_ci_to_pass: yes
+  notify:
+    wait_for_ci: yes
+
+comment:
+  layout: "reach, diff, flags, files"
+  behavior: default
+  branches: null
+
+coverage:
+  precision: 2
+  round: down
+  range: "80...100"
+  status:
+    project:
+      default:
+        target: 80%
+        threshold: 5%
+        base: auto
+    patch:
+      default:
+        target: 80%
+        threshold: 5%
+        base: auto
+
+parsers:
+  gcov:
+    branch_detection:
+      conditional: yes
+      loop: yes
+      method: no
+      subroutine: no
+
+ignore:
+  - "tests/"
+  - "**/*.Tests.cs"
+  - "**/*.Tests.csproj"
+  - "**/TestResults/"
+  - "**/obj/"
+  - "**/bin/"
+  - "**/coverage/"
+  - "**/nupkg/"
+  - "**/examples/"
+  - "**/*.md"
+  - "**/*.yml"
+  - "**/*.yaml"
+  - "**/*.json"
+  - "**/*.xml"
+  - "**/*.txt"
+  - "**/*.ps1"
+  - "**/*.sh"
+  - "**/*.bat"
+  - "**/*.cmd"
+  - "**/*.gitignore"
+  - "**/*.editorconfig"
+  - "**/*.gitattributes"
+  - "**/*.vsconfig"
+  - "**/*.sln"
+  - "**/*.csproj"
+  - "**/*.props"
+  - "**/*.targets"
+  - "**/*.nuspec"
+  - "**/*.nupkg"
+  - "**/*.dll"
+  - "**/*.exe"
+  - "**/*.pdb"
+  - "**/*.xml"
+  - "**/*.json"
+  - "**/*.log"
+  - "**/*.tmp"
+  - "**/*.temp"
+  - "**/*.cache"
+  - "**/*.bak"
+  - "**/*.orig"
+  - "**/*.rej"
+  - "**/*.swp"
+  - "**/*.swo"
+  - "**/*~"
+  - "**/.#*"
+  - "**/#*#"
+  - "**/.#*#"
+  - "**/*.DS_Store"
+  - "**/Thumbs.db"
+  - "**/ehthumbs.db"
+  - "**/Desktop.ini"
+  - "**/$RECYCLE.BIN/"
+  - "**/*.lnk"
+  - "**/*.url"
+  - "**/*.tmp"
+  - "**/*.temp"
+  - "**/*.log"
+  - "**/*.bak"
+  - "**/*.orig"
+  - "**/*.rej"
+  - "**/*.swp"
+  - "**/*.swo"
+  - "**/*~"
+  - "**/.#*"
+  - "**/#*#"
+  - "**/.#*#"
+  - "**/*.DS_Store"
+  - "**/Thumbs.db"
+  - "**/ehthumbs.db"
+  - "**/Desktop.ini"
+  - "**/$RECYCLE.BIN/"
+  - "**/*.lnk"
+  - "**/*.url"
+
+github_checks:
+  annotations: yes

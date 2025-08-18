@@ -257,8 +257,8 @@ public sealed class LoopDetectorTests
             ["int"] = 42,
             ["double"] = 3.14,
             ["bool"] = true,
-            ["null"] = null,
-            ["array"] = new object[] { "string", 42, 3.14, true, null },
+            ["null"] = (object?)null,
+            ["array"] = new object[] { "string", 42, 3.14, true, null! },
             ["object"] = new { nested = new { value = 123 } }
         };
 
@@ -565,3 +565,4 @@ public sealed class LoopDetectorTests
         Assert.IsTrue(result);
     }
 }
+

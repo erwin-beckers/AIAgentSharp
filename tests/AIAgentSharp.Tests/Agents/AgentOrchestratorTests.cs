@@ -8,16 +8,16 @@ namespace AIAgentSharp.Tests.Agents;
 [TestClass]
 public class AgentOrchestratorTests
 {
-    private Mock<ILlmClient> _mockLlmClient;
-    private Mock<IEventManager> _mockEventManager;
-    private Mock<IStatusManager> _mockStatusManager;
-    private Mock<ILoopDetector> _mockLoopDetector;
-    private Mock<IMessageBuilder> _mockMessageBuilder;
-    private Mock<IReasoningEngine> _mockReasoningEngine;
-    private Mock<IToolExecutor> _mockToolExecutor;
-    private Mock<ILogger> _mockLogger;
-    private IMetricsCollector _metricsCollector;
-    private AgentConfiguration _config;
+    private Mock<ILlmClient> _mockLlmClient = null!;
+    private Mock<IEventManager> _mockEventManager = null!;
+    private Mock<IStatusManager> _mockStatusManager = null!;
+    private Mock<ILoopDetector> _mockLoopDetector = null!;
+    private Mock<IMessageBuilder> _mockMessageBuilder = null!;
+    private Mock<IReasoningEngine> _mockReasoningEngine = null!;
+    private Mock<IToolExecutor> _mockToolExecutor = null!;
+    private Mock<ILogger> _mockLogger = null!;
+    private IMetricsCollector _metricsCollector = null!;
+    private AgentConfiguration _config = null!;
 
     [TestInitialize]
     public void Setup()

@@ -7,10 +7,10 @@ namespace AIAgentSharp.Tests;
 [TestClass]
 public class ReasoningTests
 {
-    private MockLlmClient _mockLlmClient;
-    private MemoryAgentStateStore _stateStore;
-    private IMetricsCollector _metricsCollector;
-    private Agent _agent;
+    private MockLlmClient _mockLlmClient = null!;
+    private MemoryAgentStateStore _stateStore = null!;
+    private IMetricsCollector _metricsCollector = null!;
+    private Agent _agent = null!;
 
     [TestInitialize]
     public void Setup()
@@ -49,7 +49,7 @@ public class ReasoningTests
 
         // Assert
         Assert.IsTrue(result.Succeeded);
-        Assert.IsTrue(result.FinalOutput.Contains("42"));
+        Assert.IsTrue(result.FinalOutput?.Contains("42"));
     }
 
     [TestMethod]
@@ -78,7 +78,7 @@ public class ReasoningTests
 
         // Assert
         Assert.IsTrue(result.Succeeded);
-        Assert.IsTrue(result.FinalOutput.Contains("42"));
+        Assert.IsTrue(result.FinalOutput?.Contains("42"));
     }
 
     [TestMethod]
@@ -98,7 +98,7 @@ public class ReasoningTests
 
         // Assert
         Assert.IsTrue(result.Succeeded);
-        Assert.IsTrue(result.FinalOutput.Contains("42"));
+        Assert.IsTrue(result.FinalOutput?.Contains("42"));
     }
 
     [TestMethod]
@@ -129,7 +129,7 @@ public class ReasoningTests
 
         // Assert
         Assert.IsTrue(result.Succeeded);
-        Assert.IsTrue(result.FinalOutput.Contains("42"));
+        Assert.IsTrue(result.FinalOutput?.Contains("42"));
     }
 
     [TestMethod]
@@ -160,7 +160,7 @@ public class ReasoningTests
 
         // Assert
         Assert.IsTrue(result.Succeeded);
-        Assert.IsTrue(result.FinalOutput.Contains("42"));
+        Assert.IsTrue(result.FinalOutput?.Contains("42"));
     }
 
     [TestMethod]
@@ -195,7 +195,7 @@ public class ReasoningTests
 
         // Assert
         Assert.IsTrue(result.Succeeded);
-        Assert.IsTrue(result.FinalOutput.Contains("8"));
+        Assert.IsTrue(result.FinalOutput?.Contains("8"));
     }
 
     [TestMethod]
@@ -267,7 +267,7 @@ public class ReasoningTests
 
         // Assert
         Assert.IsTrue(result.Succeeded);
-        Assert.IsTrue(result.FinalOutput.Contains("42"));
+        Assert.IsTrue(result.FinalOutput?.Contains("42"));
     }
 
     [TestMethod]
@@ -298,7 +298,7 @@ public class ReasoningTests
 
         // Assert
         Assert.IsFalse(result.Succeeded);
-        Assert.IsTrue(result.Error.Contains("JSON") || result.Error.Contains("parse"));
+        Assert.IsTrue(result.Error?.Contains("JSON") == true || result.Error?.Contains("parse") == true);
     }
 
     [TestMethod]
@@ -335,7 +335,7 @@ public class ReasoningTests
 
         // Assert
         Assert.IsFalse(result.Succeeded);
-        Assert.IsTrue(result.Error.Contains("max steps") || result.Error.Contains("limit") || result.Error.Contains("Max turns"));
+        Assert.IsTrue(result.Error?.Contains("max steps") == true || result.Error?.Contains("limit") == true || result.Error?.Contains("Max turns") == true);
     }
 
     private class MockLlmClient : ILlmClient
@@ -365,3 +365,4 @@ public class ReasoningTests
         }
     }
 }
+
