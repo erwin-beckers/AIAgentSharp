@@ -16,7 +16,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\AIAgentSharp.Gemini\AIAgentSharp.Gemini.csproj" />
-    <ProjectReference Include="..\AIAgentSharp.Tests\AIAgentSharp.Tests.csproj" />
   </ItemGroup>
 
 </Project>

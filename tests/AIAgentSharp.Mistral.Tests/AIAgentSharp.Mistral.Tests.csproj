@@ -18,7 +18,6 @@
 
   <ItemGroup>
     <ProjectReference Include="../../src/AIAgentSharp.Mistral/AIAgentSharp.Mistral.csproj" />
-    <ProjectReference Include="../AIAgentSharp.Tests/AIAgentSharp.Tests.csproj" />
   </ItemGroup>
 
 </Project>
