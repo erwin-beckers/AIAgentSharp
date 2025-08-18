@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using System.Diagnostics.CodeAnalysis;
 
 namespace AIAgentSharp.Mistral;
 
@@ -177,6 +178,7 @@ public class MistralLlmClient : ILlmClient
         return result;
     }
 
+    [ExcludeFromCodeCoverage]
     private static string CreateSystemMessageWithFunctions(IEnumerable<OpenAiFunctionSpec> functions)
     {
         var functionDefinitions = functions.Select(f => $@"

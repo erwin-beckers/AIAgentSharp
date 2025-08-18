@@ -1,6 +1,7 @@
 using OpenAI;
 using OpenAI.Chat;
 using System.ClientModel;
+using System.Diagnostics.CodeAnalysis;
 
 namespace AIAgentSharp.OpenAI;
 

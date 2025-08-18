@@ -17,6 +17,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../../src/AIAgentSharp.OpenAI/AIAgentSharp.OpenAI.csproj" />
+    <ProjectReference Include="../AIAgentSharp.Tests/AIAgentSharp.Tests.csproj" />
   </ItemGroup>
 
 </Project>

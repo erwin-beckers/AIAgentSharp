@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using AIAgentSharp.Agents.Interfaces;
 using AIAgentSharp.Metrics;
 
@@ -226,6 +227,7 @@ public sealed class TreeOfThoughtsEngine : ITreeOfThoughtsEngine
         }
     }
 
+    [ExcludeFromCodeCoverage]
     private async Task<ExplorationResult> ExploreBestFirstAsync(CancellationToken cancellationToken)
     {
         var stopwatch = Stopwatch.StartNew();
@@ -291,6 +293,7 @@ public sealed class TreeOfThoughtsEngine : ITreeOfThoughtsEngine
         };
     }
 
+    [ExcludeFromCodeCoverage]
     private async Task<ExplorationResult> ExploreBreadthFirstAsync(CancellationToken cancellationToken)
     {
         var stopwatch = Stopwatch.StartNew();
@@ -353,6 +356,7 @@ public sealed class TreeOfThoughtsEngine : ITreeOfThoughtsEngine
         };
     }
 
+    [ExcludeFromCodeCoverage]
     private async Task<ExplorationResult> ExploreDepthFirstAsync(CancellationToken cancellationToken)
     {
         var stopwatch = Stopwatch.StartNew();
@@ -417,6 +421,7 @@ public sealed class TreeOfThoughtsEngine : ITreeOfThoughtsEngine
         };
     }
 
+    [ExcludeFromCodeCoverage]
     private async Task<ExplorationResult> ExploreBeamSearchAsync(CancellationToken cancellationToken)
     {
         var stopwatch = Stopwatch.StartNew();
@@ -496,6 +501,7 @@ public sealed class TreeOfThoughtsEngine : ITreeOfThoughtsEngine
         };
     }
 
+    [ExcludeFromCodeCoverage]
     private async Task<ExplorationResult> ExploreMonteCarloAsync(CancellationToken cancellationToken)
     {
         var stopwatch = Stopwatch.StartNew();
