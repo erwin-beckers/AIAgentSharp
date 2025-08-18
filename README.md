@@ -2,16 +2,17 @@
 
 [![codecov](https://codecov.io/gh/erwin-beckers/AIAgentSharp/graph/badge.svg?token=0IIY8VJPIV)](https://codecov.io/gh/erwin-beckers/AIAgentSharp)
 
-A comprehensive, production-ready .NET 8.0 framework for building LLM-powered agents with advanced reasoning capabilities and tool calling. This framework provides a complete solution for creating intelligent agents that can reason, act, and observe using multiple reasoning strategies including Chain of Thought, Tree of Thoughts, and hybrid approaches.
+A comprehensive, production-ready .NET 8.0 framework for building LLM-powered agents with advanced reasoning capabilities and tool calling. This framework provides a complete solution for creating intelligent agents that can reason, act, and observe using multiple reasoning strategies including Chain of Thought and Tree of Thoughts.
 
 ## 🚀 Features
 
-- **🧠 Advanced Reasoning Engines**: Multiple reasoning strategies including Chain of Thought (CoT), Tree of Thoughts (ToT), and hybrid approaches
+- **🧠 Advanced Reasoning Engines**: Multiple reasoning strategies including Chain of Thought (CoT) and Tree of Thoughts (ToT)
 - **🔄 Re/Act Pattern Support**: Full implementation of the Re/Act (Reasoning and Acting) pattern for LLM agents
 - **🔧 Function Calling**: Support for OpenAI-style function calling when available
 - **🛠️ Enhanced Tool Framework**: Rich tool system with automatic schema generation, validation, introspection, and structured error handling
 - **💾 State Persistence**: Multiple state store implementations (in-memory, file-based)
 - **📊 Real-time Monitoring**: Comprehensive event system for monitoring agent activity
+- **📈 Advanced Metrics**: Comprehensive metrics collection for performance, operational, quality, and resource monitoring
 - **📱 Public Status Updates**: Real-time status updates for UI consumption without exposing internal reasoning
 - **🔄 Loop Detection**: Intelligent loop breaker to prevent infinite loops
 - **🔄 Deduplication**: Smart caching of tool results to improve performance
@@ -24,7 +25,6 @@ A comprehensive, production-ready .NET 8.0 framework for building LLM-powered ag
 
 - **Chain of Thought (CoT)**: Sequential step-by-step reasoning for complex problem decomposition
 - **Tree of Thoughts (ToT)**: Multi-branch exploration of solution paths with configurable exploration strategies
-- **Hybrid Reasoning**: Combination of multiple reasoning approaches for optimal results
 - **Reasoning Validation**: Built-in validation of reasoning quality and confidence scoring
 - **Exploration Strategies**: Best-first, breadth-first, depth-first, beam search, and Monte Carlo exploration
 - **Reasoning Metadata**: Comprehensive tracking of reasoning activities and insights
@@ -56,6 +56,17 @@ A comprehensive, production-ready .NET 8.0 framework for building LLM-powered ag
 - **Public Status Updates**: UI-friendly status updates without exposing internal reasoning
 - **Progress Tracking**: Real-time progress percentage and detailed status information
 - **Execution Time Tracking**: Detailed timing for LLM calls, tool executions, and reasoning activities
+
+### 📈 Advanced Metrics System
+
+- **Performance Metrics**: Execution times, throughput, and efficiency indicators
+- **Operational Metrics**: Success rates, error rates, and system health indicators
+- **Quality Metrics**: Reasoning confidence, response quality, and user satisfaction
+- **Resource Metrics**: Token usage, API calls, and resource consumption
+- **Real-time Monitoring**: Live metrics updates with event-driven notifications
+- **Export Formats**: JSON, CSV, Prometheus, and human-readable text formats
+- **Agent-specific Metrics**: Individual agent performance tracking
+- **Time-range Filtering**: Historical metrics analysis capabilities
 - **Turn-level Monitoring**: Complete visibility into each agent turn and decision
 - **Error Recovery**: Graceful handling of failures with detailed error information
 - **Reasoning Monitoring**: Real-time tracking of reasoning engine activities and insights
@@ -87,6 +98,9 @@ A comprehensive, production-ready .NET 8.0 framework for building LLM-powered ag
 |---------|---------|-------------|
 | `AIAgentSharp` | ![NuGet](https://img.shields.io/nuget/v/AIAgentSharp) | Core framework with abstract LLM interfaces, reasoning engines, and tool framework |
 | `AIAgentSharp.OpenAI` | ![NuGet](https://img.shields.io/nuget/v/AIAgentSharp.OpenAI) | OpenAI integration package with `OpenAiLlmClient` implementation |
+| `AIAgentSharp.Anthropic` | ![NuGet](https://img.shields.io/nuget/v/AIAgentSharp.Anthropic) | Anthropic Claude integration package with `AnthropicLlmClient` implementation |
+| `AIAgentSharp.Gemini` | ![NuGet](https://img.shields.io/nuget/v/AIAgentSharp.Gemini) | Google Gemini integration package with `GeminiLlmClient` implementation |
+| `AIAgentSharp.Mistral` | ![NuGet](https://img.shields.io/nuget/v/AIAgentSharp.Mistral) | Mistral AI integration package with `MistralLlmClient` implementation |
 
 ### Multiple LLM Provider Support
 
@@ -164,6 +178,30 @@ var llm = new OpenAiLlmClient(apiKey);
 var agent = new Agent(llm, store);
 ```
 
+#### Anthropic Claude Integration
+```csharp
+using AIAgentSharp.Anthropic;
+
+var llm = new AnthropicLlmClient(apiKey);
+var agent = new Agent(llm, store);
+```
+
+#### Google Gemini Integration
+```csharp
+using AIAgentSharp.Gemini;
+
+var llm = new GeminiLlmClient(apiKey);
+var agent = new Agent(llm, store);
+```
+
+#### Mistral AI Integration
+```csharp
+using AIAgentSharp.Mistral;
+
+var llm = new MistralLlmClient(apiKey);
+var agent = new Agent(llm, store);
+```
+
 #### Custom LLM Provider
 ```csharp
 // Implement ILlmClient for your preferred provider
@@ -210,7 +248,7 @@ If you prefer to build from source:
 The framework is built around several key components:
 
 - **`Agent`**: The main agent implementation that orchestrates reasoning and tool execution
-- **`ReasoningManager`**: Manages different reasoning engines (CoT, ToT, Hybrid)
+- **`ReasoningManager`**: Manages different reasoning engines (CoT, ToT)
 - **`ChainOfThoughtEngine`**: Implements sequential step-by-step reasoning
 - **`TreeOfThoughtsEngine`**: Implements multi-branch solution exploration
 - **`ITool` Interface**: Extensible tool system with automatic schema generation
@@ -236,6 +274,21 @@ AIAgentSharp.OpenAI (Provider Implementation)
 ├── OpenAiConfiguration
 └── OpenAI-specific utilities
 
+AIAgentSharp.Anthropic (Provider Implementation)
+├── AnthropicLlmClient (ILlmClient implementation)
+├── AnthropicConfiguration
+└── Anthropic-specific utilities
+
+AIAgentSharp.Gemini (Provider Implementation)
+├── GeminiLlmClient (ILlmClient implementation)
+├── GeminiConfiguration
+└── Google AI Platform utilities
+
+AIAgentSharp.Mistral (Provider Implementation)
+├── MistralLlmClient (ILlmClient implementation)
+├── MistralConfiguration
+└── Mistral AI-specific utilities
+
 Custom Providers
 ├── YourCustomLlmClient (ILlmClient implementation)
 └── Provider-specific configuration
@@ -253,13 +306,7 @@ using AIAgentSharp.OpenAI;
 // Create components
 var llm = new OpenAiLlmClient(apiKey);
 var store = new MemoryAgentStateStore(); // or FileAgentStateStore("./agent_state")
-var tools = new List<ITool> 
-{ 
-    new SearchFlightsTool(),
-    new SearchHotelsTool(),
-    new SearchAttractionsTool(),
-    new CalculateTripCostTool()
-};
+var tools = new List<ITool>(); // add your tools here
 
 // Configure agent with reasoning
 var config = new AgentConfiguration
@@ -354,29 +401,6 @@ if (result.State?.CurrentReasoningTree != null)
     Console.WriteLine($"Best Path Length: {tree.BestPath.Count}");
     Console.WriteLine($"Exploration Strategy: {tree.ExplorationStrategy}");
 }
-```
-
-#### Hybrid Reasoning
-
-```csharp
-// Configure for hybrid reasoning (combines multiple approaches)
-var config = new AgentConfiguration
-{
-    ReasoningType = ReasoningType.Hybrid,
-    MaxReasoningSteps = 6,
-    MaxTreeDepth = 4,
-    MaxTreeNodes = 50,
-    TreeExplorationStrategy = ExplorationStrategy.BeamSearch,
-    EnableReasoningValidation = true,
-    MinReasoningConfidence = 0.65,
-    MaxTurns = 30,
-    UseFunctionCalling = true,
-    EmitPublicStatus = true
-};
-
-var agent = new Agent(llm, store, config: config);
-
-var result = await agent.RunAsync("hybrid-agent", "Complex problem requiring multiple approaches", tools);
 ```
 
 ### Creating Enhanced Tools with Validation
@@ -544,6 +568,52 @@ agent.RunCompleted += (sender, e) =>
     Console.WriteLine($"Agent completed with {e.TotalTurns} turns");
 ```
 
+### Metrics and Monitoring
+
+```csharp
+// Access metrics through the agent
+var metrics = agent.Metrics.GetMetrics();
+
+// Print performance metrics
+Console.WriteLine($"Total Agent Runs: {metrics.Performance.TotalAgentRuns}");
+Console.WriteLine($"Average Run Time: {metrics.Performance.AverageAgentRunTimeMs:F2}ms");
+Console.WriteLine($"Success Rate: {metrics.Operational.AgentRunSuccessRate:P2}");
+Console.WriteLine($"Total Tokens Used: {metrics.Resources.TotalTokens:N0}");
+
+// Get agent-specific metrics
+var agentMetrics = agent.Metrics.GetAgentMetrics("my-agent");
+if (agentMetrics != null)
+{
+    Console.WriteLine($"Agent-specific success rate: {agentMetrics.Operational.AgentRunSuccessRate:P2}");
+}
+
+// Export metrics in different formats
+var jsonMetrics = agent.Metrics.ExportMetrics(MetricsExportFormat.Json);
+var prometheusMetrics = agent.Metrics.ExportMetrics(MetricsExportFormat.Prometheus);
+var csvMetrics = agent.Metrics.ExportMetrics(MetricsExportFormat.Csv);
+
+// Subscribe to real-time metrics updates
+agent.Metrics.MetricsUpdated += (sender, e) =>
+{
+    Console.WriteLine($"Metrics updated: {string.Join(", ", e.UpdatedMetrics)}");
+    Console.WriteLine($"Latest success rate: {e.Metrics.Operational.AgentRunSuccessRate:P2}");
+};
+
+// Record custom metrics
+agent.Metrics.RecordCustomMetric("user_satisfaction", 4.5, new Dictionary<string, string> 
+{ 
+    ["agent_type"] = "travel_planner" 
+});
+
+// Record custom events
+agent.Metrics.RecordCustomEvent("user_feedback", new Dictionary<string, string> 
+{ 
+    ["rating"] = "excellent",
+    ["category"] = "travel_planning" 
+});
+```
+```
+
 ## 📚 Documentation
 
 For comprehensive documentation, see:
@@ -622,18 +692,6 @@ var totConfig = new AgentConfiguration
     EnableReasoningValidation = true,
     MinReasoningConfidence = 0.6
 };
-
-// Hybrid Reasoning Configuration
-var hybridConfig = new AgentConfiguration
-{
-    ReasoningType = ReasoningType.Hybrid,
-    MaxReasoningSteps = 6,
-    MaxTreeDepth = 4,
-    MaxTreeNodes = 50,
-    TreeExplorationStrategy = ExplorationStrategy.BeamSearch,
-    EnableReasoningValidation = true,
-    MinReasoningConfidence = 0.65
-};
 ```
 
 ## 🧪 Testing
@@ -646,7 +704,7 @@ dotnet test
 
 The framework includes 400+ tests covering:
 - Agent execution and state management
-- Reasoning engines (Chain of Thought, Tree of Thoughts, Hybrid)
+- Reasoning engines (Chain of Thought, Tree of Thoughts)
 - Tool framework and validation
 - LLM integration and function calling
 - Event system and status updates

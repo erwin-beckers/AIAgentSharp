@@ -62,7 +62,7 @@ public class ToolCatalogTests
 
         // Assert
         Assert.IsTrue(tool is IToolIntrospect);
-        Assert.AreEqual("validate_input", tool.Name);
+        Assert.AreEqual("validation_tool", tool.Name);
     }
 
     [TestMethod]
@@ -82,7 +82,7 @@ public class ToolCatalogTests
         var jsonDoc = JsonDocument.Parse(description);
         var root = jsonDoc.RootElement;
 
-        Assert.AreEqual("validate_input", root.GetProperty("name").GetString());
+        Assert.AreEqual("validation_tool", root.GetProperty("name").GetString());
         Assert.AreEqual("Validate input data with custom rules", root.GetProperty("description").GetString());
 
         var paramsObj = root.GetProperty("params");
@@ -155,7 +155,7 @@ public class ToolCatalogTests
         var tools = new Dictionary<string, ITool>
         {
             ["concat"] = new MockConcatTool(),
-            ["validate_input"] = new MockValidationTool()
+            ["validation_tool"] = new MockValidationTool()
         };
 
         // Act
@@ -169,7 +169,7 @@ public class ToolCatalogTests
         var content = userMessage.Content;
         Assert.IsTrue(content.Contains("TOOL CATALOG"));
         Assert.IsTrue(content.Contains("concat:"));
-        Assert.IsTrue(content.Contains("validate_input:"));
+        Assert.IsTrue(content.Contains("validation_tool:"));
         Assert.IsTrue(content.Contains("GOAL:"));
         Assert.IsTrue(content.Contains("HISTORY"));
     }
@@ -188,7 +188,7 @@ public class ToolCatalogTests
         var tools = new Dictionary<string, ITool>
         {
             ["concat"] = new MockConcatTool(),
-            ["validate_input"] = new MockValidationTool()
+            ["validation_tool"] = new MockValidationTool()
         };
 
         // Act
@@ -197,7 +197,7 @@ public class ToolCatalogTests
 
         // Assert
         Assert.IsTrue(content.Contains("concat: {\"name\":\"concat\""));
-        Assert.IsTrue(content.Contains("validate_input: {\"name\":\"validate_input\""));
+        Assert.IsTrue(content.Contains("validation_tool: {\"name\":\"validation_tool\""));
         Assert.IsTrue(content.Contains("\"description\":\"Concatenate multiple strings together\""));
         Assert.IsTrue(content.Contains("\"description\":\"Validate input data with custom rules\""));
     }
@@ -407,7 +407,7 @@ public class ToolCatalogTests
         Assert.IsTrue(content.Contains("HISTORY"));
         // Should not contain any tool descriptions
         Assert.IsFalse(content.Contains("concat:"));
-        Assert.IsFalse(content.Contains("validate_input:"));
+        Assert.IsFalse(content.Contains("validation_tool:"));
     }
 
     [TestMethod]
@@ -451,7 +451,7 @@ public class ToolCatalogTests
                     Index = 0,
                     ToolCall = new ToolCallRequest
                     {
-                        Tool = "validate_input",
+                        Tool = "validation_tool",
                         Params = new Dictionary<string, object?>
                         {
                             ["input"] = "test data",
@@ -469,7 +469,7 @@ public class ToolCatalogTests
 
         var tools = new Dictionary<string, ITool>
         {
-            ["validate_input"] = new MockValidationTool()
+            ["validation_tool"] = new MockValidationTool()
         };
 
         // Act
@@ -479,7 +479,7 @@ public class ToolCatalogTests
         // Assert
         Assert.IsTrue(content.Contains("TOOL_CALL:"));
         Assert.IsTrue(content.Contains("TOOL_RESULT:"));
-        Assert.IsTrue(content.Contains("validate_input"));
+        Assert.IsTrue(content.Contains("validation_tool"));
         Assert.IsTrue(content.Contains("test data"));
         Assert.IsTrue(content.Contains("rule1"));
     }

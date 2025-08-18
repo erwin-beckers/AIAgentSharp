@@ -1,5 +1,6 @@
 using System.Text.Json;
 using AIAgentSharp.Agents;
+using AIAgentSharp.Metrics;
 
 namespace AIAgentSharp.Tests;
 
@@ -17,7 +18,7 @@ public class FunctionCallingTests
         Assert.IsTrue(concatTool is IFunctionSchemaProvider);
         Assert.IsTrue(validationTool is IFunctionSchemaProvider);
         Assert.AreEqual("concat", concatTool.Name);
-        Assert.AreEqual("validate_input", validationTool.Name);
+        Assert.AreEqual("validation_tool", validationTool.Name);
     }
 
     [TestMethod]
@@ -42,8 +43,9 @@ public class FunctionCallingTests
         Assert.AreEqual("array", strings.GetProperty("type").GetString());
 
         var required = root.GetProperty("required");
-        Assert.AreEqual(1, required.GetArrayLength());
-        Assert.AreEqual("strings", required[0].GetString());
+        Assert.AreEqual(2, required.GetArrayLength());
+        Assert.AreEqual("strings", required[1].GetString());
+        Assert.AreEqual("separator", required[0].GetString());
     }
 
     [TestMethod]
@@ -88,7 +90,7 @@ public class FunctionCallingTests
     public void LlmCommunicator_NormalizeFunctionCallToReact_WithAssistantContent()
     {
         // Arrange
-        var llmCommunicator = new LlmCommunicator(new DelegateLlmClient((_, _) => Task.FromResult("")), new AgentConfiguration(), new ConsoleLogger(), new EventManager(new ConsoleLogger()), new StatusManager(new AgentConfiguration(), new EventManager(new ConsoleLogger())));
+        var llmCommunicator = new LlmCommunicator(new DelegateLlmClient((_, _) => Task.FromResult(new LlmCompletionResult { Content = string.Empty })), new AgentConfiguration(), new ConsoleLogger(), new EventManager(new ConsoleLogger()), new StatusManager(new AgentConfiguration(), new EventManager(new ConsoleLogger())), new MetricsCollector(new ConsoleLogger()));
         var functionResult = new FunctionCallResult
         {
             HasFunctionCall = true,
@@ -114,7 +116,7 @@ public class FunctionCallingTests
     public void LlmCommunicator_NormalizeFunctionCallToReact_WithoutAssistantContent()
     {
         // Arrange
-        var llmCommunicator = new LlmCommunicator(new DelegateLlmClient((_, _) => Task.FromResult("")), new AgentConfiguration(), new ConsoleLogger(), new EventManager(new ConsoleLogger()), new StatusManager(new AgentConfiguration(), new EventManager(new ConsoleLogger())));
+        var llmCommunicator = new LlmCommunicator(new DelegateLlmClient((_, _) => Task.FromResult(new LlmCompletionResult { Content = string.Empty })), new AgentConfiguration(), new ConsoleLogger(), new EventManager(new ConsoleLogger()), new StatusManager(new AgentConfiguration(), new EventManager(new ConsoleLogger())), new MetricsCollector(new ConsoleLogger()));
         var functionResult = new FunctionCallResult
         {
             HasFunctionCall = true,
@@ -138,7 +140,7 @@ public class FunctionCallingTests
     public void LlmCommunicator_NormalizeFunctionCallToReact_InvalidArguments()
     {
         // Arrange
-        var llmCommunicator = new LlmCommunicator(new DelegateLlmClient((_, _) => Task.FromResult("")), new AgentConfiguration(), new ConsoleLogger(), new EventManager(new ConsoleLogger()), new StatusManager(new AgentConfiguration(), new EventManager(new ConsoleLogger())));
+        var llmCommunicator = new LlmCommunicator(new DelegateLlmClient((_, _) => Task.FromResult(new LlmCompletionResult { Content = string.Empty })), new AgentConfiguration(), new ConsoleLogger(), new EventManager(new ConsoleLogger()), new StatusManager(new AgentConfiguration(), new EventManager(new ConsoleLogger())), new MetricsCollector(new ConsoleLogger()));
         var functionResult = new FunctionCallResult
         {
             HasFunctionCall = true,
@@ -217,10 +219,15 @@ public class FunctionCallingTests
         // Arrange
         var mockClient = new MockFunctionCallingLlmClient
         {
-            SupportsFunctionCalling = true,
-            ShouldReturnFunctionCall = true,
-            FunctionName = "concat",
-            FunctionArguments = "{\"strings\":[\"hello\",\"world\"]}"
+            FunctionCallResponses = new List<FunctionCallResult>
+            {
+                new FunctionCallResult
+                {
+                    HasFunctionCall = true,
+                    FunctionName = "concat",
+                    FunctionArgumentsJson = "{\"strings\":[\"hello\",\"world\"],\"separator\":\",\"}"
+                }
+            }
         };
         var config = new AgentConfiguration { UseFunctionCalling = true };
         var agent = new Agent(mockClient, new MemoryAgentStateStore(), config: config);
@@ -243,10 +250,15 @@ public class FunctionCallingTests
         // Arrange
         var mockClient = new MockFunctionCallingLlmClient
         {
-            SupportsFunctionCalling = true,
-            ShouldReturnFunctionCall = true,
-            FunctionName = "concat",
-            FunctionArguments = "invalid json"
+            FunctionCallResponses = new List<FunctionCallResult>
+            {
+                new FunctionCallResult
+                {
+                    HasFunctionCall = true,
+                    FunctionName = "concat",
+                    FunctionArgumentsJson = "invalid json"
+                }
+            }
         };
         var config = new AgentConfiguration { UseFunctionCalling = true };
         var agent = new Agent(mockClient, new MemoryAgentStateStore(), config: config);
@@ -270,10 +282,15 @@ public class FunctionCallingTests
         // Arrange
         var mockClient = new MockFunctionCallingLlmClient
         {
-            SupportsFunctionCalling = true,
-            ShouldReturnFunctionCall = true,
-            FunctionName = "unknown_tool",
-            FunctionArguments = "{\"param\":\"value\"}"
+            FunctionCallResponses = new List<FunctionCallResult>
+            {
+                new FunctionCallResult
+                {
+                    HasFunctionCall = true,
+                    FunctionName = "unknown_tool",
+                    FunctionArgumentsJson = "{\"param\":\"value\"}"
+                }
+            }
         };
         var config = new AgentConfiguration { UseFunctionCalling = true };
         var agent = new Agent(mockClient, new MemoryAgentStateStore(), config: config);
@@ -297,10 +314,15 @@ public class FunctionCallingTests
         // Arrange
         var mockClient = new MockFunctionCallingLlmClient
         {
-            SupportsFunctionCalling = true,
-            ShouldReturnFunctionCall = true,
-            FunctionName = "validate_input",
-            FunctionArguments = "{\"input\":\"test_value\",\"rules\":[\"rule1\"]}"
+            FunctionCallResponses = new List<FunctionCallResult>
+            {
+                new FunctionCallResult
+                {
+                    HasFunctionCall = true,
+                    FunctionName = "validation_tool",
+                    FunctionArgumentsJson = "{\"input\":\"test_value\",\"rules\":[\"rule1\"]}"
+                }
+            }
         };
         var config = new AgentConfiguration { UseFunctionCalling = true };
         var agent = new Agent(mockClient, new MemoryAgentStateStore(), config: config);
@@ -328,11 +350,16 @@ public class FunctionCallingTests
         // Arrange
         var mockClient = new MockFunctionCallingLlmClient
         {
-            SupportsFunctionCalling = true,
-            ShouldReturnFunctionCall = true,
-            FunctionName = "validate_input",
-            FunctionArguments = "{\"input\":\"test_value\",\"rules\":[\"rule1\"]}",
-            AssistantContent = "I need to validate the test parameters."
+            FunctionCallResponses = new List<FunctionCallResult>
+            {
+                new FunctionCallResult
+                {
+                    HasFunctionCall = true,
+                    FunctionName = "validation_tool",
+                    FunctionArgumentsJson = "{\"input\":\"test_value\",\"rules\":[\"rule1\"]}",
+                    AssistantContent = "I need to validate the test parameters."
+                }
+            }
         };
         var config = new AgentConfiguration { UseFunctionCalling = true };
         var agent = new Agent(mockClient, new MemoryAgentStateStore(), config: config);
@@ -348,53 +375,32 @@ public class FunctionCallingTests
         Assert.AreEqual("I need to validate the test parameters.", result.LlmMessage.Thoughts);
         Assert.AreEqual(AgentAction.ToolCall, result.LlmMessage.Action);
         Assert.IsNotNull(result.LlmMessage.ActionInput);
-        Assert.AreEqual("validate_input", result.LlmMessage.ActionInput.Tool);
+        Assert.AreEqual("validation_tool", result.LlmMessage.ActionInput.Tool);
         Assert.IsNotNull(result.ToolResult);
         Assert.IsTrue(result.ToolResult.Success);
-        Assert.AreEqual("validate_input", result.ToolResult.Tool);
+        Assert.AreEqual("validation_tool", result.ToolResult.Tool);
     }
 
     // Helper classes for testing
-    private class MockFunctionCallingLlmClient : IFunctionCallingLlmClient
+    private class MockFunctionCallingLlmClient : ILlmClient
     {
         public bool SupportsFunctionCalling { get; set; } = true;
-        public bool ShouldReturnFunctionCall { get; set; }
-        public string FunctionName { get; set; } = "test";
-        public string FunctionArguments { get; set; } = "{}";
-        public string AssistantContent { get; set; } = "";
+        public List<FunctionCallResult> FunctionCallResponses { get; set; } = new();
+        public List<LlmCompletionResult> RegularResponses { get; set; } = new();
+        public int CallCount { get; private set; }
 
-        public Task<string> CompleteAsync(IEnumerable<LlmMessage> messages, CancellationToken ct = default)
+        public Task<LlmCompletionResult> CompleteAsync(IEnumerable<LlmMessage> messages, CancellationToken ct = default)
         {
-            return Task.FromResult("{\"thoughts\":\"Planning next steps\",\"action\":\"plan\",\"action_input\":{\"summary\":\"Planning\"}}");
+            CallCount++;
+            var response = RegularResponses.Count > 0 ? RegularResponses[Math.Min(CallCount - 1, RegularResponses.Count - 1)] : new LlmCompletionResult { Content = "{\"thoughts\":\"I need to plan my approach\",\"action\":\"plan\",\"action_input\":{\"summary\":\"Planning the next steps\"}}" };
+            return Task.FromResult(response);
         }
 
         public Task<FunctionCallResult> CompleteWithFunctionsAsync(IEnumerable<LlmMessage> messages, IEnumerable<OpenAiFunctionSpec> functions, CancellationToken ct = default)
         {
-            if (!SupportsFunctionCalling)
-            {
-                return Task.FromResult(new FunctionCallResult
-                {
-                    HasFunctionCall = false,
-                    RawTextFallback = "{\"thoughts\":\"Planning next steps\",\"action\":\"plan\",\"action_input\":{\"summary\":\"Planning\"}}"
-                });
-            }
-
-            if (ShouldReturnFunctionCall)
-            {
-                return Task.FromResult(new FunctionCallResult
-                {
-                    HasFunctionCall = true,
-                    FunctionName = FunctionName,
-                    FunctionArgumentsJson = FunctionArguments,
-                    AssistantContent = AssistantContent
-                });
-            }
-
-            return Task.FromResult(new FunctionCallResult
-            {
-                HasFunctionCall = false,
-                RawTextFallback = "{\"thoughts\":\"Planning next steps\",\"action\":\"plan\",\"action_input\":{\"summary\":\"Planning\"}}"
-            });
+            CallCount++;
+            var response = FunctionCallResponses.Count > 0 ? FunctionCallResponses[Math.Min(CallCount - 1, FunctionCallResponses.Count - 1)] : new FunctionCallResult { HasFunctionCall = false, AssistantContent = "{\"thoughts\":\"I need to plan my approach\",\"action\":\"plan\",\"action_input\":{\"summary\":\"Planning the next steps\"}}" };
+            return Task.FromResult(response);
         }
     }
 

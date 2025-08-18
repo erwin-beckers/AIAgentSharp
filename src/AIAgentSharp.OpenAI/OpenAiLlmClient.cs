@@ -8,7 +8,7 @@ namespace AIAgentSharp.OpenAI;
 /// OpenAI LLM client implementation that integrates with the OpenAI SDK.
 /// This client supports both regular chat completion and function calling.
 /// </summary>
-public sealed class OpenAiLlmClient : ILlmClient, IFunctionCallingLlmClient
+public sealed class OpenAiLlmClient : ILlmClient
 {
     private readonly OpenAIClient _client;
     private readonly string _model;
@@ -138,7 +138,14 @@ public sealed class OpenAiLlmClient : ILlmClient, IFunctionCallingLlmClient
             {
                 HasFunctionCall = false,
                 AssistantContent = content,
-                RawTextFallback = content
+                RawTextFallback = content,
+                Usage = new LlmUsage
+                {
+                    InputTokens = completion.Usage.InputTokenCount,
+                    OutputTokens = completion.Usage.OutputTokenCount,
+                    Model = _model,
+                    Provider = "OpenAI"
+                }
             };
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -153,9 +160,9 @@ public sealed class OpenAiLlmClient : ILlmClient, IFunctionCallingLlmClient
     /// </summary>
     /// <param name="messages">The conversation messages to send to the LLM.</param>
     /// <param name="ct">Cancellation token for the operation.</param>
-    /// <returns>The LLM's response as a string.</returns>
+    /// <returns>The LLM's response with usage metadata.</returns>
     /// <exception cref="OperationCanceledException">Thrown when the operation is cancelled.</exception>
-    public async Task<string> CompleteAsync(IEnumerable<LlmMessage> messages, CancellationToken ct = default)
+    public async Task<LlmCompletionResult> CompleteAsync(IEnumerable<LlmMessage> messages, CancellationToken ct = default)
     {
         try
         {
@@ -196,7 +203,17 @@ public sealed class OpenAiLlmClient : ILlmClient, IFunctionCallingLlmClient
             var content = completion.Content?.FirstOrDefault()?.Text ?? string.Empty;
             _logger.LogDebug($"Completion successful: {content.Length} characters");
 
-            return content;
+            return new LlmCompletionResult
+            {
+                Content = content,
+                Usage = new LlmUsage
+                {
+                    InputTokens = completion.Usage.InputTokenCount,
+                    OutputTokens = completion.Usage.OutputTokenCount,
+                    Model = _model,
+                    Provider = "OpenAI"
+                }
+            };
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

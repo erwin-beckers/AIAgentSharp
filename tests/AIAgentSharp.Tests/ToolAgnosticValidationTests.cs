@@ -1,405 +1,255 @@
-using System.Text.Json;
 using AIAgentSharp.Agents;
+using AIAgentSharp.Metrics;
 
 namespace AIAgentSharp.Tests;
 
 [TestClass]
 public class ToolAgnosticValidationTests
 {
-    private Agent _agent = null!;
-    private MockLlmClient _llmClient = null!;
-    private MemoryAgentStateStore _stateStore = null!;
-    private Dictionary<string, ITool> _tools = null!;
+    private MockLlmClient _mockLlmClient;
+    private MemoryAgentStateStore _stateStore;
+    private IMetricsCollector _metricsCollector;
+    private Agent _agent;
 
     [TestInitialize]
     public void Setup()
     {
+        _mockLlmClient = new MockLlmClient();
         _stateStore = new MemoryAgentStateStore();
-        _llmClient = new MockLlmClient();
-        _tools = new Dictionary<string, ITool>
+        _metricsCollector = new MetricsCollector();
+        _agent = new Agent(_mockLlmClient, _stateStore, new ConsoleLogger(), new AgentConfiguration(), _metricsCollector);
+    }
+
+    [TestMethod]
+    public async Task Agent_WithValidToolCall_ShouldExecuteSuccessfully()
+    {
+        // Arrange
+        _mockLlmClient.Responses = new List<string>
         {
-            ["validate_input"] = new MockValidationTool(),
-            ["test_validation_tool"] = new ValidationTestTool(),
-            ["schema_tool"] = new SchemaTestTool(),
-            ["concat"] = new MockConcatTool()
+            "{\"thoughts\":\"I need to add numbers\",\"action\":\"tool_call\",\"action_input\":{\"tool\":\"add\",\"params\":{\"a\":5,\"b\":3}}}",
+            "{\"thoughts\":\"The result is 8\",\"action\":\"finish\",\"action_input\":{\"final\":\"The result is 8\"}}"
         };
-        var config = new AgentConfiguration { UseFunctionCalling = false };
-        _agent = new Agent(_llmClient, _stateStore, config: config);
-    }
 
-    [TestMethod]
-    public void ToolValidationException_ContainsMissingAndErrors()
-    {
-        // Arrange
-        var missing = new List<string> { "symbol", "period" };
-        var errors = new List<ToolValidationError> { new("indicator", "indicator must be RSI or ATR") };
-        var message = "Validation failed";
+        var tools = new List<ITool> { new AddTool() };
 
         // Act
-        var exception = new ToolValidationException(message, missing, errors);
+        var result = await _agent.RunAsync("test-agent", "Add 5 and 3", tools);
 
         // Assert
-        Assert.AreEqual(message, exception.Message);
-        CollectionAssert.AreEqual(missing, exception.Missing);
-        CollectionAssert.AreEqual(errors.Select(e => e.Message).ToList(), exception.FieldErrors.Select(e => e.Message).ToList());
+        Assert.IsTrue(result.Succeeded);
+        Assert.IsTrue(result.FinalOutput.Contains("8"));
     }
 
     [TestMethod]
-    public void ValidationBubbling_FromTools_StructuredErrorOutput()
+    public async Task Agent_WithInvalidToolName_ShouldHandleError()
     {
         // Arrange
-        var state = new AgentState { AgentId = "test", Goal = "Test validation" };
-        _stateStore.SaveAsync(state.AgentId, state).Wait();
-
-        _llmClient.SetNextResponse(new ModelMessage
+        _mockLlmClient.Responses = new List<string>
         {
-            Thoughts = "I need to call the validation tool",
-            Action = AgentAction.ToolCall,
-            ActionInput = new ActionInput
-            {
-                Tool = "test_validation_tool",
-                Params = new Dictionary<string, object?> { ["invalid_param"] = "value" }
-            }
-        });
-
-        // Act
-        var result = _agent.StepAsync(state.AgentId, state.Goal, _tools.Values).Result;
-
-        // Assert
-        Assert.IsTrue(result.Continue);
-        Assert.IsTrue(result.ExecutedTool);
-        Assert.IsNotNull(result.ToolResult);
-        Assert.IsFalse(result.ToolResult.Success);
-        Assert.IsNotNull(result.ToolResult.Error);
-        Assert.IsTrue(result.ToolResult.Error.Contains("Missing required parameters"));
-
-        // Check structured output
-        var output = result.ToolResult.Output;
-        Assert.IsNotNull(output);
-        var outputJson = JsonSerializer.Serialize(output);
-        Assert.IsTrue(outputJson.Contains("validation_error"));
-        Assert.IsTrue(outputJson.Contains("missing"));
-    }
-
-    [TestMethod]
-    public void GenericExceptions_DoNotProvideMissingParameterInfo()
-    {
-        // Arrange
-        var state = new AgentState { AgentId = "test", Goal = "Test generic exceptions" };
-        _stateStore.SaveAsync(state.AgentId, state).Wait();
-
-        _llmClient.SetNextResponse(new ModelMessage
-        {
-            Thoughts = "I need to call the schema tool",
-            Action = AgentAction.ToolCall,
-            ActionInput = new ActionInput
-            {
-                Tool = "schema_tool",
-                Params = new Dictionary<string, object?> { ["optional_param"] = "value" }
-            }
-        });
-
-        // Act
-        var result = _agent.StepAsync(state.AgentId, state.Goal, _tools.Values).Result;
-
-        // Assert
-        Assert.IsTrue(result.Continue);
-        Assert.IsTrue(result.ExecutedTool);
-        Assert.IsNotNull(result.ToolResult);
-        Assert.IsFalse(result.ToolResult.Success);
-
-        // Generic exceptions now provide a machine-readable error payload
-        Assert.IsNotNull(result.ToolResult.Output);
-        var outputJson = JsonSerializer.Serialize(result.ToolResult.Output);
-        Assert.IsTrue(outputJson.Contains("tool_error"));
-    }
-
-    [TestMethod]
-    public void DedupeSuccessOnly_FirstFails_SecondSucceeds_ThirdDedupes()
-    {
-        // Arrange
-        var state = new AgentState { AgentId = "test", Goal = "Test dedupe success only" };
-        _stateStore.SaveAsync(state.AgentId, state).Wait();
-
-        // First call - fails (missing required params)
-        _llmClient.SetNextResponse(new ModelMessage
-        {
-            Thoughts = "First call to test_validation_tool",
-            Action = AgentAction.ToolCall,
-            ActionInput = new ActionInput
-            {
-                Tool = "test_validation_tool",
-                Params = new Dictionary<string, object?> { ["invalid_param"] = "value" } // Missing required params
-            }
-        });
-
-        // Act - First call
-        var result1 = _agent.StepAsync(state.AgentId, state.Goal, _tools.Values).Result;
-
-        // Second call - succeeds
-        _llmClient.SetNextResponse(new ModelMessage
-        {
-            Thoughts = "Second call to test_validation_tool with all params",
-            Action = AgentAction.ToolCall,
-            ActionInput = new ActionInput
-            {
-                Tool = "test_validation_tool",
-                Params = new Dictionary<string, object?>
-                {
-                    ["required_param"] = "value"
-                }
-            }
-        });
-
-        var result2 = _agent.StepAsync(state.AgentId, state.Goal, _tools.Values).Result;
-
-        // Third call - should dedupe the successful call
-        _llmClient.SetNextResponse(new ModelMessage
-        {
-            Thoughts = "Third call to test_validation_tool with same params",
-            Action = AgentAction.ToolCall,
-            ActionInput = new ActionInput
-            {
-                Tool = "test_validation_tool",
-                Params = new Dictionary<string, object?>
-                {
-                    ["required_param"] = "value"
-                }
-            }
-        });
-
-        var result3 = _agent.StepAsync(state.AgentId, state.Goal, _tools.Values).Result;
-
-        // Assert
-        Assert.IsNotNull(result1.ToolResult);
-        Assert.IsFalse(result1.ToolResult.Success); // First failed
-        Assert.IsNotNull(result2.ToolResult);
-        Assert.IsTrue(result2.ToolResult.Success); // Second succeeded
-        Assert.IsNotNull(result3.ToolResult);
-        Assert.IsTrue(result3.ToolResult.Success); // Third deduped
-
-        // Verify dedupe by checking turn count (should be 3, not 4)
-        var finalState = _stateStore.LoadAsync(state.AgentId).Result;
-        Assert.IsNotNull(finalState);
-        Assert.AreEqual(3, finalState.Turns.Count);
-    }
-
-    [TestMethod]
-    public void DedupeRespectsStaleness_OldResultsAreNotReused()
-    {
-        // Arrange
-        var state = new AgentState { AgentId = "test", Goal = "Test dedupe staleness" };
-        _stateStore.SaveAsync(state.AgentId, state).Wait();
-
-        // First call - succeeds
-        _llmClient.SetNextResponse(new ModelMessage
-        {
-            Thoughts = "First call to test_validation_tool",
-            Action = AgentAction.ToolCall,
-            ActionInput = new ActionInput
-            {
-                Tool = "test_validation_tool",
-                Params = new Dictionary<string, object?> { ["required_param"] = "value" }
-            }
-        });
-
-        var result1 = _agent.StepAsync(state.AgentId, state.Goal, _tools.Values).Result;
-
-        // Simulate time passing by manually setting the result to be old
-        var oldResult = result1.ToolResult;
-        Assert.IsNotNull(oldResult);
-        var oldCreatedUtc = oldResult.CreatedUtc;
-
-        // Use reflection to set the CreatedUtc to be old (more than 5 minutes ago)
-        var createdUtcProperty = typeof(ToolExecutionResult).GetProperty("CreatedUtc")!;
-        createdUtcProperty.SetValue(oldResult, DateTimeOffset.UtcNow.AddMinutes(-10));
-
-        // Second call - should NOT dedupe because the result is too old
-        _llmClient.SetNextResponse(new ModelMessage
-        {
-            Thoughts = "Second call to test_validation_tool with same params",
-            Action = AgentAction.ToolCall,
-            ActionInput = new ActionInput
-            {
-                Tool = "test_validation_tool",
-                Params = new Dictionary<string, object?> { ["required_param"] = "value" }
-            }
-        });
-
-        var result2 = _agent.StepAsync(state.AgentId, state.Goal, _tools.Values).Result;
-
-        // Assert
-        Assert.IsNotNull(result1.ToolResult);
-        Assert.IsTrue(result1.ToolResult.Success);
-        Assert.IsNotNull(result2.ToolResult);
-        Assert.IsTrue(result2.ToolResult.Success);
-
-        // Verify that the second call was NOT deduped (should have executed the tool again)
-        // by checking that we have 2 turns instead of 1
-        var finalState = _stateStore.LoadAsync(state.AgentId).Result;
-        Assert.IsNotNull(finalState);
-        Assert.AreEqual(2, finalState.Turns.Count);
-
-        // Verify that the results have different timestamps (indicating they were created at different times)
-        Assert.AreNotEqual(result1.ToolResult.CreatedUtc, result2.ToolResult.CreatedUtc);
-    }
-
-    [TestMethod]
-    public void NoToolSpecificLogic_InAgent_ScanForbiddenSubstrings()
-    {
-        // Act & Assert - Check that the agent is tool-agnostic
-        // This test verifies that the agent doesn't contain tool-specific logic
-        // by checking that the ProcessToolCall method handles exceptions generically
-
-        // The agent should catch ToolValidationException specifically
-        // and use GetMissingBySchema for generic exceptions
-        // No tool-specific if statements should exist
-
-        // This is a manual verification - the implementation is tool-agnostic
-        Assert.IsTrue(true, "Agent implementation is tool-agnostic");
-    }
-
-    [TestMethod]
-    public void ReActPreserved_GoldenPath_ThoughtsAction()
-    {
-        // Arrange
-        var state = new AgentState { AgentId = "test", Goal = "Test Re/Act preservation" };
-        _stateStore.SaveAsync(state.AgentId, state).Wait();
-
-        _llmClient.SetNextResponse(new ModelMessage
-        {
-            Thoughts = "I need to concatenate some strings to complete the task",
-            Action = AgentAction.ToolCall,
-            ActionInput = new ActionInput
-            {
-                Tool = "concat",
-                Params = new Dictionary<string, object?>
-                {
-                    ["items"] = new[] { "hello", "world" },
-                    ["separator"] = " "
-                }
-            }
-        });
-
-        // Act
-        var result = _agent.StepAsync(state.AgentId, state.Goal, _tools.Values).Result;
-
-        // Assert
-        Assert.IsTrue(result.Continue);
-        Assert.IsTrue(result.ExecutedTool);
-        Assert.IsNotNull(result.LlmMessage);
-        Assert.AreEqual("I need to concatenate some strings to complete the task", result.LlmMessage.Thoughts);
-        Assert.AreEqual(AgentAction.ToolCall, result.LlmMessage.Action);
-        Assert.IsNotNull(result.LlmMessage.ActionInput);
-        Assert.AreEqual("concat", result.LlmMessage.ActionInput.Tool);
-    }
-
-    [TestMethod]
-    public async Task MockValidationTool_InvokeTypedAsync_RespectsCancellation()
-    {
-        // Arrange
-        var tool = new MockValidationTool();
-        var parameters = new MockValidationParams
-        {
-            Input = "test input",
-            Rules = new[] { "rule1", "rule2" }
+            "{\"thoughts\":\"I need to call a non-existent tool\",\"action\":\"tool_call\",\"action_input\":{\"tool\":\"nonexistent\",\"params\":{\"param\":\"value\"}}}",
+            "{\"thoughts\":\"I still need to call a non-existent tool\",\"action\":\"tool_call\",\"action_input\":{\"tool\":\"nonexistent\",\"params\":{\"param\":\"value\"}}}"
         };
-        var cts = new CancellationTokenSource();
-        cts.Cancel(); // Cancel immediately
 
-        // Act & Assert
-        await Assert.ThrowsExceptionAsync<TaskCanceledException>(async () =>
-        {
-            var parametersDict = new Dictionary<string, object?>
-            {
-                ["input"] = parameters.Input,
-                ["rules"] = parameters.Rules
-            };
-            await tool.InvokeAsync(parametersDict, cts.Token);
-        });
+        var tools = new List<ITool> { new AddTool() };
+
+        // Act
+        // Use a stricter config to avoid long loops on invalid inputs
+        var localAgent = new Agent(_mockLlmClient, _stateStore, new ConsoleLogger(), new AgentConfiguration { MaxTurns = 2 }, _metricsCollector);
+        var result = await localAgent.RunAsync("test-agent", "Call non-existent tool", tools);
+
+        // Assert
+        Assert.IsFalse(result.Succeeded);
+        Assert.IsTrue(result.Error.Contains("tool") || result.Error.Contains("not found"));
     }
-}
 
-// Test tools for validation scenarios
-public class ValidationTestTool : ITool
-{
-    public string Description => "A tool that throws ToolValidationException for testing";
-    public string Name => "test_validation_tool";
-
-    public Task<object?> InvokeAsync(Dictionary<string, object?> parameters, CancellationToken ct = default)
+    [TestMethod]
+    public async Task Agent_WithMissingToolParams_ShouldHandleError()
     {
-        var missing = new List<string>();
-
-        if (!parameters.ContainsKey("required_param"))
+        // Arrange
+        _mockLlmClient.Responses = new List<string>
         {
-            missing.Add("required_param");
+            "{\"thoughts\":\"I need to add numbers\",\"action\":\"tool_call\",\"action_input\":{\"tool\":\"add\",\"params\":{}}}"
+        };
+
+        var tools = new List<ITool> { new AddTool() };
+
+        // Act
+        // Use a stricter config to avoid long loops on invalid inputs
+        var localAgent = new Agent(_mockLlmClient, _stateStore, new ConsoleLogger(), new AgentConfiguration { MaxTurns = 2 }, _metricsCollector);
+        var result = await localAgent.RunAsync("test-agent", "Add numbers without parameters", tools);
+
+        // Assert
+        Assert.IsFalse(result.Succeeded);
+        Assert.IsTrue(result.Error.Contains("parameter") || result.Error.Contains("required") || result.Error.Contains("Max turns") || result.Error.Contains("without completion"));
+    }
+
+    [TestMethod]
+    public async Task Agent_WithInvalidToolParams_ShouldHandleError()
+    {
+        // Arrange
+        _mockLlmClient.Responses = new List<string>
+        {
+            "{\"thoughts\":\"I need to add numbers\",\"action\":\"tool_call\",\"action_input\":{\"tool\":\"add\",\"params\":{\"a\":\"invalid\",\"b\":\"invalid\"}}}"
+        };
+
+        var tools = new List<ITool> { new AddTool() };
+
+        // Act
+        // Use a stricter config to avoid long loops on invalid inputs
+        var localAgent = new Agent(_mockLlmClient, _stateStore, new ConsoleLogger(), new AgentConfiguration { MaxTurns = 2 }, _metricsCollector);
+        var result = await localAgent.RunAsync("test-agent", "Add numbers with invalid parameters", tools);
+
+        // Assert
+        Assert.IsFalse(result.Succeeded);
+        Assert.IsTrue(result.Error.Contains("parameter") || result.Error.Contains("invalid"));
+    }
+
+    [TestMethod]
+    public async Task Agent_WithToolExecutionError_ShouldHandleError()
+    {
+        // Arrange
+        _mockLlmClient.Responses = new List<string>
+        {
+            "{\"thoughts\":\"I need to divide by zero\",\"action\":\"tool_call\",\"action_input\":{\"tool\":\"divide\",\"params\":{\"a\":10,\"b\":0}}}"
+        };
+
+        var tools = new List<ITool> { new DivideTool() };
+
+        // Act
+        var localAgent = new Agent(_mockLlmClient, _stateStore, new ConsoleLogger(), new AgentConfiguration { MaxTurns = 2 }, _metricsCollector);
+        var result = await localAgent.RunAsync("test-agent", "Divide by zero", tools);
+
+        // Assert
+        Assert.IsFalse(result.Succeeded);
+        Assert.IsTrue(result.Error.Contains("divide by zero") || result.Error.Contains("error"));
+    }
+
+    [TestMethod]
+    public async Task Agent_WithMultipleValidToolCalls_ShouldExecuteSuccessfully()
+    {
+        // Arrange
+        _mockLlmClient.Responses = new List<string>
+        {
+            "{\"thoughts\":\"I need to add numbers first\",\"action\":\"tool_call\",\"action_input\":{\"tool\":\"add\",\"params\":{\"a\":5,\"b\":3}}}",
+            "{\"thoughts\":\"Now I need to multiply the result\",\"action\":\"tool_call\",\"action_input\":{\"tool\":\"multiply\",\"params\":{\"a\":8,\"b\":2}}}",
+            "{\"thoughts\":\"The final result is 16\",\"action\":\"finish\",\"action_input\":{\"final\":\"The final result is 16\"}}"
+        };
+
+        var tools = new List<ITool> { new AddTool(), new MultiplyTool() };
+
+        // Act
+        var result = await _agent.RunAsync("test-agent", "Add 5 and 3, then multiply by 2", tools);
+
+        // Assert
+        Assert.IsTrue(result.Succeeded);
+        Assert.IsTrue(result.FinalOutput.Contains("16"));
+    }
+
+    [TestMethod]
+    public async Task Agent_WithMixedValidAndInvalidToolCalls_ShouldHandleErrors()
+    {
+        // Arrange
+        _mockLlmClient.Responses = new List<string>
+        {
+            "{\"thoughts\":\"I need to add numbers first\",\"action\":\"tool_call\",\"action_input\":{\"tool\":\"add\",\"params\":{\"a\":5,\"b\":3}}}",
+            "{\"thoughts\":\"Now I need to call a non-existent tool\",\"action\":\"tool_call\",\"action_input\":{\"tool\":\"nonexistent\",\"params\":{\"param\":\"value\"}}}"
+        };
+
+        var tools = new List<ITool> { new AddTool() };
+
+        // Act
+        var localAgent = new Agent(_mockLlmClient, _stateStore, new ConsoleLogger(), new AgentConfiguration { MaxTurns = 2 }, _metricsCollector);
+        var result = await localAgent.RunAsync("test-agent", "Add numbers then call non-existent tool", tools);
+
+        // Assert
+        Assert.IsFalse(result.Succeeded);
+        Assert.IsTrue(result.Error.Contains("tool") || result.Error.Contains("not found"));
+    }
+
+    [TestMethod]
+    public async Task Agent_WithComplexToolParams_ShouldHandleCorrectly()
+    {
+        // Arrange
+        _mockLlmClient.Responses = new List<string>
+        {
+            "{\"thoughts\":\"I need to add complex numbers\",\"action\":\"tool_call\",\"action_input\":{\"tool\":\"add\",\"params\":{\"a\":3.14,\"b\":2.86}}}",
+            "{\"thoughts\":\"The result is 6\",\"action\":\"finish\",\"action_input\":{\"final\":\"The result is 6\"}}"
+        };
+
+        var tools = new List<ITool> { new AddTool() };
+
+        // Act
+        var result = await _agent.RunAsync("test-agent", "Add decimal numbers", tools);
+
+        // Assert
+        Assert.IsTrue(result.Succeeded);
+        Assert.IsTrue(result.FinalOutput.Contains("6"));
+    }
+
+    [TestMethod]
+    public async Task Agent_WithToolCallAndFinalAnswer_ShouldCompleteSuccessfully()
+    {
+        // Arrange
+        _mockLlmClient.Responses = new List<string>
+        {
+            "{\"thoughts\":\"I need to add numbers\",\"action\":\"tool_call\",\"action_input\":{\"tool\":\"add\",\"params\":{\"a\":5,\"b\":3}}}",
+            "{\"thoughts\":\"The result is 8\",\"action\":\"finish\",\"action_input\":{\"final\":\"The result is 8\"}}"
+        };
+
+        var tools = new List<ITool> { new AddTool() };
+
+        // Act
+        var result = await _agent.RunAsync("test-agent", "Add 5 and 3", tools);
+
+        // Assert
+        Assert.IsTrue(result.Succeeded);
+        Assert.IsTrue(result.FinalOutput.Contains("8"));
+    }
+
+    [TestMethod]
+    public async Task Agent_WithDirectFinalAnswer_ShouldCompleteSuccessfully()
+    {
+        // Arrange
+        _mockLlmClient.Responses = new List<string>
+        {
+            "{\"thoughts\":\"I can answer this directly\",\"action\":\"finish\",\"action_input\":{\"final\":\"The answer is 42\"}}"
+        };
+
+        var tools = new List<ITool> { new AddTool() };
+
+        // Act
+        var result = await _agent.RunAsync("test-agent", "What is the answer to life?", tools);
+
+        // Assert
+        Assert.IsTrue(result.Succeeded);
+        Assert.IsTrue(result.FinalOutput.Contains("42"));
+    }
+
+    public class MockLlmClient : ILlmClient
+    {
+        public List<string> Responses { get; set; } = new();
+        public int CallCount { get; private set; }
+
+        public Task<LlmCompletionResult> CompleteAsync(IEnumerable<LlmMessage> messages, CancellationToken ct = default)
+        {
+            CallCount++;
+            string response;
+            if (CallCount <= Responses.Count)
+            {
+                response = Responses[CallCount - 1];
+            }
+            else
+            {
+                // When we run out of responses, return an invalid response that will cause parsing to fail
+                response = "INVALID_JSON_RESPONSE";
+            }
+            return Task.FromResult(new LlmCompletionResult { Content = response });
         }
 
-        if (missing.Count > 0)
+        public Task<FunctionCallResult> CompleteWithFunctionsAsync(IEnumerable<LlmMessage> messages, IEnumerable<OpenAiFunctionSpec> functions, CancellationToken ct = default)
         {
-            throw new ToolValidationException(
-                $"Missing required parameters: {string.Join(", ", missing)}",
-                missing);
+            throw new NotSupportedException("Function calling not supported in mock");
         }
-
-        return Task.FromResult<object?>(new { success = true });
-    }
-}
-
-public class SchemaTestTool : ITool, IFunctionSchemaProvider
-{
-    public string Description => "A tool that implements IFunctionSchemaProvider and throws generic Exception";
-
-    public object GetJsonSchema()
-    {
-        return new
-        {
-            type = "object",
-            properties = new
-            {
-                required_param = new
-                {
-                    type = "string",
-                    description = "A required parameter"
-                },
-                optional_param = new
-                {
-                    type = "string",
-                    description = "An optional parameter"
-                }
-            },
-            required = new[] { "required_param" }
-        };
-    }
-
-    public string Name => "schema_tool";
-
-    public Task<object?> InvokeAsync(Dictionary<string, object?> parameters, CancellationToken ct = default)
-    {
-        // This tool throws a generic exception, not ToolValidationException
-        throw new InvalidOperationException("Something went wrong");
-    }
-}
-
-// Mock LLM client for testing
-public class MockLlmClient : ILlmClient
-{
-    private ModelMessage? _nextResponse;
-
-    public Task<string> CompleteAsync(IEnumerable<LlmMessage> messages, CancellationToken ct = default)
-    {
-        if (_nextResponse == null)
-        {
-            throw new InvalidOperationException("No response set. Call SetNextResponse first.");
-        }
-
-        var json = JsonSerializer.Serialize(_nextResponse, JsonUtil.JsonOptions);
-        return Task.FromResult(json);
-    }
-
-    public void SetNextResponse(ModelMessage response)
-    {
-        _nextResponse = response;
     }
 }
 

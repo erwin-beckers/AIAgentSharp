@@ -1,4 +1,5 @@
 using AIAgentSharp.Agents.Interfaces;
+using AIAgentSharp.Metrics;
 
 namespace AIAgentSharp.Agents;
 
@@ -16,6 +17,7 @@ public sealed class Agent : IAgent
     private readonly IAgentOrchestrator _orchestrator;
     private readonly IEventManager _eventManager;
     private readonly IStatusManager _statusManager;
+    private readonly IMetricsCollector _metricsCollector;
 
     // Current agent state for status updates
     private string? _agentId;
@@ -25,17 +27,19 @@ public sealed class Agent : IAgent
         ILlmClient llmClient,
         IAgentStateStore stateStore,
         ILogger? logger = null,
-        AgentConfiguration? config = null)
+        AgentConfiguration? config = null,
+        IMetricsCollector? metricsCollector = null)
     {
         _llm = llmClient ?? throw new ArgumentNullException(nameof(llmClient));
         _store = stateStore ?? throw new ArgumentNullException(nameof(stateStore));
         _logger = logger ?? new ConsoleLogger();
         _config = config ?? new AgentConfiguration();
+        _metricsCollector = metricsCollector ?? new MetricsCollector(_logger);
         
         // Initialize specialized components
         _eventManager = new EventManager(_logger);
         _statusManager = new StatusManager(_config, _eventManager);
-        _orchestrator = new AgentOrchestrator(_llm, _store, _config, _logger, _eventManager, _statusManager);
+        _orchestrator = new AgentOrchestrator(_llm, _store, _config, _logger, _eventManager, _statusManager, _metricsCollector);
     }
 
     /// <summary>
@@ -73,6 +77,7 @@ public sealed class Agent : IAgent
     /// <exception cref="OperationCanceledException">Thrown when the operation is cancelled via <paramref name="ct"/>.</exception>
     public async Task<AgentResult> RunAsync(string agentId, string goal, IEnumerable<ITool> tools, CancellationToken ct = default)
     {
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         _logger.LogInformation($"Starting agent run for {agentId} with goal: {goal}");
 
         // Set current agent state for status updates
@@ -100,8 +105,14 @@ public sealed class Agent : IAgent
             // Raise step started event with actual turn index
             _eventManager.RaiseStepStarted(agentId, state.Turns.Count);
 
+            var stepStopwatch = System.Diagnostics.Stopwatch.StartNew();
             var step = await _orchestrator.ExecuteStepAsync(state, registry, ct);
+            stepStopwatch.Stop();
             await _store.SaveAsync(agentId, state, ct);
+
+            // Record step metrics
+            _metricsCollector.RecordAgentStepExecutionTime(agentId, state.Turns.Count, stepStopwatch.ElapsedMilliseconds);
+            _metricsCollector.RecordAgentStepCompletion(agentId, state.Turns.Count, step.FinalOutput != null || step.Continue, step.ToolResult != null, step.Error);
 
             // Raise step completed event
             _eventManager.RaiseStepCompleted(agentId, state.Turns.Count, step);
@@ -129,25 +140,95 @@ public sealed class Agent : IAgent
                 var finalStatus = result.Succeeded ? "Task completed successfully" : "Task failed";
                 _statusManager.EmitStatus(agentId, finalStatus, result.FinalOutput ?? result.Error, null, 100);
 
+                // Record metrics for successful completion
+                stopwatch.Stop();
+                _metricsCollector.RecordAgentRunExecutionTime(agentId, stopwatch.ElapsedMilliseconds, i + 1);
+                _metricsCollector.RecordAgentRunCompletion(agentId, result.Succeeded, i + 1, result.Error);
+                _metricsCollector.RecordResponseQuality(agentId, result.FinalOutput?.Length ?? 0, result.FinalOutput != null);
+
                 // Raise run completed event
                 _eventManager.RaiseRunCompleted(agentId, result.Succeeded, result.FinalOutput, result.Error, i + 1);
 
                 return result;
             }
+
+            // If we're at the last allowed turn and still asked to continue, return a failure now
+            if (i == _config.MaxTurns - 1)
+            {
+                // Try to surface the most recent tool/parse error if available
+                string? lastErr = null;
+                for (int t = state.Turns.Count - 1; t >= 0; t--)
+                {
+                    var tr = state.Turns[t].ToolResult;
+                    if (tr != null && tr.Success == false && !string.IsNullOrWhiteSpace(tr.Error))
+                    {
+                        lastErr = tr.Error;
+                        break;
+                    }
+                }
+
+                var errorMsg = lastErr != null
+                    ? $"Max turns {_config.MaxTurns} reached without finish. Last error: {lastErr}"
+                    : $"Max turns {_config.MaxTurns} reached without finish.";
+
+                var earlyStop = new AgentResult
+                {
+                    Succeeded = false,
+                    FinalOutput = null,
+                    State = state,
+                    Error = errorMsg
+                };
+
+                _logger.LogWarning(errorMsg);
+
+                // Emit completion status
+                _statusManager.EmitStatus(agentId, "Task failed", errorMsg, null, 100);
+
+                // Record metrics
+                stopwatch.Stop();
+                _metricsCollector.RecordAgentRunExecutionTime(agentId, stopwatch.ElapsedMilliseconds, i + 1);
+                _metricsCollector.RecordAgentRunCompletion(agentId, false, i + 1, errorMsg);
+                _metricsCollector.RecordResponseQuality(agentId, 0, false);
+
+                _eventManager.RaiseRunCompleted(agentId, false, null, errorMsg, i + 1);
+                return earlyStop;
+            }
         }
 
         _logger.LogWarning($"Max turns {_config.MaxTurns} reached without completion");
+
+        // Prefer reporting the most recent meaningful error if available (e.g., tool failure or JSON parse error)
+        string? specificError = null;
+        for (int t = state.Turns.Count - 1; t >= 0; t--)
+        {
+            var tr = state.Turns[t].ToolResult;
+            if (tr != null && tr.Success == false && !string.IsNullOrWhiteSpace(tr.Error))
+            {
+                specificError = tr.Error;
+                break;
+            }
+        }
+
+        var finalError = specificError != null
+            ? $"Max turns {_config.MaxTurns} reached without finish. Last error: {specificError}"
+            : $"Max turns {_config.MaxTurns} reached without finish.";
 
         var maxTurnsResult = new AgentResult
         {
             Succeeded = false,
             FinalOutput = null,
             State = state,
-            Error = $"Max turns {_config.MaxTurns} reached without finish."
+            Error = finalError
         };
 
+        // Record metrics for max turns reached
+        stopwatch.Stop();
+        _metricsCollector.RecordAgentRunExecutionTime(agentId, stopwatch.ElapsedMilliseconds, _config.MaxTurns);
+        _metricsCollector.RecordAgentRunCompletion(agentId, false, _config.MaxTurns, finalError);
+        _metricsCollector.RecordResponseQuality(agentId, 0, false);
+
         // Raise run completed event for max turns reached
-        _eventManager.RaiseRunCompleted(agentId, false, null, $"Max turns {_config.MaxTurns} reached without finish.", _config.MaxTurns);
+        _eventManager.RaiseRunCompleted(agentId, false, null, finalError, _config.MaxTurns);
 
         return maxTurnsResult;
     }
@@ -273,6 +354,11 @@ public sealed class Agent : IAgent
         add => _eventManager.StatusUpdate += value;
         remove => _eventManager.StatusUpdate -= value;
     }
+
+    /// <summary>
+    /// Gets the metrics provider for accessing collected metrics data.
+    /// </summary>
+    public IMetricsProvider Metrics => _metricsCollector as IMetricsProvider ?? throw new InvalidOperationException("Metrics collector does not implement IMetricsProvider");
 
     private async Task<AgentState> EnsureState(string agentId, string goal, CancellationToken ct)
     {

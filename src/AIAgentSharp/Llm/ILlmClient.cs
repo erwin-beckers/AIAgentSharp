@@ -17,10 +17,8 @@ namespace AIAgentSharp;
 /// - Response parsing and error handling
 /// - Rate limiting and retry logic
 /// - Model-specific configurations
-/// </para>
-/// <para>
-/// For OpenAI models with function calling support, consider implementing
-/// <see cref="IFunctionCallingLlmClient"/> instead of this interface.
+/// - Usage metadata reporting when available
+/// - Function calling when supported by the provider
 /// </para>
 /// </remarks>
 /// <example>
@@ -37,11 +35,29 @@ namespace AIAgentSharp;
 ///         _model = model;
 ///     }
 ///     
-///     public async Task&lt;string&gt; CompleteAsync(IEnumerable&lt;LlmMessage&gt; messages, CancellationToken ct = default)
+///     public async Task&lt;LlmCompletionResult&gt; CompleteAsync(IEnumerable&lt;LlmMessage&gt; messages, CancellationToken ct = default)
 ///     {
 ///         var chatMessages = messages.Select(m => new ChatMessage(m.Role, m.Content)).ToList();
 ///         var response = await _client.GetChatCompletionsAsync(_model, chatMessages, ct);
-///         return response.Value.Choices[0].Message.Content;
+///         var completion = response.Value;
+///         
+///         return new LlmCompletionResult
+///         {
+///             Content = completion.Choices[0].Message.Content,
+///             Usage = new LlmUsage
+///             {
+///                 InputTokens = completion.Usage.PromptTokens,
+///                 OutputTokens = completion.Usage.CompletionTokens,
+///                 Model = _model,
+///                 Provider = "OpenAI"
+///             }
+///         };
+///     }
+///     
+///     public async Task&lt;FunctionCallResult&gt; CompleteWithFunctionsAsync(IEnumerable&lt;LlmMessage&gt; messages, IEnumerable&lt;OpenAiFunctionSpec&gt; functions, CancellationToken ct = default)
+///     {
+///         // Implementation for function calling
+///         // Returns FunctionCallResult with usage metadata
 ///     }
 /// }
 /// </code>
@@ -49,7 +65,7 @@ namespace AIAgentSharp;
 public interface ILlmClient
 {
     /// <summary>
-    /// Sends a collection of messages to the LLM and returns the generated response.
+    /// Sends a collection of messages to the LLM and returns the generated response with optional usage metadata.
     /// </summary>
     /// <param name="messages">
     /// A collection of messages that form the conversation context. The messages should
@@ -61,8 +77,8 @@ public interface ILlmClient
     /// for managing timeouts and allowing users to cancel long-running operations.
     /// </param>
     /// <returns>
-    /// A task that represents the asynchronous LLM completion. The result is the
-    /// generated text response from the language model.
+    /// A task that represents the asynchronous LLM completion. The result contains the
+    /// generated text response and optional usage metadata from the language model.
     /// </returns>
     /// <exception cref="ArgumentNullException">
     /// Thrown when <paramref name="messages"/> is null.
@@ -99,6 +115,7 @@ public interface ILlmClient
     /// - Respect rate limits and quotas
     /// - Provide meaningful error messages for debugging
     /// - Handle model-specific response formats
+    /// - Return usage metadata when available from the provider
     /// </para>
     /// <para>
     /// The response should be a well-formed text that the agent can parse and use for
@@ -117,9 +134,80 @@ public interface ILlmClient
     ///     new LlmMessage("tool_result", "Temperature: 22°C, Conditions: Partly cloudy")
     /// };
     /// 
-    /// var response = await llmClient.CompleteAsync(messages, ct);
-    /// // Response: "Based on the weather data, it's currently 22°C and partly cloudy in New York."
+    /// var result = await llmClient.CompleteAsync(messages, ct);
+    /// // result.Content: "Based on the weather data, it's currently 22°C and partly cloudy in New York."
+    /// // result.Usage: Optional token usage metadata from the provider
     /// </code>
     /// </example>
-    Task<string> CompleteAsync(IEnumerable<LlmMessage> messages, CancellationToken ct = default);
+    Task<LlmCompletionResult> CompleteAsync(IEnumerable<LlmMessage> messages, CancellationToken ct = default);
+
+    /// <summary>
+    /// Completes a conversation with function calling capabilities.
+    /// This method is optional - providers that don't support function calling can throw
+    /// <see cref="NotSupportedException"/>.
+    /// </summary>
+    /// <param name="messages">The conversation messages to send to the LLM.</param>
+    /// <param name="functions">The available functions that the LLM can call.</param>
+    /// <param name="ct">Cancellation token for the operation.</param>
+    /// <returns>The result of the function calling operation with optional usage metadata.</returns>
+    /// <exception cref="NotSupportedException">
+    /// Thrown when the LLM provider doesn't support function calling.
+    /// </exception>
+    /// <exception cref="ArgumentNullException">
+    /// Thrown when <paramref name="messages"/> or <paramref name="functions"/> is null.
+    /// </exception>
+    /// <exception cref="ArgumentException">
+    /// Thrown when <paramref name="messages"/> is empty or contains invalid messages.
+    /// </exception>
+    /// <exception cref="OperationCanceledException">
+    /// Thrown when the operation is cancelled via the cancellation token.
+    /// </exception>
+    /// <exception cref="HttpRequestException">
+    /// Thrown when there is a network or HTTP-related error communicating with the LLM service.
+    /// </exception>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown when the LLM service returns an error response or invalid data.
+    /// </exception>
+    /// <remarks>
+    /// <para>
+    /// Function calling provides more reliable tool selection and parameter extraction
+    /// compared to the Re/Act pattern. The LLM can directly call functions with
+    /// structured parameters, making tool execution more predictable.
+    /// </para>
+    /// <para>
+    /// Providers that support function calling should implement this method and return
+    /// a <see cref="FunctionCallResult"/> containing:
+    /// - Whether a function was called
+    /// - The function name and arguments
+    /// - Any assistant content
+    /// - Usage metadata when available
+    /// </para>
+    /// <para>
+    /// Providers that don't support function calling should throw
+    /// <see cref="NotSupportedException"/> to indicate this capability is not available.
+    /// </para>
+    /// </remarks>
+    /// <example>
+    /// <para>Example usage with function calling:</para>
+    /// <code>
+    /// var functions = new List&lt;OpenAiFunctionSpec&gt;
+    /// {
+    ///     new OpenAiFunctionSpec
+    ///     {
+    ///         Name = "get_weather",
+    ///         Description = "Get the current weather for a location",
+    ///         Parameters = new { type = "object", properties = new { location = new { type = "string" } } }
+    ///     }
+    /// };
+    /// 
+    /// var result = await llmClient.CompleteWithFunctionsAsync(messages, functions, ct);
+    /// if (result.HasFunctionCall)
+    /// {
+    ///     // Execute the function call
+    ///     var functionName = result.FunctionName;
+    ///     var arguments = JsonSerializer.Deserialize&lt;Dictionary&lt;string, object&gt;&gt;(result.FunctionArgumentsJson);
+    /// }
+    /// </code>
+    /// </example>
+    Task<FunctionCallResult> CompleteWithFunctionsAsync(IEnumerable<LlmMessage> messages, IEnumerable<OpenAiFunctionSpec> functions, CancellationToken ct = default);
 }

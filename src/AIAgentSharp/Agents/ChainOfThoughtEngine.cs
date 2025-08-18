@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using AIAgentSharp.Agents.Interfaces;
+using AIAgentSharp.Metrics;
 
 namespace AIAgentSharp.Agents;
 
@@ -13,19 +14,22 @@ public sealed class ChainOfThoughtEngine : IChainOfThoughtEngine
     private readonly ILogger _logger;
     private readonly IEventManager _eventManager;
     private readonly IStatusManager _statusManager;
+    private readonly IMetricsCollector _metricsCollector;
 
     public ChainOfThoughtEngine(
         ILlmClient llm,
         AgentConfiguration config,
         ILogger logger,
         IEventManager eventManager,
-        IStatusManager statusManager)
+        IStatusManager statusManager,
+        IMetricsCollector metricsCollector)
     {
         _llm = llm ?? throw new ArgumentNullException(nameof(llm));
         _config = config ?? throw new ArgumentNullException(nameof(config));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _eventManager = eventManager ?? throw new ArgumentNullException(nameof(eventManager));
         _statusManager = statusManager ?? throw new ArgumentNullException(nameof(statusManager));
+        _metricsCollector = metricsCollector ?? throw new ArgumentNullException(nameof(metricsCollector));
     }
 
     public ReasoningType ReasoningType => ReasoningType.ChainOfThought;
@@ -81,6 +85,10 @@ public sealed class ChainOfThoughtEngine : IChainOfThoughtEngine
             stopwatch.Stop();
             result.ExecutionTimeMs = stopwatch.ElapsedMilliseconds;
             result.Chain = CurrentChain;
+
+            // Record metrics for reasoning completion
+            _metricsCollector.RecordReasoningExecutionTime("agent", ReasoningType.ChainOfThought, stopwatch.ElapsedMilliseconds);
+            _metricsCollector.RecordReasoningConfidence("agent", ReasoningType.ChainOfThought, result.Confidence);
 
             _logger.LogInformation($"Chain of Thought reasoning completed in {stopwatch.ElapsedMilliseconds}ms. Success: {result.Success}");
 
@@ -221,11 +229,11 @@ public sealed class ChainOfThoughtEngine : IChainOfThoughtEngine
 
         var prompt = BuildAnalysisPrompt(goal, context, tools);
         var messages = new List<LlmMessage> { new LlmMessage { Role = "user", Content = prompt } };
-        var response = await _llm.CompleteAsync(messages, cancellationToken);
+        var llmResponse = await _llm.CompleteAsync(messages, cancellationToken);
 
-        var reasoning = ExtractReasoningFromResponse(response);
-        var confidence = ExtractConfidenceFromResponse(response);
-        var insights = ExtractInsightsFromResponse(response);
+        var reasoning = ExtractReasoningFromResponse(llmResponse);
+        var confidence = ExtractConfidenceFromResponse(llmResponse);
+        var insights = ExtractInsightsFromResponse(llmResponse);
 
         var step = AddStep(reasoning, ReasoningStepType.Analysis, confidence, insights);
 
@@ -244,11 +252,11 @@ public sealed class ChainOfThoughtEngine : IChainOfThoughtEngine
 
         var prompt = BuildPlanningPrompt(goal, context, tools, analysisInsights);
         var messages = new List<LlmMessage> { new LlmMessage { Role = "user", Content = prompt } };
-        var response = await _llm.CompleteAsync(messages, cancellationToken);
+        var llmResponse = await _llm.CompleteAsync(messages, cancellationToken);
 
-        var reasoning = ExtractReasoningFromResponse(response);
-        var confidence = ExtractConfidenceFromResponse(response);
-        var insights = ExtractInsightsFromResponse(response);
+        var reasoning = ExtractReasoningFromResponse(llmResponse);
+        var confidence = ExtractConfidenceFromResponse(llmResponse);
+        var insights = ExtractInsightsFromResponse(llmResponse);
 
         var step = AddStep(reasoning, ReasoningStepType.Planning, confidence, insights);
 
@@ -267,11 +275,11 @@ public sealed class ChainOfThoughtEngine : IChainOfThoughtEngine
 
         var prompt = BuildStrategyPrompt(goal, context, tools, planningInsights);
         var messages = new List<LlmMessage> { new LlmMessage { Role = "user", Content = prompt } };
-        var response = await _llm.CompleteAsync(messages, cancellationToken);
+        var llmResponse = await _llm.CompleteAsync(messages, cancellationToken);
 
-        var reasoning = ExtractReasoningFromResponse(response);
-        var confidence = ExtractConfidenceFromResponse(response);
-        var insights = ExtractInsightsFromResponse(response);
+        var reasoning = ExtractReasoningFromResponse(llmResponse);
+        var confidence = ExtractConfidenceFromResponse(llmResponse);
+        var insights = ExtractInsightsFromResponse(llmResponse);
 
         var step = AddStep(reasoning, ReasoningStepType.Decision, confidence, insights);
 
@@ -290,12 +298,12 @@ public sealed class ChainOfThoughtEngine : IChainOfThoughtEngine
 
         var prompt = BuildEvaluationPrompt(goal, context, tools, allInsights);
         var messages = new List<LlmMessage> { new LlmMessage { Role = "user", Content = prompt } };
-        var response = await _llm.CompleteAsync(messages, cancellationToken);
+        var llmResponse = await _llm.CompleteAsync(messages, cancellationToken);
 
-        var reasoning = ExtractReasoningFromResponse(response);
-        var confidence = ExtractConfidenceFromResponse(response);
-        var insights = ExtractInsightsFromResponse(response);
-        var conclusion = ExtractConclusionFromResponse(response);
+        var reasoning = ExtractReasoningFromResponse(llmResponse);
+        var confidence = ExtractConfidenceFromResponse(llmResponse);
+        var insights = ExtractInsightsFromResponse(llmResponse);
+        var conclusion = ExtractConclusionFromResponse(llmResponse);
 
         var step = AddStep(reasoning, ReasoningStepType.Evaluation, confidence, insights);
 
@@ -313,10 +321,10 @@ public sealed class ChainOfThoughtEngine : IChainOfThoughtEngine
     {
         var prompt = BuildValidationPrompt(goal, insights, conclusion, confidence);
         var messages = new List<LlmMessage> { new LlmMessage { Role = "user", Content = prompt } };
-        var response = await _llm.CompleteAsync(messages, cancellationToken);
+        var llmResponse = await _llm.CompleteAsync(messages, cancellationToken);
 
-        var isValid = ExtractValidationResult(response);
-        var error = isValid ? null : ExtractValidationError(response);
+        var isValid = ExtractValidationResult(llmResponse);
+        var error = isValid ? null : ExtractValidationError(llmResponse);
 
         return new ValidationResult
         {
@@ -481,24 +489,24 @@ Respond with JSON:
 Be thorough but fair in your validation.";
     }
 
-    private string ExtractReasoningFromResponse(string response)
+    private string ExtractReasoningFromResponse(LlmCompletionResult llmResponse)
     {
         try
         {
-            var json = System.Text.Json.JsonDocument.Parse(response);
+            var json = System.Text.Json.JsonDocument.Parse(llmResponse.Content);
             return json.RootElement.GetProperty("reasoning").GetString() ?? "";
         }
         catch
         {
-            return response;
+            return llmResponse.Content;
         }
     }
 
-    private double ExtractConfidenceFromResponse(string response)
+    private double ExtractConfidenceFromResponse(LlmCompletionResult llmResponse)
     {
         try
         {
-            var json = System.Text.Json.JsonDocument.Parse(response);
+            var json = System.Text.Json.JsonDocument.Parse(llmResponse.Content);
             return json.RootElement.GetProperty("confidence").GetDouble();
         }
         catch
@@ -507,11 +515,11 @@ Be thorough but fair in your validation.";
         }
     }
 
-    private List<string> ExtractInsightsFromResponse(string response)
+    private List<string> ExtractInsightsFromResponse(LlmCompletionResult llmResponse)
     {
         try
         {
-            var json = System.Text.Json.JsonDocument.Parse(response);
+            var json = System.Text.Json.JsonDocument.Parse(llmResponse.Content);
             var insightsArray = json.RootElement.GetProperty("insights");
             return insightsArray.EnumerateArray().Select(e => e.GetString() ?? "").Where(s => !string.IsNullOrEmpty(s)).ToList();
         }
@@ -521,11 +529,11 @@ Be thorough but fair in your validation.";
         }
     }
 
-    private string ExtractConclusionFromResponse(string response)
+    private string ExtractConclusionFromResponse(LlmCompletionResult llmResponse)
     {
         try
         {
-            var json = System.Text.Json.JsonDocument.Parse(response);
+            var json = System.Text.Json.JsonDocument.Parse(llmResponse.Content);
             return json.RootElement.GetProperty("conclusion").GetString() ?? "";
         }
         catch
@@ -534,11 +542,11 @@ Be thorough but fair in your validation.";
         }
     }
 
-    private bool ExtractValidationResult(string response)
+    private bool ExtractValidationResult(LlmCompletionResult llmResponse)
     {
         try
         {
-            var json = System.Text.Json.JsonDocument.Parse(response);
+            var json = System.Text.Json.JsonDocument.Parse(llmResponse.Content);
             return json.RootElement.GetProperty("is_valid").GetBoolean();
         }
         catch
@@ -547,11 +555,11 @@ Be thorough but fair in your validation.";
         }
     }
 
-    private string ExtractValidationError(string response)
+    private string ExtractValidationError(LlmCompletionResult llmResponse)
     {
         try
         {
-            var json = System.Text.Json.JsonDocument.Parse(response);
+            var json = System.Text.Json.JsonDocument.Parse(llmResponse.Content);
             return json.RootElement.GetProperty("error").GetString() ?? "";
         }
         catch

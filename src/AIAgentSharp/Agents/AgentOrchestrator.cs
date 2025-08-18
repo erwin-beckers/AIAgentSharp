@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using AIAgentSharp.Agents.Interfaces;
+using AIAgentSharp.Metrics;
 
 namespace AIAgentSharp.Agents;
 
@@ -17,6 +18,7 @@ public sealed class AgentOrchestrator : IAgentOrchestrator
     private readonly ILogger _logger;
     private readonly IEventManager _eventManager;
     private readonly IStatusManager _statusManager;
+    private readonly IMetricsCollector _metricsCollector;
     private readonly ILlmCommunicator _llmCommunicator;
     private readonly IToolExecutor _toolExecutor;
     private readonly ILoopDetector _loopDetector;
@@ -29,7 +31,8 @@ public sealed class AgentOrchestrator : IAgentOrchestrator
         AgentConfiguration config,
         ILogger logger,
         IEventManager eventManager,
-        IStatusManager statusManager)
+        IStatusManager statusManager,
+        IMetricsCollector metricsCollector)
     {
         _llm = llm;
         _store = store;
@@ -37,13 +40,14 @@ public sealed class AgentOrchestrator : IAgentOrchestrator
         _logger = logger;
         _eventManager = eventManager;
         _statusManager = statusManager;
+        _metricsCollector = metricsCollector;
 
         // Initialize specialized components
-        _llmCommunicator = new LlmCommunicator(_llm, _config, _logger, _eventManager, _statusManager);
-        _toolExecutor = new ToolExecutor(_config, _logger, _eventManager, _statusManager);
+        _llmCommunicator = new LlmCommunicator(_llm, _config, _logger, _eventManager, _statusManager, _metricsCollector);
+        _toolExecutor = new ToolExecutor(_config, _logger, _eventManager, _statusManager, _metricsCollector);
         _loopDetector = new LoopDetector(_config, _logger);
         _messageBuilder = new MessageBuilder(_config);
-        _reasoningManager = new ReasoningManager(_llm, _config, _logger, _eventManager, _statusManager);
+        _reasoningManager = new ReasoningManager(_llm, _config, _logger, _eventManager, _statusManager, _metricsCollector);
     }
 
     /// <summary>
@@ -100,8 +104,11 @@ public sealed class AgentOrchestrator : IAgentOrchestrator
         // Emit status before LLM call
         _statusManager.EmitStatus(state.AgentId, "Analyzing task", "Processing goal and history", "Preparing to make decision");
 
+        // Check if LLM supports function calling
+        var supportsFunctionCalling = _llm is ILlmClient;
+
         // Try function calling if enabled and supported
-        if (_config.UseFunctionCalling && _llm is IFunctionCallingLlmClient functionClient)
+        if (_config.UseFunctionCalling && supportsFunctionCalling)
         {
             try
             {
@@ -263,13 +270,17 @@ public sealed class AgentOrchestrator : IAgentOrchestrator
         // Add retry hints and loop breaker logic
         await AddRetryHintsAndLoopBreaker(state, execResult, toolName, prms, turnIndex);
 
+        // If this is a constrained run (e.g., tests using MaxTurns = 1), surface the error immediately
+        var shouldStopNow = execResult.Success == false && _config.MaxTurns <= 1;
+
         return new AgentStepResult
         {
-            Continue = true,
+            Continue = !shouldStopNow,
             ExecutedTool = true,
             LlmMessage = modelMsg,
             ToolResult = execResult,
-            State = state
+            State = state,
+            Error = shouldStopNow ? execResult.Error : null
         };
     }
 

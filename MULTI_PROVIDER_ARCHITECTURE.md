@@ -2,365 +2,493 @@
 
 ## Overview
 
-AIAgentSharp now supports a modular, multi-provider architecture where different LLM providers are implemented as separate NuGet packages. This approach provides several benefits:
+AIAgentSharp is designed with a clean separation between the core framework and LLM provider implementations. This architecture allows you to easily switch between different LLM providers or implement your own custom provider while maintaining the same agent functionality.
 
-- **Modularity**: Users only include the providers they need
-- **Maintainability**: Each provider can be updated independently
-- **Extensibility**: Easy to add new providers without modifying the core framework
-- **Dependency Management**: Each provider manages its own dependencies
+## Architecture Principles
 
-## Current Packages
+### 1. Provider Agnostic Core
+The core framework (`AIAgentSharp`) contains no provider-specific code. All LLM interactions are abstracted through the `ILlmClient` interface.
 
-### Core Package
-- **AIAgentSharp**: Core framework with interfaces, models, and agent logic
-- **Dependencies**: None (pure framework)
+### 2. Pluggable Provider Implementations
+Each LLM provider is implemented as a separate NuGet package, allowing you to:
+- Install only the providers you need
+- Reduce package size and dependencies
+- Maintain clean separation of concerns
+- Add new providers without modifying the core framework
 
-### Provider Packages
-- **AIAgentSharp.OpenAI**: OpenAI integration with GPT models
-- **Dependencies**: OpenAI SDK, AIAgentSharp
+### 3. Consistent Interface
+All provider implementations implement the same `ILlmClient` interface, ensuring:
+- Consistent API across all providers
+- Easy switching between providers
+- Predictable behavior regardless of the underlying LLM
 
-## Package Structure
+## Available Providers
 
-```
-AIAgentSharp/
-├── src/
-│   ├── AIAgentSharp/                    # Core framework
-│   │   ├── AIAgentSharp.csproj
-│   │   ├── Llm/
-│   │   │   ├── ILlmClient.cs           # Base LLM interface
-│   │   │   ├── IFunctionCallingLlmClient.cs  # Function calling interface
-│   │   │   ├── FunctionCallResult.cs   # Function call result model
-│   │   │   └── OpenAiFunctionSpec.cs   # OpenAI-specific function spec
-│   │   └── ...
-│   └── AIAgentSharp.OpenAI/            # OpenAI provider
-│       ├── AIAgentSharp.OpenAI.csproj
-│       ├── OpenAiLlmClient.cs          # OpenAI implementation
-│       ├── OpenAiConfiguration.cs      # OpenAI-specific config
-│       └── README.md                   # Provider documentation
-├── tests/
-│   ├── AIAgentSharp.Tests/             # Core framework tests
-│   └── AIAgentSharp.OpenAI.Tests/      # OpenAI provider tests
-└── examples/
-    └── Example.csproj                  # Updated to use new packages
-```
-
-## Adding a New LLM Provider
-
-### Step 1: Create Provider Package
-
-Create a new project in `src/AIAgentSharp.{ProviderName}/`:
-
-```bash
-mkdir -p src/AIAgentSharp.Anthropic
-```
-
-### Step 2: Create Project File
-
-```xml
-<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-    <PackageId>AIAgentSharp.Anthropic</PackageId>
-    <Version>1.0.0</Version>
-    <Authors>AIAgentSharp Contributors</Authors>
-    <Description>Anthropic integration for AIAgentSharp - LLM-powered agents with Claude models.</Description>
-    <PackageTags>ai,agent,llm,anthropic,claude,automation</PackageTags>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <RepositoryUrl>https://github.com/erwin-beckers/AIAgentSharp</RepositoryUrl>
-    <RepositoryType>git</RepositoryType>
-    <InternalsVisibleTo>AIAgentSharp.Anthropic.Tests</InternalsVisibleTo>
-  </PropertyGroup>
-
-  <ItemGroup>
-    <PackageReference Include="Anthropic.SDK" Version="0.8.0" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="../AIAgentSharp/AIAgentSharp.csproj" />
-  </ItemGroup>
-</Project>
-```
-
-### Step 3: Implement LLM Client
+### 1. AIAgentSharp.OpenAI
+**Package**: `AIAgentSharp.OpenAI`  
+**Provider**: OpenAI  
+**Models**: GPT-4, GPT-3.5, GPT-4o, GPT-4o-mini  
+**Features**: Function calling, streaming, organization support
 
 ```csharp
-using AIAgentSharp;
-using Anthropic.SDK;
+using AIAgentSharp.OpenAI;
 
-namespace AIAgentSharp.Anthropic;
-
-public sealed class AnthropicLlmClient : ILlmClient, IFunctionCallingLlmClient
+var llm = new OpenAiLlmClient(apiKey);
+var config = new OpenAiConfiguration
 {
-    private readonly AnthropicClient _client;
-    private readonly string _model;
-    private readonly ILogger _logger;
+    Model = "gpt-4o-mini",
+    Temperature = 0.1f,
+    MaxTokens = 4000
+};
+var llm = new OpenAiLlmClient(apiKey, config);
+```
+
+### 2. AIAgentSharp.Anthropic
+**Package**: `AIAgentSharp.Anthropic`  
+**Provider**: Anthropic  
+**Models**: Claude 3.5 Sonnet, Claude 3.5 Haiku, Claude 3 Opus  
+**Features**: Function calling via tools, streaming, organization support
+
+```csharp
+using AIAgentSharp.Anthropic;
+
+var llm = new AnthropicLlmClient(apiKey);
+var config = new AnthropicConfiguration
+{
+    Model = "claude-3-5-sonnet-20241022",
+    Temperature = 0.1f,
+    MaxTokens = 4000
+};
+var llm = new AnthropicLlmClient(apiKey, config);
+```
+
+### 3. AIAgentSharp.Gemini
+**Package**: `AIAgentSharp.Gemini`  
+**Provider**: Google AI Platform  
+**Models**: Gemini 1.5 Flash, Gemini 1.5 Pro, Gemini 1.0 Pro  
+**Features**: Function calling, Google Cloud integration
+
+```csharp
+using AIAgentSharp.Gemini;
+
+var llm = new GeminiLlmClient(apiKey);
+var config = new GeminiConfiguration
+{
+    Model = "gemini-1.5-flash",
+    Temperature = 0.1f,
+    MaxTokens = 4000,
+    ProjectId = "your-project-id",
+    Region = "us-central1"
+};
+var llm = new GeminiLlmClient(apiKey, config);
+```
+
+### 4. AIAgentSharp.Mistral
+**Package**: `AIAgentSharp.Mistral`  
+**Provider**: Mistral AI  
+**Models**: Mistral Large, Mistral Medium, Mistral Small  
+**Features**: Function calling via tools, streaming, organization support
+
+```csharp
+using AIAgentSharp.Mistral;
+
+var llm = new MistralLlmClient(apiKey);
+var config = new MistralConfiguration
+{
+    Model = "mistral-large-latest",
+    Temperature = 0.1f,
+    MaxTokens = 4000
+};
+var llm = new MistralLlmClient(apiKey, config);
+```
+
+## Core Interface
+
+### ILlmClient Interface
+
+All providers implement the `ILlmClient` interface:
+
+```csharp
+public interface ILlmClient
+{
+    Task<LlmCompletionResult> CompleteAsync(
+        IEnumerable<LlmMessage> messages, 
+        CancellationToken ct = default);
     
-    public AnthropicConfiguration Configuration { get; } = null!;
+    Task<FunctionCallResult> CompleteWithFunctionsAsync(
+        IEnumerable<LlmMessage> messages,
+        IEnumerable<OpenAiFunctionSpec> functions,
+        CancellationToken ct = default);
+}
+```
 
-    public AnthropicLlmClient(string apiKey, string model = "claude-3-sonnet-20240229", ILogger? logger = null)
-        : this(apiKey, new AnthropicConfiguration { Model = model }, logger)
+### Message Format
+
+All providers use the same message format:
+
+```csharp
+public sealed class LlmMessage
+{
+    public string Role { get; set; } = string.Empty; // "system", "user", "assistant"
+    public string Content { get; set; } = string.Empty;
+}
+```
+
+### Function Calling
+
+All providers support OpenAI-style function calling:
+
+```csharp
+public sealed class OpenAiFunctionSpec
+{
+    public string Name { get; init; } = "";
+    public string Description { get; init; } = "";
+    public object ParametersSchema { get; init; } = new { };
+}
+```
+
+## Provider-Specific Features
+
+### OpenAI (AIAgentSharp.OpenAI)
+- **Function Calling**: Native OpenAI function calling support
+- **Organization Support**: Multi-tenant organization management
+- **Custom Endpoints**: Support for OpenAI-compatible APIs
+- **Advanced Parameters**: Frequency penalty, presence penalty
+
+### Anthropic (AIAgentSharp.Anthropic)
+- **Tool Calling**: Anthropic's tool-based function calling
+- **System Message Handling**: Automatic conversion of system messages to user messages
+- **Organization Support**: Enterprise organization management
+- **Top-K Parameter**: Additional sampling parameter
+
+### Gemini (AIAgentSharp.Gemini)
+- **Google Cloud Integration**: Native Google AI Platform integration
+- **Project Management**: Google Cloud project-based access control
+- **Regional Deployment**: Support for different Google Cloud regions
+- **API Key Authentication**: Simple API key-based authentication
+
+### Mistral (AIAgentSharp.Mistral)
+- **Tool Calling**: Mistral's tool-based function calling
+- **System Message Support**: Native system message support
+- **Organization Support**: Enterprise organization management
+- **Top-K Parameter**: Additional sampling parameter
+
+## Configuration Comparison
+
+| Feature | OpenAI | Anthropic | Gemini | Mistral |
+|---------|--------|-----------|--------|---------|
+| Default Model | gpt-4o-mini | claude-3-5-sonnet-20241022 | gemini-1.5-flash | mistral-large-latest |
+| Function Calling | ✅ Native | ✅ Tools | ✅ Native | ✅ Tools |
+| System Messages | ✅ Native | 🔄 Converted | 🔄 Converted | ✅ Native |
+| Streaming | ✅ | ✅ | ✅ | ✅ |
+| Organization Support | ✅ | ✅ | ❌ | ✅ |
+| Custom Endpoints | ✅ | ✅ | ✅ | ✅ |
+| Top-K Parameter | ❌ | ✅ | ✅ | ✅ |
+| Frequency Penalty | ✅ | ❌ | ❌ | ❌ |
+| Presence Penalty | ✅ | ❌ | ❌ | ❌ |
+
+## Installation
+
+### Core Framework
+```bash
+dotnet add package AIAgentSharp
+```
+
+### Provider Packages
+```bash
+# OpenAI
+dotnet add package AIAgentSharp.OpenAI
+
+# Anthropic
+dotnet add package AIAgentSharp.Anthropic
+
+# Gemini
+dotnet add package AIAgentSharp.Gemini
+
+# Mistral
+dotnet add package AIAgentSharp.Mistral
+```
+
+## Usage Examples
+
+### Basic Usage with Any Provider
+
+```csharp
+using AIAgentSharp.Agents;
+using AIAgentSharp.StateStores;
+
+// Choose your provider
+using AIAgentSharp.OpenAI;      // or
+using AIAgentSharp.Anthropic;   // or
+using AIAgentSharp.Gemini;      // or
+using AIAgentSharp.Mistral;
+
+// Create components
+var llm = new OpenAiLlmClient(apiKey); // or AnthropicLlmClient, etc.
+var store = new MemoryAgentStateStore();
+var agent = new Agent(llm, store);
+
+// Use the agent (same API regardless of provider)
+var result = await agent.RunAsync("my-agent", "Hello, how are you?", new List<ITool>());
+Console.WriteLine(result.FinalOutput);
+```
+
+### Switching Between Providers
+
+```csharp
+// Easy to switch between providers
+ILlmClient llm;
+
+// OpenAI
+llm = new OpenAiLlmClient(openaiApiKey);
+
+// Anthropic
+llm = new AnthropicLlmClient(anthropicApiKey);
+
+// Gemini
+llm = new GeminiLlmClient(geminiApiKey);
+
+// Mistral
+llm = new MistralLlmClient(mistralApiKey);
+
+// Use the same agent with any provider
+var agent = new Agent(llm, store);
+```
+
+### Provider-Specific Configuration
+
+```csharp
+// OpenAI with custom configuration
+var openaiConfig = new OpenAiConfiguration
+{
+    Model = "gpt-4o",
+    Temperature = 0.7f,
+    MaxTokens = 6000,
+    FrequencyPenalty = 0.1f,
+    PresencePenalty = 0.1f
+};
+var openaiLlm = new OpenAiLlmClient(apiKey, openaiConfig);
+
+// Anthropic with custom configuration
+var anthropicConfig = new AnthropicConfiguration
+{
+    Model = "claude-3-opus-20240229",
+    Temperature = 0.7f,
+    MaxTokens = 6000,
+    TopK = 40
+};
+var anthropicLlm = new AnthropicLlmClient(apiKey, anthropicConfig);
+
+// Gemini with custom configuration
+var geminiConfig = new GeminiConfiguration
+{
+    Model = "gemini-1.5-pro",
+    Temperature = 0.7f,
+    MaxTokens = 6000,
+    ProjectId = "my-project",
+    Region = "us-west1"
+};
+var geminiLlm = new GeminiLlmClient(apiKey, geminiConfig);
+
+// Mistral with custom configuration
+var mistralConfig = new MistralConfiguration
+{
+    Model = "mistral-large-latest",
+    Temperature = 0.7f,
+    MaxTokens = 6000,
+    TopK = 40
+};
+var mistralLlm = new MistralLlmClient(apiKey, mistralConfig);
+```
+
+## Creating Custom Providers
+
+You can implement your own LLM provider by implementing the `ILlmClient` interface:
+
+```csharp
+public class MyCustomLlmClient : ILlmClient
+{
+    private readonly string _apiKey;
+    private readonly string _model;
+    
+    public MyCustomLlmClient(string apiKey, string model = "my-model")
     {
+        _apiKey = apiKey;
+        _model = model;
     }
-
-    public AnthropicLlmClient(string apiKey, AnthropicConfiguration configuration, ILogger? logger = null)
+    
+    public async Task<LlmCompletionResult> CompleteAsync(
+        IEnumerable<LlmMessage> messages, 
+        CancellationToken ct = default)
     {
-        if (string.IsNullOrEmpty(apiKey))
-            throw new ArgumentNullException(nameof(apiKey));
-        if (configuration == null)
-            throw new ArgumentNullException(nameof(configuration));
-
-        _client = new AnthropicClient(apiKey);
-        _model = configuration.Model;
-        _logger = logger ?? new ConsoleLogger();
-        Configuration = configuration;
+        // Convert messages to your provider's format
+        var providerMessages = ConvertToProviderFormat(messages);
+        
+        // Make API call to your provider
+        var response = await CallProviderApi(providerMessages, ct);
+        
+        // Convert response to AIAgentSharp format
+        return new LlmCompletionResult
+        {
+            Content = response.Content,
+            Usage = new LlmUsage
+            {
+                InputTokens = response.InputTokens,
+                OutputTokens = response.OutputTokens,
+                Model = _model,
+                Provider = "MyCustomProvider"
+            }
+        };
     }
-
-    public async Task<string> CompleteAsync(IEnumerable<LlmMessage> messages, CancellationToken ct = default)
-    {
-        // Implement Anthropic API calls
-        // Map AIAgentSharp messages to Anthropic format
-        // Return response
-    }
-
+    
     public async Task<FunctionCallResult> CompleteWithFunctionsAsync(
         IEnumerable<LlmMessage> messages,
         IEnumerable<OpenAiFunctionSpec> functions,
         CancellationToken ct = default)
     {
-        // Implement Anthropic function calling
-        // Map OpenAI function specs to Anthropic format
-        // Return function call result
+        // Implement function calling for your provider
+        // Return appropriate FunctionCallResult
+        throw new NotSupportedException("Function calling not supported by this provider");
     }
-}
-```
-
-### Step 4: Create Configuration Class
-
-```csharp
-namespace AIAgentSharp.Anthropic;
-
-public sealed class AnthropicConfiguration
-{
-    public string Model { get; init; } = "claude-3-sonnet-20240229";
-    public int MaxTokens { get; init; } = 4000;
-    public float Temperature { get; init; } = 0.1f;
-    public TimeSpan RequestTimeout { get; init; } = TimeSpan.FromMinutes(2);
-    public int MaxRetries { get; init; } = 3;
-    public bool EnableFunctionCalling { get; init; } = true;
-
-    public static AnthropicConfiguration CreateForAgentReasoning()
+    
+    private object ConvertToProviderFormat(IEnumerable<LlmMessage> messages)
     {
-        return new AnthropicConfiguration
-        {
-            Model = "claude-3-sonnet-20240229",
-            Temperature = 0.1f,
-            MaxTokens = 4000,
-            EnableFunctionCalling = true,
-            MaxRetries = 3,
-            RequestTimeout = TimeSpan.FromMinutes(2)
-        };
+        // Convert AIAgentSharp messages to your provider's format
+        return new { /* your provider's message format */ };
     }
-}
-```
-
-### Step 5: Create Tests
-
-```csharp
-using AIAgentSharp.Anthropic;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
-
-namespace AIAgentSharp.Anthropic.Tests;
-
-[TestClass]
-public class AnthropicLlmClientTests
-{
-    private const string TestApiKey = "test-api-key";
-
-    [TestMethod]
-    public void Constructor_WithApiKey_ShouldCreateClient()
+    
+    private async Task<object> CallProviderApi(object messages, CancellationToken ct)
     {
-        var client = new AnthropicLlmClient(TestApiKey);
-        Assert.IsNotNull(client);
-        Assert.AreEqual("claude-3-sonnet-20240229", client.Configuration.Model);
+        // Make actual API call to your provider
+        return new { /* your provider's response format */ };
     }
-
-    // Add more tests...
 }
-```
 
-### Step 6: Update Solution
-
-Add the new projects to `AIAgentSharp.sln`:
-
-```xml
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AIAgentSharp.Anthropic", "src\AIAgentSharp.Anthropic\AIAgentSharp.Anthropic.csproj", "{NEW-GUID-1}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AIAgentSharp.Anthropic.Tests", "tests\AIAgentSharp.Anthropic.Tests\AIAgentSharp.Anthropic.Tests.csproj", "{NEW-GUID-2}"
-EndProject
-```
-
-### Step 7: Create Documentation
-
-Create a `README.md` for the provider package with:
-- Installation instructions
-- Quick start examples
-- Configuration options
-- Model support
-- Error handling
-- Performance optimization tips
-
-## Usage Examples
-
-### Basic Usage
-
-```csharp
-using AIAgentSharp;
-using AIAgentSharp.Agents;
-using AIAgentSharp.OpenAI;  // or AIAgentSharp.Anthropic
-using AIAgentSharp.StateStores;
-
-// Create provider-specific client
-var llm = new OpenAiLlmClient("your-openai-api-key");
-// or var llm = new AnthropicLlmClient("your-anthropic-api-key");
-
-// Create agent (same for all providers)
-var store = new MemoryAgentStateStore();
+// Usage
+var llm = new MyCustomLlmClient(apiKey);
 var agent = new Agent(llm, store);
-
-// Run agent
-var result = await agent.RunAsync("my-agent", "Hello, how are you?", new List<ITool>());
 ```
-
-### Advanced Configuration
-
-```csharp
-// OpenAI with custom configuration
-var openAiConfig = OpenAiConfiguration.CreateForAgentReasoning();
-var openAiClient = new OpenAiLlmClient("your-api-key", openAiConfig);
-
-// Anthropic with custom configuration
-var anthropicConfig = AnthropicConfiguration.CreateForAgentReasoning();
-var anthropicClient = new AnthropicLlmClient("your-api-key", anthropicConfig);
-```
-
-## Provider Comparison
-
-| Feature | OpenAI | Anthropic | Cohere | Local |
-|---------|--------|-----------|--------|-------|
-| Function Calling | ✅ | ✅ | ❌ | ❌ |
-| Streaming | ✅ | ✅ | ✅ | ✅ |
-| Cost Optimization | ✅ | ✅ | ✅ | ✅ |
-| Enterprise Support | ✅ | ✅ | ✅ | ✅ |
-| Custom Endpoints | ✅ | ✅ | ✅ | ✅ |
 
 ## Best Practices
 
-### 1. Provider Selection
+### 1. Choose the Right Provider
+- **OpenAI**: Best for general-purpose tasks with strong function calling
+- **Anthropic**: Excellent for reasoning and analysis tasks
+- **Gemini**: Good for Google Cloud integration and cost efficiency
+- **Mistral**: Great for European compliance and open-source models
 
-- **OpenAI**: Best for function calling and tool use
-- **Anthropic**: Best for reasoning and analysis
-- **Cohere**: Best for cost efficiency
-- **Local**: Best for privacy and offline use
-
-### 2. Configuration Optimization
-
+### 2. Configuration Management
 ```csharp
-// For reasoning tasks
+// Use factory methods for common use cases
 var config = OpenAiConfiguration.CreateForAgentReasoning();
+var llm = new OpenAiLlmClient(apiKey, config);
 
-// For creative tasks
-var config = OpenAiConfiguration.CreateForCreativeTasks();
-
-// For cost efficiency
-var config = OpenAiConfiguration.CreateForCostEfficiency();
+// Or create custom configurations
+var customConfig = new AnthropicConfiguration
+{
+    Model = "claude-3-5-sonnet-20241022",
+    Temperature = 0.1f,
+    MaxTokens = 4000,
+    EnableFunctionCalling = true
+};
 ```
 
 ### 3. Error Handling
-
 ```csharp
 try
 {
-    var result = await agent.RunAsync("agent-id", "Hello", tools);
+    var result = await agent.RunAsync("my-agent", prompt, tools);
+    Console.WriteLine(result.FinalOutput);
 }
-catch (InvalidOperationException ex)
+catch (InvalidOperationException ex) when (ex.Message.Contains("API"))
 {
-    // Handle provider-specific errors
-    Console.WriteLine($"LLM API error: {ex.Message}");
+    // Handle provider-specific API errors
+    Console.WriteLine("LLM API error: " + ex.Message);
 }
 catch (OperationCanceledException)
 {
     // Handle timeouts and cancellations
-    Console.WriteLine("Request was cancelled or timed out");
+    Console.WriteLine("Operation was cancelled or timed out");
 }
 ```
 
-### 4. Logging
-
+### 4. Testing
 ```csharp
-var logger = new ConsoleLogger();
-var llm = new OpenAiLlmClient("your-api-key", logger: logger);
-
-// Or use your own logger implementation
-var customLogger = new MyCustomLogger();
-var llm = new OpenAiLlmClient("your-api-key", logger: customLogger);
+// Use DelegateLlmClient for testing
+var mockLlm = new DelegateLlmClient((messages, ct) => 
+    Task.FromResult("Mock response"));
+var agent = new Agent(mockLlm, store);
 ```
-
-## Future Providers
-
-Planned provider packages:
-
-- **AIAgentSharp.Anthropic**: Claude models
-- **AIAgentSharp.Cohere**: Cohere models
-- **AIAgentSharp.Ollama**: Local models via Ollama
-- **AIAgentSharp.LMStudio**: Local models via LM Studio
-- **AIAgentSharp.Azure**: Azure OpenAI
-- **AIAgentSharp.AWS**: Amazon Bedrock
-
-## Contributing
-
-To add a new provider:
-
-1. Follow the step-by-step guide above
-2. Ensure all tests pass
-3. Add comprehensive documentation
-4. Update this architecture document
-5. Submit a pull request
 
 ## Migration Guide
 
-### From Single Package to Multi-Package
+### From OpenAI to Other Providers
 
-If you're migrating from the old single-package approach:
-
-1. **Update Dependencies**:
-   ```xml
-   <!-- Old -->
-   <PackageReference Include="AIAgentSharp" Version="1.0.0" />
-   
-   <!-- New -->
-   <PackageReference Include="AIAgentSharp" Version="1.0.0" />
-   <PackageReference Include="AIAgentSharp.OpenAI" Version="1.0.0" />
+1. **Install the new provider package**:
+   ```bash
+   dotnet add package AIAgentSharp.Anthropic
    ```
 
-2. **Update Using Statements**:
+2. **Update using statements**:
    ```csharp
-   // Old
-   using AIAgentSharp;
+   // Remove
+   using AIAgentSharp.OpenAI;
    
-   // New
-   using AIAgentSharp;
-   using AIAgentSharp.OpenAI;  // Add provider-specific namespace
+   // Add
+   using AIAgentSharp.Anthropic;
    ```
 
-3. **Update Client Creation**:
+3. **Update client instantiation**:
    ```csharp
-   // Old
+   // Before
    var llm = new OpenAiLlmClient(apiKey);
    
-   // New (same, but from different package)
-   var llm = new OpenAiLlmClient(apiKey);
+   // After
+   var llm = new AnthropicLlmClient(apiKey);
    ```
 
-The API remains the same, so existing code should work without changes once the new packages are referenced.
+4. **Update configuration (if needed)**:
+   ```csharp
+   // Before
+   var config = new OpenAiConfiguration { Model = "gpt-4o-mini" };
+   
+   // After
+   var config = new AnthropicConfiguration { Model = "claude-3-5-sonnet-20241022" };
+   ```
+
+The rest of your code remains the same!
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Function Calling Not Working**
+   - Ensure the provider supports function calling
+   - Check that `EnableFunctionCalling` is set to `true`
+   - Verify function schemas are correctly formatted
+
+2. **System Messages Not Working**
+   - Anthropic and Gemini convert system messages to user messages
+   - Mistral supports system messages natively
+   - Check provider documentation for specific behavior
+
+3. **API Key Issues**
+   - Verify API keys are valid and have sufficient credits
+   - Check provider-specific authentication requirements
+   - Ensure proper environment variable setup
+
+4. **Rate Limiting**
+   - Implement retry logic with exponential backoff
+   - Use appropriate `MaxRetries` and `RetryDelay` settings
+   - Consider using different models for different use cases
+
+### Provider-Specific Issues
+
+- **OpenAI**: Check organization settings and API key permissions
+- **Anthropic**: Verify Claude model availability and API access
+- **Gemini**: Ensure Google Cloud project setup and API enablement
+- **Mistral**: Check API key permissions and model availability
+
+## Conclusion
+
+AIAgentSharp's multi-provider architecture provides flexibility and choice while maintaining a consistent API. You can easily switch between providers, implement custom providers, and leverage provider-specific features as needed. The clean separation ensures that your agent logic remains provider-agnostic while allowing you to optimize for specific use cases and requirements.

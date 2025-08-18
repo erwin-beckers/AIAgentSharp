@@ -1,5 +1,6 @@
 using System.Text.Json;
 using AIAgentSharp.Agents.Interfaces;
+using AIAgentSharp.Metrics;
 
 namespace AIAgentSharp.Agents;
 
@@ -13,6 +14,7 @@ public sealed class LlmCommunicator : ILlmCommunicator
     private readonly ILogger _logger;
     private readonly IEventManager _eventManager;
     private readonly IStatusManager _statusManager;
+    private readonly IMetricsCollector _metricsCollector;
     private readonly TimeSpan _llmTimeout;
 
     public LlmCommunicator(
@@ -20,13 +22,15 @@ public sealed class LlmCommunicator : ILlmCommunicator
         AgentConfiguration config,
         ILogger logger,
         IEventManager eventManager,
-        IStatusManager statusManager)
+        IStatusManager statusManager,
+        IMetricsCollector metricsCollector)
     {
         _llm = llm;
         _config = config;
         _logger = logger;
         _eventManager = eventManager;
         _statusManager = statusManager;
+        _metricsCollector = metricsCollector;
         _llmTimeout = config.LlmTimeout;
     }
 
@@ -47,26 +51,34 @@ public sealed class LlmCommunicator : ILlmCommunicator
     /// provides more reliable tool selection and parameter extraction compared to the Re/Act pattern.
     /// </para>
     /// <para>
-    /// The method includes timeout handling and event emission for monitoring and debugging purposes.
+    /// If function calling is not supported by the LLM client, this method will throw a
+    /// <see cref="NotSupportedException"/> which should be handled by the calling code.
     /// </para>
     /// </remarks>
-    /// <exception cref="InvalidOperationException">Thrown when the LLM client doesn't support function calling.</exception>
     /// <exception cref="OperationCanceledException">Thrown when the operation is cancelled or times out.</exception>
+    /// <exception cref="NotSupportedException">Thrown when the LLM client doesn't support function calling.</exception>
     public async Task<FunctionCallResult> CallWithFunctionsAsync(IEnumerable<LlmMessage> messages, List<OpenAiFunctionSpec> functionSpecs, string agentId, int turnIndex, CancellationToken ct)
     {
-        if (_llm is not IFunctionCallingLlmClient functionClient)
-        {
-            throw new InvalidOperationException("LLM client does not support function calling");
-        }
-
-        // Raise LLM call started event for function calling
+        // Raise LLM call started event
         _eventManager.RaiseLlmCallStarted(agentId, turnIndex);
 
         using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         timeoutCts.CancelAfter(_llmTimeout);
 
-        _logger.LogDebug($"Attempting function calling with {functionSpecs.Count} functions");
-        var functionResult = await functionClient.CompleteWithFunctionsAsync(messages, functionSpecs, timeoutCts.Token);
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        var functionResult = await _llm.CompleteWithFunctionsAsync(messages, functionSpecs, timeoutCts.Token);
+        stopwatch.Stop();
+
+        // Record metrics
+        _metricsCollector.RecordLlmCallExecutionTime(agentId, turnIndex, stopwatch.ElapsedMilliseconds, "function-calling");
+        _metricsCollector.RecordLlmCallCompletion(agentId, turnIndex, true, "function-calling");
+        _metricsCollector.RecordApiCall(agentId, "LLM", "function-calling");
+
+        // If provider reported usage, record token usage
+        if (functionResult.Usage != null)
+        {
+            _metricsCollector.RecordTokenUsage(agentId, turnIndex, (int)functionResult.Usage.InputTokens, (int)functionResult.Usage.OutputTokens, functionResult.Usage.Model);
+        }
 
         // Raise LLM call completed event for function call
         _eventManager.RaiseLlmCallCompleted(agentId, turnIndex, null);
@@ -107,8 +119,10 @@ public sealed class LlmCommunicator : ILlmCommunicator
     {
         try
         {
-            var llmRaw = await CallLlmWithTimeout(messages, agentId, turnIndex, ct);
-            return await ParseJsonResponse(llmRaw, turnIndex, turnId, state, ct);
+            var result = await CallLlmWithUsage(messages, agentId, turnIndex, ct);
+            // Parse content
+            var model = await ParseJsonResponse(result.Content, turnIndex, turnId, state, ct);
+            return model;
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -258,37 +272,31 @@ public sealed class LlmCommunicator : ILlmCommunicator
         };
     }
 
-    private async Task<string> CallLlmWithTimeout(IEnumerable<LlmMessage> messages, string agentId, int turnIndex, CancellationToken ct)
+    private async Task<LlmCompletionResult> CallLlmWithUsage(IEnumerable<LlmMessage> messages, string agentId, int turnIndex, CancellationToken ct)
     {
         // Raise LLM call started event
         _eventManager.RaiseLlmCallStarted(agentId, turnIndex);
 
-        try
-        {
-            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            timeoutCts.CancelAfter(_llmTimeout);
+        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeoutCts.CancelAfter(_llmTimeout);
 
-            _logger.LogDebug($"Calling LLM with timeout {_llmTimeout}");
-            return await _llm.CompleteAsync(messages, timeoutCts.Token);
-        }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        _logger.LogDebug($"Calling LLM with timeout {_llmTimeout}");
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        var result = await _llm.CompleteAsync(messages, timeoutCts.Token);
+        sw.Stop();
+
+        // Record metrics (only with a concrete model if provided)
+        if (result.Usage != null)
         {
-            var err = "LLM call was cancelled by user";
-            _logger.LogError(err);
-            throw;
+            _metricsCollector.RecordLlmCallExecutionTime(agentId, turnIndex, sw.ElapsedMilliseconds, result.Usage.Model);
+            _metricsCollector.RecordLlmCallCompletion(agentId, turnIndex, true, result.Usage.Model);
+            _metricsCollector.RecordApiCall(agentId, "LLM", result.Usage.Model);
+            _metricsCollector.RecordTokenUsage(agentId, turnIndex, (int)result.Usage.InputTokens, (int)result.Usage.OutputTokens, result.Usage.Model);
         }
-        catch (OperationCanceledException)
-        {
-            var err = $"LLM call deadline exceeded after {_llmTimeout}";
-            _logger.LogError(err);
-            throw;
-        }
-        catch (Exception ex)
-        {
-            var err = $"LLM call failed: {ex.Message}";
-            _logger.LogError(err);
-            throw;
-        }
+
+        // Raise completed
+        _eventManager.RaiseLlmCallCompleted(agentId, turnIndex, null);
+        return result;
     }
 
     private static object? ConvertJsonElementToNativeType(object? value)

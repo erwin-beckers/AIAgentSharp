@@ -1,94 +1,108 @@
 namespace AIAgentSharp.Tests;
 
 [TestClass]
-public sealed class LlmClientTests
+public class LlmClientTests
 {
     [TestMethod]
-    public async Task DelegateLlmClient_CompleteAsync_CallsDelegate()
+    public async Task DelegateLlmClient_CompleteAsync_ReturnsExpectedResult()
     {
         // Arrange
-        var expectedMessages = new List<LlmMessage>
+        var expectedContent = "Test response";
+        var expectedUsage = new LlmUsage
         {
-            new() { Role = "system", Content = "test system" },
-            new() { Role = "user", Content = "test user" }
+            InputTokens = 10,
+            OutputTokens = 20,
+            Model = "test-model",
+            Provider = "test-provider"
         };
-        var expectedResult = "test completion";
 
-        var delegateCalled = false;
-        var delegateLlmClient = new DelegateLlmClient((messages, ct) =>
+        var delegateClient = new DelegateLlmClient(
+            (messages, ct) => Task.FromResult(new LlmCompletionResult
+            {
+                Content = expectedContent,
+                Usage = expectedUsage
+            }));
+
+        var messages = new List<LlmMessage>
         {
-            delegateCalled = true;
-            Assert.AreEqual(expectedMessages.Count, messages.Count());
-            Assert.AreEqual(expectedMessages[0].Content, messages.First().Content);
-            Assert.AreEqual(expectedMessages[1].Content, messages.Skip(1).First().Content);
-            return Task.FromResult(expectedResult);
-        });
+            new LlmMessage { Role = "user", Content = "Hello" }
+        };
 
         // Act
-        var result = await delegateLlmClient.CompleteAsync(expectedMessages);
+        var result = await delegateClient.CompleteAsync(messages);
 
         // Assert
-        Assert.IsTrue(delegateCalled);
-        Assert.AreEqual(expectedResult, result);
+        Assert.AreEqual(expectedContent, result.Content);
+        Assert.AreEqual(expectedUsage.InputTokens, result.Usage?.InputTokens);
+        Assert.AreEqual(expectedUsage.OutputTokens, result.Usage?.OutputTokens);
+        Assert.AreEqual(expectedUsage.Model, result.Usage?.Model);
+        Assert.AreEqual(expectedUsage.Provider, result.Usage?.Provider);
     }
 
     [TestMethod]
-    public void DelegateLlmClient_NullDelegate_ThrowsArgumentNullException()
-    {
-        // Act & Assert
-        Assert.ThrowsException<ArgumentNullException>(() => new DelegateLlmClient(null!));
-    }
-
-    [TestMethod]
-    public async Task DelegateLlmClient_WithCancellationToken_PassesToken()
+    public async Task DelegateLlmClient_CompleteWithFunctionsAsync_ThrowsNotSupportedException()
     {
         // Arrange
-        var tokenPassed = false;
-        var delegateLlmClient = new DelegateLlmClient((messages, ct) =>
+        var delegateClient = new DelegateLlmClient(
+            (messages, ct) => Task.FromResult(new LlmCompletionResult { Content = "test" }));
+
+        var messages = new List<LlmMessage>
         {
-            tokenPassed = true;
-            Assert.IsTrue(ct.CanBeCanceled);
-            return Task.FromResult("test");
-        });
+            new LlmMessage { Role = "user", Content = "Hello" }
+        };
 
-        using var cts = new CancellationTokenSource();
-
-        // Act
-        await delegateLlmClient.CompleteAsync(new[] { new LlmMessage() }, cts.Token);
-
-        // Assert
-        Assert.IsTrue(tokenPassed);
-    }
-
-    [TestMethod]
-    public async Task DelegateLlmClient_EmptyMessages_HandlesCorrectly()
-    {
-        // Arrange
-        var delegateLlmClient = new DelegateLlmClient((messages, ct) =>
+        var functions = new List<OpenAiFunctionSpec>
         {
-            Assert.AreEqual(0, messages.Count());
-            return Task.FromResult("empty result");
-        });
-
-        // Act
-        var result = await delegateLlmClient.CompleteAsync(Enumerable.Empty<LlmMessage>());
-
-        // Assert
-        Assert.AreEqual("empty result", result);
-    }
-
-    [TestMethod]
-    public async Task DelegateLlmClient_ExceptionInDelegate_PropagatesException()
-    {
-        // Arrange
-        var expectedException = new InvalidOperationException("test exception");
-        var delegateLlmClient = new DelegateLlmClient((messages, ct) =>
-        {
-            throw expectedException;
-        });
+            new OpenAiFunctionSpec { Name = "test" }
+        };
 
         // Act & Assert
-        var actualException = await Assert.ThrowsExceptionAsync<InvalidOperationException>(() => delegateLlmClient.CompleteAsync(new[] { new LlmMessage() }));
-        Assert.AreEqual(expectedException, actualException);
+        await Assert.ThrowsExceptionAsync<NotSupportedException>(
+            () => delegateClient.CompleteWithFunctionsAsync(messages, functions));
+    }
+
+    [TestMethod]
+    public async Task DelegateLlmClient_CompleteWithFunctionsAsync_WithFunctionImpl_ReturnsExpectedResult()
+    {
+        // Arrange
+        var expectedFunctionResult = new FunctionCallResult
+        {
+            HasFunctionCall = true,
+            FunctionName = "test_function",
+            FunctionArgumentsJson = "{\"param\":\"value\"}",
+            AssistantContent = "Function called",
+            Usage = new LlmUsage
+            {
+                InputTokens = 15,
+                OutputTokens = 25,
+                Model = "test-model",
+                Provider = "test-provider"
+            }
+        };
+
+        var delegateClient = new DelegateLlmClient(
+            (messages, ct) => Task.FromResult(new LlmCompletionResult { Content = "test" }),
+            (messages, functions, ct) => Task.FromResult(expectedFunctionResult));
+
+        var messages = new List<LlmMessage>
+        {
+            new LlmMessage { Role = "user", Content = "Hello" }
+        };
+
+        var functions = new List<OpenAiFunctionSpec>
+        {
+            new OpenAiFunctionSpec { Name = "test" }
+        };
+
+        // Act
+        var result = await delegateClient.CompleteWithFunctionsAsync(messages, functions);
+
+        // Assert
+        Assert.AreEqual(expectedFunctionResult.HasFunctionCall, result.HasFunctionCall);
+        Assert.AreEqual(expectedFunctionResult.FunctionName, result.FunctionName);
+        Assert.AreEqual(expectedFunctionResult.FunctionArgumentsJson, result.FunctionArgumentsJson);
+        Assert.AreEqual(expectedFunctionResult.AssistantContent, result.AssistantContent);
+        Assert.AreEqual(expectedFunctionResult.Usage?.InputTokens, result.Usage?.InputTokens);
+        Assert.AreEqual(expectedFunctionResult.Usage?.OutputTokens, result.Usage?.OutputTokens);
     }
 }

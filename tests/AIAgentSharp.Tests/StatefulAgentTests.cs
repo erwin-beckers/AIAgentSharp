@@ -1,5 +1,5 @@
-using System.Text.Json;
 using AIAgentSharp.Agents;
+using System.Text.Json;
 
 namespace AIAgentSharp.Tests;
 
@@ -10,7 +10,7 @@ public sealed class AgentTests
     public void Constructor_ValidParameters_CreatesInstance()
     {
         // Arrange
-        var llmClient = new DelegateLlmClient((messages, ct) => Task.FromResult("test"));
+        var llmClient = new DelegateLlmClient((messages, ct) => Task.FromResult(new LlmCompletionResult { Content = "test" }));
         var stateStore = new MemoryAgentStateStore();
 
         // Act
@@ -24,7 +24,7 @@ public sealed class AgentTests
     public void Constructor_WithCustomLogger_CreatesInstance()
     {
         // Arrange
-        var llmClient = new DelegateLlmClient((messages, ct) => Task.FromResult("test"));
+        var llmClient = new DelegateLlmClient((messages, ct) => Task.FromResult(new LlmCompletionResult { Content = "test" }));
         var stateStore = new MemoryAgentStateStore();
         var logger = new ConsoleLogger();
 
@@ -39,7 +39,7 @@ public sealed class AgentTests
     public void Constructor_WithCustomTimeouts_CreatesInstance()
     {
         // Arrange
-        var llmClient = new DelegateLlmClient((messages, ct) => Task.FromResult("test"));
+        var llmClient = new DelegateLlmClient((messages, ct) => Task.FromResult(new LlmCompletionResult { Content = "test" }));
         var stateStore = new MemoryAgentStateStore();
         var llmTimeout = TimeSpan.FromMinutes(5);
         var toolTimeout = TimeSpan.FromMinutes(3);
@@ -71,7 +71,7 @@ public sealed class AgentTests
     public void Constructor_NullStateStore_ThrowsArgumentNullException()
     {
         // Arrange
-        var llmClient = new DelegateLlmClient((messages, ct) => Task.FromResult("test"));
+        var llmClient = new DelegateLlmClient((messages, ct) => Task.FromResult(new LlmCompletionResult { Content = "test" }));
 
         // Act & Assert
         Assert.ThrowsException<ArgumentNullException>(() => new Agent(llmClient, null!));
@@ -81,7 +81,7 @@ public sealed class AgentTests
     public async Task StepAsync_NewAgent_CreatesInitialState()
     {
         // Arrange
-        var llmClient = new DelegateLlmClient((messages, ct) => Task.FromResult("test"));
+        var llmClient = new DelegateLlmClient((messages, ct) => Task.FromResult(new LlmCompletionResult { Content = "test" }));
         var stateStore = new MemoryAgentStateStore();
         var agent = new Agent(llmClient, stateStore);
 
@@ -100,7 +100,7 @@ public sealed class AgentTests
     public async Task StepAsync_ExistingAgent_PreservesState()
     {
         // Arrange
-        var llmClient = new DelegateLlmClient((messages, ct) => Task.FromResult("test"));
+        var llmClient = new DelegateLlmClient((messages, ct) => Task.FromResult(new LlmCompletionResult { Content = "test" }));
         var stateStore = new MemoryAgentStateStore();
         var agent = new Agent(llmClient, stateStore);
 
@@ -128,12 +128,14 @@ public sealed class AgentTests
             ""action_input"": {
                 ""tool"": ""concat"",
                 ""params"": {
-                    ""strings"": [""hello"", ""world""]
+                    ""strings"": [""hello"", ""world""],
+                    ""separator"": "",""     
+
                 }
             }
         }";
 
-        var llmClient = new DelegateLlmClient((messages, ct) => Task.FromResult(llmResponse));
+        var llmClient = new DelegateLlmClient((messages, ct) => Task.FromResult(new LlmCompletionResult { Content = llmResponse }));
         var stateStore = new MemoryAgentStateStore();
         var agent = new Agent(llmClient, stateStore);
         var tools = new ITool[] { new MockConcatTool() };
@@ -165,7 +167,7 @@ public sealed class AgentTests
             }
         }";
 
-        var llmClient = new DelegateLlmClient((messages, ct) => Task.FromResult(llmResponse));
+        var llmClient = new DelegateLlmClient((messages, ct) => Task.FromResult(new LlmCompletionResult { Content = llmResponse }));
         var stateStore = new MemoryAgentStateStore();
         var agent = new Agent(llmClient, stateStore);
 
@@ -187,7 +189,7 @@ public sealed class AgentTests
     public async Task StepAsync_WithInvalidJson_ReturnsError()
     {
         // Arrange
-        var llmClient = new DelegateLlmClient((messages, ct) => Task.FromResult("invalid json"));
+        var llmClient = new DelegateLlmClient((messages, ct) => Task.FromResult(new LlmCompletionResult { Content = "invalid json" }));
         var stateStore = new MemoryAgentStateStore();
         var agent = new Agent(llmClient, stateStore);
 
@@ -213,7 +215,7 @@ public sealed class AgentTests
             }
         }";
 
-        var llmClient = new DelegateLlmClient((messages, ct) => Task.FromResult(llmResponse));
+        var llmClient = new DelegateLlmClient((messages, ct) => Task.FromResult(new LlmCompletionResult { Content = llmResponse }));
         var stateStore = new MemoryAgentStateStore();
         var agent = new Agent(llmClient, stateStore);
 
@@ -238,7 +240,7 @@ public sealed class AgentTests
             }
         }";
 
-        var llmClient = new DelegateLlmClient((messages, ct) => Task.FromResult(llmResponse));
+        var llmClient = new DelegateLlmClient((messages, ct) => Task.FromResult(new LlmCompletionResult { Content = llmResponse }));
         var stateStore = new MemoryAgentStateStore();
         var agent = new Agent(llmClient, stateStore);
 
@@ -265,7 +267,7 @@ public sealed class AgentTests
             }
         }";
 
-        var llmClient = new DelegateLlmClient((messages, ct) => Task.FromResult(llmResponse));
+        var llmClient = new DelegateLlmClient((messages, ct) => Task.FromResult(new LlmCompletionResult { Content = llmResponse }));
         var stateStore = new MemoryAgentStateStore();
         var agent = new Agent(llmClient, stateStore);
 
@@ -287,7 +289,7 @@ public sealed class AgentTests
         var llmClient = new DelegateLlmClient(async (messages, ct) =>
         {
             await Task.Delay(1000, ct); // Simulate slow response
-            return "test";
+            return new LlmCompletionResult { Content = "test" };
         });
         var stateStore = new MemoryAgentStateStore();
         var config = new AgentConfiguration
@@ -321,7 +323,7 @@ public sealed class AgentTests
             }
         }";
 
-        var llmClient = new DelegateLlmClient((messages, ct) => Task.FromResult(llmResponse));
+        var llmClient = new DelegateLlmClient((messages, ct) => Task.FromResult(new LlmCompletionResult { Content = llmResponse }));
         var stateStore = new MemoryAgentStateStore();
         var config = new AgentConfiguration
         {
@@ -361,7 +363,7 @@ public sealed class AgentTests
             }
         }";
 
-        var llmClient = new DelegateLlmClient((messages, ct) => Task.FromResult(llmResponse));
+        var llmClient = new DelegateLlmClient((messages, ct) => Task.FromResult(new LlmCompletionResult { Content = llmResponse }));
         var stateStore = new MemoryAgentStateStore();
         var agent = new Agent(llmClient, stateStore);
 
@@ -394,7 +396,7 @@ public sealed class AgentTests
             }
         }";
 
-        var llmClient = new DelegateLlmClient((messages, ct) => Task.FromResult(llmResponse));
+        var llmClient = new DelegateLlmClient((messages, ct) => Task.FromResult(new LlmCompletionResult { Content = llmResponse }));
         var stateStore = new MemoryAgentStateStore();
         var agent = new Agent(llmClient, stateStore);
 
@@ -414,7 +416,7 @@ public sealed class AgentTests
     public async Task RunAsync_WithMaxTurns_StopsAtLimit()
     {
         // Arrange
-        var llmClient = new DelegateLlmClient((messages, ct) => Task.FromResult("test"));
+        var llmClient = new DelegateLlmClient((messages, ct) => Task.FromResult(new LlmCompletionResult { Content = "test" }));
         var stateStore = new MemoryAgentStateStore();
         var config = new AgentConfiguration { MaxTurns = 3 };
         var agent = new Agent(llmClient, stateStore, config: config);
@@ -433,7 +435,7 @@ public sealed class AgentTests
     public async Task StepAsync_WithIdempotency_ReusesExistingResults()
     {
         // Arrange
-        var llmClient = new DelegateLlmClient((messages, ct) => Task.FromResult("test"));
+        var llmClient = new DelegateLlmClient((messages, ct) => Task.FromResult(new LlmCompletionResult { Content = "test" }));
         var stateStore = new MemoryAgentStateStore();
         var agent = new Agent(llmClient, stateStore);
 
@@ -464,7 +466,7 @@ public sealed class AgentTests
             }
         }";
 
-        var llmClient = new DelegateLlmClient((messages, ct) => Task.FromResult(llmResponse));
+        var llmClient = new DelegateLlmClient((messages, ct) => Task.FromResult(new LlmCompletionResult { Content = llmResponse }));
         var stateStore = new MemoryAgentStateStore();
         var config = new AgentConfiguration
         {
@@ -528,7 +530,7 @@ public sealed class AgentTests
     public void Constructor_WithCustomConfiguration_CreatesInstance()
     {
         // Arrange
-        var llmClient = new DelegateLlmClient((messages, ct) => Task.FromResult("test"));
+        var llmClient = new DelegateLlmClient((messages, ct) => Task.FromResult(new LlmCompletionResult { Content = "test" }));
         var stateStore = new MemoryAgentStateStore();
         var config = new AgentConfiguration
         {
@@ -722,7 +724,7 @@ public sealed class AgentTests
             }
         }";
 
-        var llmClient = new DelegateLlmClient((messages, ct) => Task.FromResult(llmResponse));
+        var llmClient = new DelegateLlmClient((messages, ct) => Task.FromResult(new LlmCompletionResult { Content = llmResponse }));
         var stateStore = new MemoryAgentStateStore();
         var agent = new Agent(llmClient, stateStore);
 
@@ -759,7 +761,7 @@ public sealed class AgentTests
             }
         }";
 
-        var llmClient = new DelegateLlmClient((messages, ct) => Task.FromResult(llmResponse));
+        var llmClient = new DelegateLlmClient((messages, ct) => Task.FromResult(new LlmCompletionResult { Content = llmResponse }));
         var stateStore = new MemoryAgentStateStore();
         var agent = new Agent(llmClient, stateStore);
 

@@ -14,6 +14,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\src\AIAgentSharp.Anthropic\AIAgentSharp.Anthropic.csproj" />
+    <ProjectReference Include="..\src\AIAgentSharp.Gemini\AIAgentSharp.Gemini.csproj" />
+    <ProjectReference Include="..\src\AIAgentSharp.Mistral\AIAgentSharp.Mistral.csproj" />
     <ProjectReference Include="..\src\AIAgentSharp\AIAgentSharp.csproj" />
     <ProjectReference Include="..\src\AIAgentSharp.OpenAI\AIAgentSharp.OpenAI.csproj" />
   </ItemGroup>

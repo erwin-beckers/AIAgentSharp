@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using AIAgentSharp.Agents.Interfaces;
+using AIAgentSharp.Metrics;
 
 namespace AIAgentSharp.Agents;
 
@@ -15,18 +16,21 @@ public sealed class ToolExecutor : IToolExecutor
     private readonly ILogger _logger;
     private readonly IEventManager _eventManager;
     private readonly IStatusManager _statusManager;
+    private readonly IMetricsCollector _metricsCollector;
     private readonly TimeSpan _toolTimeout;
 
     public ToolExecutor(
         AgentConfiguration config,
         ILogger logger,
         IEventManager eventManager,
-        IStatusManager statusManager)
+        IStatusManager statusManager,
+        IMetricsCollector metricsCollector)
     {
         _config = config;
         _logger = logger;
         _eventManager = eventManager;
         _statusManager = statusManager;
+        _metricsCollector = metricsCollector;
         _toolTimeout = config.ToolTimeout;
     }
 
@@ -97,6 +101,10 @@ public sealed class ToolExecutor : IToolExecutor
                 CreatedUtc = DateTimeOffset.UtcNow
             };
 
+            // Record metrics for successful tool execution
+            _metricsCollector.RecordToolCallExecutionTime(agentId, turnIndex, toolName, stopwatch.ElapsedMilliseconds);
+            _metricsCollector.RecordToolCallCompletion(agentId, turnIndex, toolName, true);
+
             _logger.LogInformation($"Tool {toolName} executed successfully in {stopwatch.Elapsed.TotalMilliseconds:F2}ms");
 
             // Emit status on tool success
@@ -120,6 +128,9 @@ public sealed class ToolExecutor : IToolExecutor
                 CreatedUtc = DateTimeOffset.UtcNow
             };
 
+            // Record metrics for cancelled tool execution
+            _metricsCollector.RecordToolCallCompletion(agentId, turnIndex, toolName, false, "Cancelled");
+
             // Raise tool call completed event for cancellation
             _eventManager.RaiseToolCallCompleted(agentId, turnIndex, toolName, false, null, err);
         }
@@ -142,6 +153,9 @@ public sealed class ToolExecutor : IToolExecutor
                     type = "timeout"
                 }
             };
+
+            // Record metrics for timeout tool execution
+            _metricsCollector.RecordToolCallCompletion(agentId, turnIndex, toolName, false, "Timeout");
 
             // Raise tool call completed event for timeout
             _eventManager.RaiseToolCallCompleted(agentId, turnIndex, toolName, false, null, err);
@@ -169,6 +183,9 @@ public sealed class ToolExecutor : IToolExecutor
                 }
             };
 
+            // Record metrics for validation error tool execution
+            _metricsCollector.RecordToolCallCompletion(agentId, turnIndex, toolName, false, "ValidationError");
+
             // Raise tool call completed event for validation error
             _eventManager.RaiseToolCallCompleted(agentId, turnIndex, toolName, false, null, err);
         }
@@ -187,6 +204,9 @@ public sealed class ToolExecutor : IToolExecutor
                 TurnId = dedupeId,
                 CreatedUtc = DateTimeOffset.UtcNow
             };
+
+            // Record metrics for unknown tool error
+            _metricsCollector.RecordToolCallCompletion(agentId, turnIndex, toolName, false, "ToolNotFound");
 
             // Raise tool call completed event for unknown tool error
             _eventManager.RaiseToolCallCompleted(agentId, turnIndex, toolName, false, null, err);
@@ -211,6 +231,9 @@ public sealed class ToolExecutor : IToolExecutor
                     type = "tool_error"
                 }
             };
+
+            // Record metrics for general tool execution error
+            _metricsCollector.RecordToolCallCompletion(agentId, turnIndex, toolName, false, "ExecutionError");
 
             // Raise tool call completed event for execution error
             _eventManager.RaiseToolCallCompleted(agentId, turnIndex, toolName, false, null, err);

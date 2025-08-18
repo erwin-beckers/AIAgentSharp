@@ -36,12 +36,19 @@ public class AgentTests
         _mockStateStore.Setup(x => x.SaveAsync(agentId, It.IsAny<AgentState>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
+        // Mock LLM to return valid JSON response (finish)
+        _mockLlm.Setup(x => x.CompleteAsync(It.IsAny<IEnumerable<LlmMessage>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new LlmCompletionResult 
+            { 
+                Content = "{\"thoughts\":\"I need to complete the test goal\",\"action\":\"finish\",\"action_input\":{\"final\":\"Test completed\"}}" 
+            });
+
         // Act
         var result = await _agent.RunAsync(agentId, goal, tools);
 
         // Assert
         Assert.IsNotNull(result);
-        Assert.IsFalse(result.Succeeded); // Should fail due to no LLM response
+        Assert.IsTrue(result.Succeeded);
         Assert.AreEqual(goal, expectedState.Goal);
         _mockStateStore.Verify(x => x.SaveAsync(agentId, It.IsAny<AgentState>(), It.IsAny<CancellationToken>()), Times.AtLeastOnce);
     }
@@ -59,6 +66,13 @@ public class AgentTests
             .ReturnsAsync(expectedState);
         _mockStateStore.Setup(x => x.SaveAsync(agentId, It.IsAny<AgentState>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
+
+        // Mock LLM to return valid JSON response (plan)
+        _mockLlm.Setup(x => x.CompleteAsync(It.IsAny<IEnumerable<LlmMessage>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new LlmCompletionResult 
+            { 
+                Content = "{\"thoughts\":\"I need to continue working on the goal\",\"action\":\"plan\",\"action_input\":{\"summary\":\"Continuing with the task\"}}" 
+            });
 
         // Act
         var result = await _agent.StepAsync(agentId, goal, tools);
@@ -87,6 +101,13 @@ public class AgentTests
         _mockStateStore.Setup(x => x.LoadAsync(agentId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(existingState);
 
+        // Mock LLM to return valid JSON response (finish)
+        _mockLlm.Setup(x => x.CompleteAsync(It.IsAny<IEnumerable<LlmMessage>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new LlmCompletionResult 
+            { 
+                Content = "{\"thoughts\":\"I need to complete the test goal\",\"action\":\"finish\",\"action_input\":{\"final\":\"Test completed\"}}" 
+            });
+
         // Act
         var result = await _agent.RunAsync(agentId, goal, tools);
 
@@ -104,6 +125,13 @@ public class AgentTests
 
         _mockStateStore.Setup(x => x.LoadAsync(agentId, It.IsAny<CancellationToken>()))
             .ReturnsAsync((AgentState?)null);
+
+        // Mock LLM to return valid JSON response (finish)
+        _mockLlm.Setup(x => x.CompleteAsync(It.IsAny<IEnumerable<LlmMessage>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new LlmCompletionResult 
+            { 
+                Content = "{\"thoughts\":\"I need to complete the test goal\",\"action\":\"finish\",\"action_input\":{\"final\":\"Test completed\"}}" 
+            });
 
         // Act
         var result = await _agent.RunAsync(agentId, goal, tools);
@@ -162,6 +190,10 @@ public class AgentTests
         _mockStateStore.Setup(x => x.LoadAsync(agentId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(state);
 
+        // Mock LLM to return invalid JSON response to trigger max turns
+        _mockLlm.Setup(x => x.CompleteAsync(It.IsAny<IEnumerable<LlmMessage>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new LlmCompletionResult { Content = "invalid json response" });
+
         // Act
         var result = await agent.RunAsync(agentId, goal, tools);
 
@@ -219,10 +251,10 @@ public class AgentTests
         
         // Set up a slow LLM response to ensure cancellation can be tested
         _mockLlm.Setup(x => x.CompleteAsync(It.IsAny<IEnumerable<LlmMessage>>(), It.IsAny<CancellationToken>()))
-            .Returns(async () => 
+            .Returns(async (IEnumerable<LlmMessage> _, CancellationToken token) => 
             {
-                await Task.Delay(1000, cts.Token); // This will throw if cancelled
-                return "test response";
+                await Task.Delay(1000, token); // Use the passed token instead of cts.Token
+                return new LlmCompletionResult { Content = "{\"thoughts\":\"test response\",\"action\":\"final_answer\",\"action_input\":{\"tool\":\"\",\"params\":{},\"summary\":\"test\"}}" };
             });
 
         // Act & Assert
@@ -246,10 +278,10 @@ public class AgentTests
         
         // Set up a slow LLM response to ensure cancellation can be tested
         _mockLlm.Setup(x => x.CompleteAsync(It.IsAny<IEnumerable<LlmMessage>>(), It.IsAny<CancellationToken>()))
-            .Returns(async () => 
+            .Returns(async (IEnumerable<LlmMessage> _, CancellationToken token) => 
             {
-                await Task.Delay(1000, cts.Token); // This will throw if cancelled
-                return "test response";
+                await Task.Delay(1000, token); // Use the passed token instead of cts.Token
+                return new LlmCompletionResult { Content = "{\"thoughts\":\"test response\",\"action\":\"final_answer\",\"action_input\":{\"tool\":\"\",\"params\":{},\"summary\":\"test\"}}" };
             });
 
         // Act & Assert

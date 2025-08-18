@@ -1,4 +1,5 @@
 using AIAgentSharp.Agents.Interfaces;
+using AIAgentSharp.Metrics;
 
 namespace AIAgentSharp.Agents;
 
@@ -12,6 +13,7 @@ public sealed class ReasoningManager
     private readonly ILogger _logger;
     private readonly IEventManager _eventManager;
     private readonly IStatusManager _statusManager;
+    private readonly IMetricsCollector _metricsCollector;
     private readonly Dictionary<ReasoningType, IReasoningEngine> _reasoningEngines;
 
     public ReasoningManager(
@@ -19,19 +21,21 @@ public sealed class ReasoningManager
         AgentConfiguration config,
         ILogger logger,
         IEventManager eventManager,
-        IStatusManager statusManager)
+        IStatusManager statusManager,
+        IMetricsCollector metricsCollector)
     {
         _llm = llm ?? throw new ArgumentNullException(nameof(llm));
         _config = config ?? throw new ArgumentNullException(nameof(config));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _eventManager = eventManager ?? throw new ArgumentNullException(nameof(eventManager));
         _statusManager = statusManager ?? throw new ArgumentNullException(nameof(statusManager));
+        _metricsCollector = metricsCollector ?? throw new ArgumentNullException(nameof(metricsCollector));
 
         // Initialize reasoning engines
         _reasoningEngines = new Dictionary<ReasoningType, IReasoningEngine>
         {
-            [ReasoningType.ChainOfThought] = new ChainOfThoughtEngine(_llm, _config, _logger, _eventManager, _statusManager),
-            [ReasoningType.TreeOfThoughts] = new TreeOfThoughtsEngine(_llm, _config, _logger, _eventManager, _statusManager)
+            [ReasoningType.ChainOfThought] = new ChainOfThoughtEngine(_llm, _config, _logger, _eventManager, _statusManager, _metricsCollector),
+            [ReasoningType.TreeOfThoughts] = new TreeOfThoughtsEngine(_llm, _config, _logger, _eventManager, _statusManager, _metricsCollector)
         };
     }
 
@@ -316,7 +320,8 @@ Focus on creating a unified, actionable conclusion that leverages the strengths 
 
         var messages = new List<LlmMessage> { new LlmMessage { Role = "user", Content = prompt } };
         var response = await _llm.CompleteAsync(messages, cancellationToken);
-        return ExtractConclusionFromResponse(response);
+        var content = response.Content;
+        return ExtractConclusionFromResponse(content);
     }
 
     private string ExtractConclusionFromResponse(string response)

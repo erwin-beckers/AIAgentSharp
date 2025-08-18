@@ -5,16 +5,19 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <PackageId>AIAgentSharp</PackageId>
-    <Version>1.0.7</Version>
+    <Version>1.0.8</Version>
     <Authors>AIAgentSharp Contributors</Authors>
     <Description>A powerful .NET library for building AI agents with LLM integration, tool execution, and state management.</Description>
     <PackageTags>ai,agent,llm,openai,automation</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <RepositoryUrl>https://github.com/erwin-beckers/AIAgentSharp</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
     <InternalsVisibleTo>AIAgentSharp.Tests</InternalsVisibleTo>
   </PropertyGroup>
 
-
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="/" />
+  </ItemGroup>
 
 </Project>

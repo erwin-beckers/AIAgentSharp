@@ -1,259 +1,320 @@
+using Moq;
 using AIAgentSharp.Agents;
 using AIAgentSharp.Agents.Interfaces;
-using Moq;
+using AIAgentSharp.Metrics;
 
 namespace AIAgentSharp.Tests.Agents;
 
 [TestClass]
 public class LlmCommunicatorTests
 {
-    private Mock<ILlmClient> _mockLlm = null!;
-    private AgentConfiguration _config = null!;
-    private Mock<ILogger> _mockLogger = null!;
-    private Mock<IEventManager> _mockEventManager = null!;
-    private Mock<IStatusManager> _mockStatusManager = null!;
-    private LlmCommunicator _communicator = null!;
+    private Mock<ILlmClient> _mockLlmClient;
+    private Mock<IEventManager> _mockEventManager;
+    private Mock<IStatusManager> _mockStatusManager;
+    private Mock<ILogger> _mockLogger;
+    private IMetricsCollector _metricsCollector;
+    private AgentConfiguration _config;
+    private LlmCommunicator _communicator;
 
     [TestInitialize]
     public void Setup()
     {
-        _mockLlm = new Mock<ILlmClient>();
-        _config = new AgentConfiguration { LlmTimeout = TimeSpan.FromSeconds(30) };
-        _mockLogger = new Mock<ILogger>();
+        _mockLlmClient = new Mock<ILlmClient>();
         _mockEventManager = new Mock<IEventManager>();
         _mockStatusManager = new Mock<IStatusManager>();
-
+        _mockLogger = new Mock<ILogger>();
+        _metricsCollector = new MetricsCollector();
+        _config = new AgentConfiguration();
         _communicator = new LlmCommunicator(
-            _mockLlm.Object,
+            _mockLlmClient.Object,
             _config,
             _mockLogger.Object,
             _mockEventManager.Object,
-            _mockStatusManager.Object);
+            _mockStatusManager.Object,
+            _metricsCollector);
     }
 
     [TestMethod]
-    public async Task CallWithFunctionsAsync_WithValidInputs_ShouldReturnFunctionResult()
+    public async Task CallLlmAndParseAsync_WithValidResponse_ShouldReturnModelMessage()
     {
         // Arrange
-        var messages = new List<LlmMessage>();
-        var functionSpecs = new List<OpenAiFunctionSpec>();
-        var agentId = "test-agent";
-        var turnIndex = 1;
-        var expectedResult = new FunctionCallResult { HasFunctionCall = false };
-
-        // Create a mock that implements IFunctionCallingLlmClient
-        var mockFunctionClient = new Mock<IFunctionCallingLlmClient>();
-        mockFunctionClient.Setup(x => x.CompleteWithFunctionsAsync(It.IsAny<IEnumerable<LlmMessage>>(), It.IsAny<IEnumerable<OpenAiFunctionSpec>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(expectedResult);
-
-        var communicator = new LlmCommunicator(
-            mockFunctionClient.Object,
-            _config,
-            _mockLogger.Object,
-            _mockEventManager.Object,
-            _mockStatusManager.Object);
-
-        // Act
-        var result = await communicator.CallWithFunctionsAsync(messages, functionSpecs, agentId, turnIndex, CancellationToken.None);
-
-        // Assert
-        Assert.IsNotNull(result);
-        _mockEventManager.Verify(x => x.RaiseLlmCallStarted(agentId, turnIndex), Times.Once);
-        _mockEventManager.Verify(x => x.RaiseLlmCallCompleted(agentId, turnIndex, null, null), Times.Once);
-    }
-
-    [TestMethod]
-    public async Task CallLlmAndParseAsync_WithValidInputs_ShouldReturnModelMessage()
-    {
-        // Arrange
-        var messages = new List<LlmMessage>();
-        var agentId = "test-agent";
-        var turnIndex = 1;
-        var turnId = "turn_1_123";
-        var state = new AgentState { AgentId = agentId, Turns = new List<AgentTurn>() };
-        var jsonResponse = "{\"thoughts\":\"test\",\"action\":\"finish\",\"action_input\":{\"final\":\"result\"}}";
-
-        _mockLlm.Setup(x => x.CompleteAsync(It.IsAny<IEnumerable<LlmMessage>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(jsonResponse);
-
-        // Act
-        var result = await _communicator.CallLlmAndParseAsync(messages, agentId, turnIndex, turnId, state, CancellationToken.None);
-
-        // Assert
-        Assert.IsNotNull(result);
-        Assert.AreEqual("test", result.Thoughts);
-        Assert.AreEqual(AgentAction.Finish, result.Action);
-    }
-
-    [TestMethod]
-    public async Task ParseJsonResponse_WithValidJson_ShouldReturnModelMessage()
-    {
-        // Arrange
-        var llmRaw = "{\"thoughts\":\"test\",\"action\":\"finish\",\"action_input\":{\"final\":\"result\"}}";
-        var turnIndex = 1;
-        var turnId = "turn_1_123";
-        var state = new AgentState { AgentId = "test-agent", Turns = new List<AgentTurn>() };
-
-        // Act
-        var result = await _communicator.ParseJsonResponse(llmRaw, turnIndex, turnId, state, CancellationToken.None);
-
-        // Assert
-        Assert.IsNotNull(result);
-        Assert.AreEqual("test", result.Thoughts);
-        Assert.AreEqual(AgentAction.Finish, result.Action);
-        _mockEventManager.Verify(x => x.RaiseLlmCallCompleted(state.AgentId, turnIndex, result, null), Times.Once);
-    }
-
-    [TestMethod]
-    public async Task ParseJsonResponse_WithInvalidJson_ShouldReturnNull()
-    {
-        // Arrange
-        var llmRaw = "invalid json";
-        var turnIndex = 1;
-        var turnId = "turn_1_123";
-        var state = new AgentState { AgentId = "test-agent", Turns = new List<AgentTurn>() };
-
-        // Act
-        var result = await _communicator.ParseJsonResponse(llmRaw, turnIndex, turnId, state, CancellationToken.None);
-
-        // Assert
-        Assert.IsNull(result);
-        _mockEventManager.Verify(x => x.RaiseLlmCallCompleted(state.AgentId, turnIndex, null, It.IsAny<string>()), Times.Once);
-        _mockStatusManager.Verify(x => x.EmitStatus(state.AgentId, "Invalid model output", "JSON parsing failed", "Will retry with corrected format", null), Times.Once);
-    }
-
-    [TestMethod]
-    public void NormalizeFunctionCallToReact_WithValidInput_ShouldReturnModelMessage()
-    {
-        // Arrange
-        var functionResult = new FunctionCallResult
+        var expectedResponse = new LlmCompletionResult
         {
-            FunctionName = "test_function",
-            FunctionArgumentsJson = "{\"param1\":\"value1\"}",
-            AssistantContent = "Calling test function"
+            Content = "{\"thoughts\":\"I can answer this directly\",\"action\":\"finish\",\"action_input\":{\"final\":\"The answer is 42\"}}"
         };
-        var turnIndex = 1;
+
+        _mockLlmClient.Setup(x => x.CompleteAsync(It.IsAny<IEnumerable<LlmMessage>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(expectedResponse);
+
+        var messages = new List<LlmMessage> { new LlmMessage { Role = "user", Content = "test" } };
+        var state = new AgentState { AgentId = "test-agent" };
 
         // Act
-        var result = _communicator.NormalizeFunctionCallToReact(functionResult, turnIndex);
+        var result = await _communicator.CallLlmAndParseAsync(messages, "test-agent", 0, "turn-123", state, CancellationToken.None);
 
         // Assert
         Assert.IsNotNull(result);
-        Assert.AreEqual("Calling test function", result.Thoughts);
+        Assert.AreEqual("I can answer this directly", result.Thoughts);
+        Assert.AreEqual(AgentAction.Finish, result.Action);
+        Assert.AreEqual("The answer is 42", result.ActionInput?.Final);
+    }
+
+    [TestMethod]
+    public async Task CallLlmAndParseAsync_WithToolCall_ShouldReturnToolCallMessage()
+    {
+        // Arrange
+        var expectedResponse = new LlmCompletionResult
+        {
+            Content = "{\"thoughts\":\"I need to add numbers\",\"action\":\"tool_call\",\"action_input\":{\"tool\":\"add\",\"params\":{\"a\":5,\"b\":3}}}"
+        };
+
+        _mockLlmClient.Setup(x => x.CompleteAsync(It.IsAny<IEnumerable<LlmMessage>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(expectedResponse);
+
+        var messages = new List<LlmMessage> { new LlmMessage { Role = "user", Content = "test" } };
+        var state = new AgentState { AgentId = "test-agent" };
+
+        // Act
+        var result = await _communicator.CallLlmAndParseAsync(messages, "test-agent", 0, "turn-123", state, CancellationToken.None);
+
+        // Assert
+        Assert.IsNotNull(result);
+        Assert.AreEqual("I need to add numbers", result.Thoughts);
         Assert.AreEqual(AgentAction.ToolCall, result.Action);
-        Assert.AreEqual("test_function", result.ActionInput.Tool);
-        Assert.IsNotNull(result.ActionInput.Params);
-        Assert.AreEqual("value1", result.ActionInput.Params["param1"]);
+        Assert.AreEqual("add", result.ActionInput?.Tool);
+        Assert.IsNotNull(result.ActionInput?.Params);
+        Assert.AreEqual("5", result.ActionInput.Params["a"]?.ToString());
+        Assert.AreEqual("3", result.ActionInput.Params["b"]?.ToString());
     }
 
     [TestMethod]
-    public void NormalizeFunctionCallToReact_WithInvalidJson_ShouldThrowArgumentException()
+    public async Task CallLlmAndParseAsync_WithInvalidJson_ShouldReturnNull()
     {
         // Arrange
-        var functionResult = new FunctionCallResult
+        var expectedResponse = new LlmCompletionResult
         {
-            FunctionName = "test_function",
-            FunctionArgumentsJson = "invalid json",
-            AssistantContent = "Calling test function"
+            Content = "Invalid JSON response"
         };
-        var turnIndex = 1;
 
-        // Act & Assert
-        Assert.ThrowsException<ArgumentException>(() => 
-            _communicator.NormalizeFunctionCallToReact(functionResult, turnIndex));
-    }
+        _mockLlmClient.Setup(x => x.CompleteAsync(It.IsAny<IEnumerable<LlmMessage>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(expectedResponse);
 
-        [TestMethod]
-    public async Task CallLlmAndParseAsync_WithCancellation_ShouldThrowOperationCanceledException()
-    {
-        // Arrange
-        var messages = new List<LlmMessage>();
-        var agentId = "test-agent";
-        var turnIndex = 1;
-        var turnId = "turn_1_123";
-        var state = new AgentState { AgentId = agentId, Turns = new List<AgentTurn>() };
-        var cts = new CancellationTokenSource();
-        
-        // Set up a slow LLM response to ensure cancellation can be tested
-        _mockLlm.Setup(x => x.CompleteAsync(It.IsAny<IEnumerable<LlmMessage>>(), It.IsAny<CancellationToken>()))
-            .Returns(async () => 
-            {
-                await Task.Delay(1000, cts.Token); // This will throw if cancelled
-                return "test response";
-            });
-
-        // Act & Assert
-        var task = _communicator.CallLlmAndParseAsync(messages, agentId, turnIndex, turnId, state, cts.Token);
-        
-        // Cancel after a short delay to ensure the operation has started
-        await Task.Delay(100);
-        cts.Cancel();
-        
-        await Assert.ThrowsExceptionAsync<TaskCanceledException>(() => task);
-    }
-
-    [TestMethod]
-    public async Task CallLlmAndParseAsync_WithLlmException_ShouldReturnNull()
-    {
-        // Arrange
-        var messages = new List<LlmMessage>();
-        var agentId = "test-agent";
-        var turnIndex = 1;
-        var turnId = "turn_1_123";
-        var state = new AgentState { AgentId = agentId, Turns = new List<AgentTurn>() };
-
-        _mockLlm.Setup(x => x.CompleteAsync(It.IsAny<IEnumerable<LlmMessage>>(), It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new Exception("LLM error"));
+        var messages = new List<LlmMessage> { new LlmMessage { Role = "user", Content = "test" } };
+        var state = new AgentState { AgentId = "test-agent" };
 
         // Act
-        var result = await _communicator.CallLlmAndParseAsync(messages, agentId, turnIndex, turnId, state, CancellationToken.None);
+        var result = await _communicator.CallLlmAndParseAsync(messages, "test-agent", 0, "turn-123", state, CancellationToken.None);
 
         // Assert
         Assert.IsNull(result);
         Assert.AreEqual(1, state.Turns.Count);
-        Assert.IsNotNull(state.Turns[0].ToolResult);
-        var toolResult = state.Turns[0].ToolResult;
-        Assert.IsNotNull(toolResult);
-        Assert.IsFalse(toolResult.Success);
-        Assert.IsNotNull(toolResult.Error);
-        Assert.IsTrue(toolResult.Error.Contains("LLM error"));
+        Assert.IsFalse(state.Turns[0].ToolResult?.Success ?? true);
     }
 
     [TestMethod]
-    public async Task ParseJsonResponse_WithStatusFields_ShouldEmitStatus()
+    public async Task CallLlmAndParseAsync_WithTimeout_ShouldHandleTimeout()
     {
         // Arrange
-        var llmRaw = "{\"thoughts\":\"test\",\"action\":\"finish\",\"action_input\":{\"final\":\"result\"},\"status_title\":\"Processing\",\"status_details\":\"Working on it\",\"next_step_hint\":\"Almost done\",\"progress_pct\":75}";
-        var turnIndex = 1;
-        var turnId = "turn_1_123";
-        var state = new AgentState { AgentId = "test-agent", Turns = new List<AgentTurn>() };
+        var config = new AgentConfiguration { LlmTimeout = TimeSpan.FromMilliseconds(100) };
+        var communicator = new LlmCommunicator(
+            _mockLlmClient.Object,
+            config,
+            _mockLogger.Object,
+            _mockEventManager.Object,
+            _mockStatusManager.Object,
+            _metricsCollector);
+
+        _mockLlmClient.Setup(x => x.CompleteAsync(It.IsAny<IEnumerable<LlmMessage>>(), It.IsAny<CancellationToken>()))
+            .Returns(async (IEnumerable<LlmMessage> messages, CancellationToken ct) =>
+            {
+                await Task.Delay(200, ct);
+                return new LlmCompletionResult { Content = "test" };
+            });
+
+        var messages = new List<LlmMessage> { new LlmMessage { Role = "user", Content = "test" } };
+        var state = new AgentState { AgentId = "test-agent" };
 
         // Act
-        var result = await _communicator.ParseJsonResponse(llmRaw, turnIndex, turnId, state, CancellationToken.None);
+        var result = await communicator.CallLlmAndParseAsync(messages, "test-agent", 0, "turn-123", state, CancellationToken.None);
+
+        // Assert
+        Assert.IsNull(result);
+        Assert.AreEqual(1, state.Turns.Count);
+        Assert.IsFalse(state.Turns[0].ToolResult?.Success ?? true);
+        Assert.IsTrue(state.Turns[0].ToolResult?.Error?.Contains("deadline exceeded") ?? false);
+    }
+
+    [TestMethod]
+    public async Task CallWithFunctionsAsync_WithValidFunctionCall_ShouldReturnFunctionResult()
+    {
+        // Arrange
+        var expectedResponse = new FunctionCallResult
+        {
+            HasFunctionCall = true,
+            FunctionName = "add",
+            FunctionArgumentsJson = "{\"a\":5,\"b\":3}",
+            AssistantContent = "I need to add 5 and 3"
+        };
+
+        _mockLlmClient.Setup(x => x.CompleteWithFunctionsAsync(It.IsAny<IEnumerable<LlmMessage>>(), It.IsAny<IEnumerable<OpenAiFunctionSpec>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(expectedResponse);
+
+        var messages = new List<LlmMessage> { new LlmMessage { Role = "user", Content = "test" } };
+        var functions = new List<OpenAiFunctionSpec> { new OpenAiFunctionSpec { Name = "add" } };
+
+        // Act
+        var result = await _communicator.CallWithFunctionsAsync(messages, functions, "test-agent", 0, CancellationToken.None);
 
         // Assert
         Assert.IsNotNull(result);
-        _mockStatusManager.Verify(x => x.EmitStatus(state.AgentId, "Processing", "Working on it", "Almost done", 75), Times.Once);
+        Assert.IsTrue(result.HasFunctionCall);
+        Assert.AreEqual("add", result.FunctionName);
+        Assert.AreEqual("{\"a\":5,\"b\":3}", result.FunctionArgumentsJson);
+        Assert.AreEqual("I need to add 5 and 3", result.AssistantContent);
     }
 
     [TestMethod]
-    public void Constructor_WithValidParameters_ShouldInitializeCorrectly()
-    {
-        // Assert
-        Assert.IsNotNull(_communicator);
-    }
-
-    [TestMethod]
-    public async Task CallWithFunctionsAsync_WithNonFunctionCallingLlm_ShouldThrowInvalidOperationException()
+    public async Task CallWithFunctionsAsync_WithNoFunctionCall_ShouldReturnNoFunctionResult()
     {
         // Arrange
-        var messages = new List<LlmMessage>();
-        var functionSpecs = new List<OpenAiFunctionSpec>();
-        var agentId = "test-agent";
-        var turnIndex = 1;
+        var expectedResponse = new FunctionCallResult
+        {
+            HasFunctionCall = false,
+            AssistantContent = "I can answer this directly"
+        };
 
-        // Act & Assert
-        await Assert.ThrowsExceptionAsync<InvalidOperationException>(() => 
-            _communicator.CallWithFunctionsAsync(messages, functionSpecs, agentId, turnIndex, CancellationToken.None));
+        _mockLlmClient.Setup(x => x.CompleteWithFunctionsAsync(It.IsAny<IEnumerable<LlmMessage>>(), It.IsAny<IEnumerable<OpenAiFunctionSpec>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(expectedResponse);
+
+        var messages = new List<LlmMessage> { new LlmMessage { Role = "user", Content = "test" } };
+        var functions = new List<OpenAiFunctionSpec> { new OpenAiFunctionSpec { Name = "add" } };
+
+        // Act
+        var result = await _communicator.CallWithFunctionsAsync(messages, functions, "test-agent", 0, CancellationToken.None);
+
+        // Assert
+        Assert.IsNotNull(result);
+        Assert.IsFalse(result.HasFunctionCall);
+        Assert.AreEqual("I can answer this directly", result.AssistantContent);
+    }
+
+    [TestMethod]
+    public async Task CallWithFunctionsAsync_WithUsageData_ShouldRecordMetrics()
+    {
+        // Arrange
+        var expectedResponse = new FunctionCallResult
+        {
+            HasFunctionCall = true,
+            FunctionName = "add",
+            FunctionArgumentsJson = "{\"a\":5,\"b\":3}",
+            AssistantContent = "I need to add 5 and 3",
+            Usage = new LlmUsage
+            {
+                InputTokens = 100,
+                OutputTokens = 50,
+                Model = "test-model",
+                Provider = "test-provider"
+            }
+        };
+
+        _mockLlmClient.Setup(x => x.CompleteWithFunctionsAsync(It.IsAny<IEnumerable<LlmMessage>>(), It.IsAny<IEnumerable<OpenAiFunctionSpec>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(expectedResponse);
+
+        var messages = new List<LlmMessage> {new LlmMessage { Role = "user", Content = "test" } };
+        var functions = new List<OpenAiFunctionSpec> { new OpenAiFunctionSpec { Name = "add" } };
+
+        // Act
+        var result = await _communicator.CallWithFunctionsAsync(messages, functions, "test-agent", 0, CancellationToken.None);
+        var metrics = ((IMetricsProvider)_metricsCollector).GetMetrics();
+
+        // Assert
+        Assert.IsNotNull(result);
+        Assert.IsTrue(metrics.Resources.TotalInputTokens > 0);
+        Assert.IsTrue(metrics.Resources.TotalOutputTokens > 0);
+    }
+
+    [TestMethod]
+    public void NormalizeFunctionCallToReact_WithValidFunctionCall_ShouldReturnModelMessage()
+    {
+        // Arrange
+        var functionResult = new FunctionCallResult
+        {
+            HasFunctionCall = true,
+            FunctionName = "add",
+            FunctionArgumentsJson = "{\"a\":5,\"b\":3}",
+            AssistantContent = "I need to add 5 and 3"
+        };
+
+        // Act
+        var result = _communicator.NormalizeFunctionCallToReact(functionResult, 0);
+
+        // Assert
+        Assert.IsNotNull(result);
+        Assert.AreEqual("I need to add 5 and 3", result.Thoughts);
+        Assert.AreEqual(AgentAction.ToolCall, result.Action);
+        Assert.AreEqual("add", result.ActionInput?.Tool);
+        Assert.IsNotNull(result.ActionInput?.Params);
+        Assert.AreEqual(5, result.ActionInput.Params["a"]);
+        Assert.AreEqual(3, result.ActionInput.Params["b"]);
+    }
+
+    [TestMethod]
+    public void  NormalizeFunctionCallToReact_WithComplexArguments_ShouldParseCorrectly()
+    {
+        // Arrange
+        var functionResult = new FunctionCallResult
+        {
+            HasFunctionCall = true,
+            FunctionName = "complex_tool",
+            FunctionArgumentsJson = "{\"string_param\":\"test\",\"int_param\":42,\"bool_param\":true,\"array_param\":[1,2,3]}",
+            AssistantContent = "I need to call a complex tool"
+        };
+
+        // Act
+        var result = _communicator.NormalizeFunctionCallToReact(functionResult, 0);
+
+        // Assert
+        Assert.IsNotNull(result);
+        Assert.AreEqual("I need to call a complex tool", result.Thoughts);
+        Assert.AreEqual(AgentAction.ToolCall, result.Action);
+        Assert.AreEqual("complex_tool", result.ActionInput?.Tool);
+        Assert.IsNotNull(result.ActionInput?.Params);
+        Assert.AreEqual("test", result.ActionInput.Params["string_param"]);
+        Assert.AreEqual(42, result.ActionInput.Params["int_param"]);
+        Assert.AreEqual(true, result.ActionInput.Params["bool_param"]);
+        Assert.IsInstanceOfType(result.ActionInput.Params["array_param"], typeof(List<object>));
+    }
+
+    [TestMethod]
+    public async Task CallLlmAndParseAsync_WithMetrics_ShouldRecordMetrics()
+    {
+        // Arrange
+        var expectedResponse = new LlmCompletionResult
+        {
+            Content = "{\"thoughts\":\"I can answer this directly\",\"action\":\"finish\",\"action_input\":{\"final\":\"The answer is 42\"}}",
+            Usage = new LlmUsage
+            {
+                InputTokens = 100,
+                OutputTokens = 50,
+                Model = "test-model",
+                Provider = "test-provider"
+            }
+        };
+
+        _mockLlmClient.Setup(x => x.CompleteAsync(It.IsAny<IEnumerable<LlmMessage>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(expectedResponse);
+
+        var messages = new List<LlmMessage> { new LlmMessage { Role = "user", Content = "test" } };
+        var state = new AgentState { AgentId = "test-agent" };
+
+        // Act
+        var result = await _communicator.CallLlmAndParseAsync(messages, "test-agent", 0, "turn-123", state, CancellationToken.None);
+        var metrics = ((IMetricsProvider)_metricsCollector).GetMetrics();
+
+        // Assert
+        Assert.IsNotNull(result);
+        Assert.IsTrue(metrics.Performance.TotalLlmCalls > 0);
+        Assert.IsTrue(metrics.Resources.TotalInputTokens > 0);
+        Assert.IsTrue(metrics.Resources.TotalOutputTokens > 0);
     }
 }

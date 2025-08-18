@@ -280,7 +280,15 @@ public sealed class SchemaGeneratorTests
     {
         if (schema is IDictionary<string, object> dict && dict.ContainsKey("type"))
         {
-            return (object[])dict["type"];
+            var typeValue = dict["type"];
+            if (typeValue is object[] typeArray)
+            {
+                return typeArray;
+            }
+            else if (typeValue is string typeString)
+            {
+                return new object[] { typeString };
+            }
         }
 
         // For anonymous objects, use reflection to get the type property
@@ -289,7 +297,15 @@ public sealed class SchemaGeneratorTests
 
         if (typeProperty != null)
         {
-            return (object[])typeProperty.GetValue(schema)!;
+            var typeValue = typeProperty.GetValue(schema);
+            if (typeValue is object[] typeArray)
+            {
+                return typeArray;
+            }
+            else if (typeValue is string typeString)
+            {
+                return new object[] { typeString };
+            }
         }
 
         throw new InvalidOperationException("Could not extract type array from schema");

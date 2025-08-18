@@ -1,5 +1,6 @@
 using AIAgentSharp.Agents;
 using AIAgentSharp.Agents.Interfaces;
+using AIAgentSharp.Metrics;
 using Moq;
 
 namespace AIAgentSharp.Tests.Agents;
@@ -10,6 +11,7 @@ public sealed class ReasoningManagerTests
     private Mock<ILlmClient> _mockLlm = null!;
     private Mock<IEventManager> _mockEventManager = null!;
     private Mock<IStatusManager> _mockStatusManager = null!;
+    private Mock<IMetricsCollector> _mockMetricsCollector = null!;
     private ConsoleLogger _logger = null!;
     private AgentConfiguration _config = null!;
     private ReasoningManager _reasoningManager = null!;
@@ -20,12 +22,13 @@ public sealed class ReasoningManagerTests
         _mockLlm = new Mock<ILlmClient>();
         _mockEventManager = new Mock<IEventManager>();
         _mockStatusManager = new Mock<IStatusManager>();
+        _mockMetricsCollector = new Mock<IMetricsCollector>();
         _logger = new ConsoleLogger();
         _config = new AgentConfiguration
         {
             ReasoningType = ReasoningType.ChainOfThought
         };
-        _reasoningManager = new ReasoningManager(_mockLlm.Object, _config, _logger, _mockEventManager.Object, _mockStatusManager.Object);
+        _reasoningManager = new ReasoningManager(_mockLlm.Object, _config, _logger, _mockEventManager.Object, _mockStatusManager.Object, _mockMetricsCollector.Object);
     }
 
     [TestMethod]
@@ -33,7 +36,7 @@ public sealed class ReasoningManagerTests
     {
         // Act & Assert
         Assert.ThrowsException<ArgumentNullException>(() => 
-            new ReasoningManager(null!, _config, _logger, _mockEventManager.Object, _mockStatusManager.Object));
+            new ReasoningManager(null!, _config, _logger, _mockEventManager.Object, _mockStatusManager.Object, _mockMetricsCollector.Object));
     }
 
     [TestMethod]
@@ -41,7 +44,7 @@ public sealed class ReasoningManagerTests
     {
         // Act & Assert
         Assert.ThrowsException<ArgumentNullException>(() => 
-            new ReasoningManager(_mockLlm.Object, null!, _logger, _mockEventManager.Object, _mockStatusManager.Object));
+            new ReasoningManager(_mockLlm.Object, null!, _logger, _mockEventManager.Object, _mockStatusManager.Object, _mockMetricsCollector.Object));
     }
 
     [TestMethod]
@@ -49,7 +52,7 @@ public sealed class ReasoningManagerTests
     {
         // Act & Assert
         Assert.ThrowsException<ArgumentNullException>(() => 
-            new ReasoningManager(_mockLlm.Object, _config, null!, _mockEventManager.Object, _mockStatusManager.Object));
+            new ReasoningManager(_mockLlm.Object, _config, null!, _mockEventManager.Object, _mockStatusManager.Object, _mockMetricsCollector.Object));
     }
 
     [TestMethod]
@@ -57,7 +60,7 @@ public sealed class ReasoningManagerTests
     {
         // Act & Assert
         Assert.ThrowsException<ArgumentNullException>(() => 
-            new ReasoningManager(_mockLlm.Object, _config, _logger, null!, _mockStatusManager.Object));
+            new ReasoningManager(_mockLlm.Object, _config, _logger, null!, _mockStatusManager.Object, _mockMetricsCollector.Object));
     }
 
     [TestMethod]
@@ -65,7 +68,7 @@ public sealed class ReasoningManagerTests
     {
         // Act & Assert
         Assert.ThrowsException<ArgumentNullException>(() => 
-            new ReasoningManager(_mockLlm.Object, _config, _logger, _mockEventManager.Object, null!));
+            new ReasoningManager(_mockLlm.Object, _config, _logger, _mockEventManager.Object, null!, _mockMetricsCollector.Object));
     }
 
     [TestMethod]
@@ -126,7 +129,7 @@ public sealed class ReasoningManagerTests
     {
         // Arrange
         var config = new AgentConfiguration { ReasoningType = ReasoningType.ChainOfThought };
-        var manager = new ReasoningManager(_mockLlm.Object, config, _logger, _mockEventManager.Object, _mockStatusManager.Object);
+        var manager = new ReasoningManager(_mockLlm.Object, config, _logger, _mockEventManager.Object, _mockStatusManager.Object, _mockMetricsCollector.Object);
 
         // Act
         var chain = manager.GetCurrentChain();
@@ -140,7 +143,7 @@ public sealed class ReasoningManagerTests
     {
         // Arrange
         var config = new AgentConfiguration { ReasoningType = ReasoningType.TreeOfThoughts };
-        var manager = new ReasoningManager(_mockLlm.Object, config, _logger, _mockEventManager.Object, _mockStatusManager.Object);
+        var manager = new ReasoningManager(_mockLlm.Object, config, _logger, _mockEventManager.Object, _mockStatusManager.Object, _mockMetricsCollector.Object);
 
         // Act
         var chain = manager.GetCurrentChain();
@@ -154,7 +157,7 @@ public sealed class ReasoningManagerTests
     {
         // Arrange
         var config = new AgentConfiguration { ReasoningType = ReasoningType.TreeOfThoughts };
-        var manager = new ReasoningManager(_mockLlm.Object, config, _logger, _mockEventManager.Object, _mockStatusManager.Object);
+        var manager = new ReasoningManager(_mockLlm.Object, config, _logger, _mockEventManager.Object, _mockStatusManager.Object, _mockMetricsCollector.Object);
 
         // Act
         var tree = manager.GetCurrentTree();
@@ -168,7 +171,7 @@ public sealed class ReasoningManagerTests
     {
         // Arrange
         var config = new AgentConfiguration { ReasoningType = ReasoningType.ChainOfThought };
-        var manager = new ReasoningManager(_mockLlm.Object, config, _logger, _mockEventManager.Object, _mockStatusManager.Object);
+        var manager = new ReasoningManager(_mockLlm.Object, config, _logger, _mockEventManager.Object, _mockStatusManager.Object, _mockMetricsCollector.Object);
 
         // Act
         var tree = manager.GetCurrentTree();
@@ -182,7 +185,7 @@ public sealed class ReasoningManagerTests
     {
         // Arrange
         var config = new AgentConfiguration { ReasoningType = ReasoningType.None };
-        var manager = new ReasoningManager(_mockLlm.Object, config, _logger, _mockEventManager.Object, _mockStatusManager.Object);
+        var manager = new ReasoningManager(_mockLlm.Object, config, _logger, _mockEventManager.Object, _mockStatusManager.Object, _mockMetricsCollector.Object);
         var tools = new Dictionary<string, ITool>();
 
         // Act & Assert
@@ -206,7 +209,7 @@ public sealed class ReasoningManagerTests
     {
         // Arrange
         var config = new AgentConfiguration { ReasoningType = ReasoningType.None };
-        var manager = new ReasoningManager(_mockLlm.Object, config, _logger, _mockEventManager.Object, _mockStatusManager.Object);
+        var manager = new ReasoningManager(_mockLlm.Object, config, _logger, _mockEventManager.Object, _mockStatusManager.Object, _mockMetricsCollector.Object);
         var tools = new Dictionary<string, ITool>();
 
         // Mock LLM to return invalid response to simulate engine failures
@@ -227,12 +230,12 @@ public sealed class ReasoningManagerTests
     {
         // Arrange
         var config = new AgentConfiguration { ReasoningType = ReasoningType.ChainOfThought };
-        var manager = new ReasoningManager(_mockLlm.Object, config, _logger, _mockEventManager.Object, _mockStatusManager.Object);
+        var manager = new ReasoningManager(_mockLlm.Object, config, _logger, _mockEventManager.Object, _mockStatusManager.Object, _mockMetricsCollector.Object);
         var tools = new Dictionary<string, ITool>();
 
         // Mock LLM to return invalid response that causes reasoning to fail
         _mockLlm.Setup(x => x.CompleteAsync(It.IsAny<IEnumerable<LlmMessage>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync("invalid json response");
+            .ReturnsAsync(new LlmCompletionResult { Content = "invalid json response" });
 
         // Act
         var result = await manager.PerformHybridReasoningAsync("Test goal", "Test context", tools);
@@ -248,12 +251,12 @@ public sealed class ReasoningManagerTests
     {
         // Arrange
         var config = new AgentConfiguration { ReasoningType = ReasoningType.ChainOfThought };
-        var manager = new ReasoningManager(_mockLlm.Object, config, _logger, _mockEventManager.Object, _mockStatusManager.Object);
+        var manager = new ReasoningManager(_mockLlm.Object, config, _logger, _mockEventManager.Object, _mockStatusManager.Object, _mockMetricsCollector.Object);
         var tools = new Dictionary<string, ITool>();
 
         // Mock LLM to return valid response for hybrid reasoning
         _mockLlm.Setup(x => x.CompleteAsync(It.IsAny<IEnumerable<LlmMessage>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync("{\"conclusion\":\"Combined reasoning result\"}");
+            .ReturnsAsync(new LlmCompletionResult { Content = "{\"conclusion\":\"Combined reasoning result\"}" });
 
         // Act
         var result = await manager.PerformHybridReasoningAsync("Test goal", "Test context", tools);

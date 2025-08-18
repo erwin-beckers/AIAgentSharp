@@ -9,15 +9,16 @@
 5. [State Management](#state-management)
 6. [LLM Integration](#llm-integration)
 7. [Event System](#event-system)
-8. [Configuration](#configuration)
-9. [Installation and Setup](#installation-and-setup)
-10. [Usage Examples](#usage-examples)
-11. [Advanced Features](#advanced-features)
-12. [Testing](#testing)
-13. [Performance Considerations](#performance-considerations)
-14. [Error Handling](#error-handling)
-15. [API Reference](#api-reference)
-16. [Contributing](#contributing)
+8. [Metrics System](#metrics-system)
+9. [Configuration](#configuration)
+10. [Installation and Setup](#installation-and-setup)
+11. [Usage Examples](#usage-examples)
+12. [Advanced Features](#advanced-features)
+13. [Testing](#testing)
+14. [Performance Considerations](#performance-considerations)
+15. [Error Handling](#error-handling)
+16. [API Reference](#api-reference)
+17. [Contributing](#contributing)
 
 ## Project Overview
 
@@ -29,6 +30,9 @@ AIAgentSharp supports multiple LLM providers through a flexible architecture:
 
 - **AIAgentSharp** - Core framework with abstract LLM interfaces, reasoning engines, and tool framework
 - **AIAgentSharp.OpenAI** - OpenAI integration package with `OpenAiLlmClient` implementation
+- **AIAgentSharp.Anthropic** - Anthropic Claude integration package with `AnthropicLlmClient` implementation
+- **AIAgentSharp.Gemini** - Google Gemini integration package with `GeminiLlmClient` implementation
+- **AIAgentSharp.Mistral** - Mistral AI integration package with `MistralLlmClient` implementation
 - **Custom LLM Providers** - Implement `ILlmClient` for your preferred provider
 
 ### Available NuGet Packages
@@ -37,6 +41,9 @@ AIAgentSharp supports multiple LLM providers through a flexible architecture:
 |---------|---------|-------------|
 | `AIAgentSharp` | ![NuGet](https://img.shields.io/nuget/v/AIAgentSharp) | Core framework with abstract LLM interfaces, reasoning engines, and tool framework |
 | `AIAgentSharp.OpenAI` | ![NuGet](https://img.shields.io/nuget/v/AIAgentSharp.OpenAI) | OpenAI integration package with `OpenAiLlmClient` implementation |
+| `AIAgentSharp.Anthropic` | ![NuGet](https://img.shields.io/nuget/v/AIAgentSharp.Anthropic) | Anthropic Claude integration package with `AnthropicLlmClient` implementation |
+| `AIAgentSharp.Gemini` | ![NuGet](https://img.shields.io/nuget/v/AIAgentSharp.Gemini) | Google Gemini integration package with `GeminiLlmClient` implementation |
+| `AIAgentSharp.Mistral` | ![NuGet](https://img.shields.io/nuget/v/AIAgentSharp.Mistral) | Mistral AI integration package with `MistralLlmClient` implementation |
 
 ### Key Features
 
@@ -73,9 +80,19 @@ AIAgentSharp/
 │   ├── OpenAiLlmClient.cs      # OpenAI LLM client implementation
 │   ├── OpenAiConfiguration.cs  # OpenAI-specific configuration
 │   └── README.md               # OpenAI package documentation
-├── examples/                   # Usage examples
+├── src/AIAgentSharp.Anthropic/ # Anthropic integration package
+│   ├── AnthropicLlmClient.cs   # Anthropic LLM client implementation
+│   ├── AnthropicConfiguration.cs # Anthropic-specific configuration
+│   └── README.md               # Anthropic package documentation
+├── src/AIAgentSharp.Gemini/    # Gemini integration package
+│   ├── GeminiLlmClient.cs      # Gemini LLM client implementation
+│   ├── GeminiConfiguration.cs  # Gemini-specific configuration
+│   └── README.md               # Gemini package documentation
+├── src/AIAgentSharp.Mistral/   # Mistral integration package
+│   ├── MistralLlmClient.cs     # Mistral LLM client implementation
+│   ├── MistralConfiguration.cs # Mistral-specific configuration
+│   └── README.md               # Mistral package documentation
 ├── tests/                      # Comprehensive test suite
-└── docs/                       # Documentation
 ```
 
 ### Multi-Provider Architecture
@@ -93,6 +110,21 @@ AIAgentSharp.OpenAI (Provider Implementation)
 ├── OpenAiLlmClient (ILlmClient implementation)
 ├── OpenAiConfiguration
 └── OpenAI-specific utilities
+
+AIAgentSharp.Anthropic (Provider Implementation)
+├── AnthropicLlmClient (ILlmClient implementation)
+├── AnthropicConfiguration
+└── Anthropic-specific utilities
+
+AIAgentSharp.Gemini (Provider Implementation)
+├── GeminiLlmClient (ILlmClient implementation)
+├── GeminiConfiguration
+└── Google AI Platform utilities
+
+AIAgentSharp.Mistral (Provider Implementation)
+├── MistralLlmClient (ILlmClient implementation)
+├── MistralConfiguration
+└── Mistral AI-specific utilities
 
 Custom Providers
 ├── YourCustomLlmClient (ILlmClient implementation)
@@ -490,10 +522,75 @@ var config = new OpenAiConfiguration
 var llm = new OpenAiLlmClient(apiKey, config);
 ```
 
+#### AIAgentSharp.Anthropic Package
+
+The `AIAgentSharp.Anthropic` package provides Anthropic Claude integration:
+
+```csharp
+using AIAgentSharp.Anthropic;
+
+// Basic usage
+var llm = new AnthropicLlmClient(apiKey);
+
+// With custom configuration
+var config = new AnthropicConfiguration
+{
+    Model = "claude-3-5-sonnet-20241022",
+    Temperature = 0.1f,
+    MaxTokens = 4000,
+    EnableFunctionCalling = true
+};
+var llm = new AnthropicLlmClient(apiKey, config);
+```
+
+#### AIAgentSharp.Gemini Package
+
+The `AIAgentSharp.Gemini` package provides Google Gemini integration:
+
+```csharp
+using AIAgentSharp.Gemini;
+
+// Basic usage
+var llm = new GeminiLlmClient(apiKey);
+
+// With custom configuration
+var config = new GeminiConfiguration
+{
+    Model = "gemini-1.5-flash",
+    Temperature = 0.1f,
+    MaxTokens = 4000,
+    EnableFunctionCalling = true,
+    ProjectId = "your-project-id",
+    Region = "us-central1"
+};
+var llm = new GeminiLlmClient(apiKey, config);
+```
+
+#### AIAgentSharp.Mistral Package
+
+The `AIAgentSharp.Mistral` package provides Mistral AI integration:
+
+```csharp
+using AIAgentSharp.Mistral;
+
+// Basic usage
+var llm = new MistralLlmClient(apiKey);
+
+// With custom configuration
+var config = new MistralConfiguration
+{
+    Model = "mistral-large-latest",
+    Temperature = 0.1f,
+    MaxTokens = 4000,
+    EnableFunctionCalling = true
+};
+var llm = new MistralLlmClient(apiKey, config);
+```
+
 #### OpenAiLlmClient Features
 
 ```csharp
-public sealed class OpenAiLlmClient : ILlmClient, IFunctionCallingLlmClient
+public sealed class OpenAiLlmClient : ILlmClient
 {
     // Constructor overloads
     public OpenAiLlmClient(string apiKey, string model = "gpt-4o-mini", ILogger? logger = null);
@@ -530,6 +627,82 @@ public sealed class OpenAiConfiguration
     public static OpenAiConfiguration CreateForAgentReasoning();
     public static OpenAiConfiguration CreateForCreativeTasks();
     public static OpenAiConfiguration CreateForCostEfficiency();
+}
+```
+
+#### AnthropicConfiguration Options
+
+```csharp
+public sealed class AnthropicConfiguration
+{
+    public string Model { get; init; } = "claude-3-5-sonnet-20241022";
+    public int MaxTokens { get; init; } = 4000;
+    public float Temperature { get; init; } = 0.1f;
+    public float TopP { get; init; } = 1.0f;
+    public int? TopK { get; init; }
+    public bool EnableStreaming { get; init; } = false;
+    public TimeSpan RequestTimeout { get; init; } = TimeSpan.FromMinutes(2);
+    public int MaxRetries { get; init; } = 3;
+    public TimeSpan RetryDelay { get; init; } = TimeSpan.FromSeconds(1);
+    public bool EnableFunctionCalling { get; init; } = true;
+    public string? ApiBaseUrl { get; init; }
+    public string? OrganizationId { get; init; }
+    
+    // Factory methods for common use cases
+    public static AnthropicConfiguration CreateForAgentReasoning();
+    public static AnthropicConfiguration CreateForCreativeTasks();
+    public static AnthropicConfiguration CreateForCostEfficiency();
+}
+```
+
+#### GeminiConfiguration Options
+
+```csharp
+public sealed class GeminiConfiguration
+{
+    public string Model { get; init; } = "gemini-1.5-flash";
+    public int MaxTokens { get; init; } = 4000;
+    public float Temperature { get; init; } = 0.1f;
+    public float TopP { get; init; } = 1.0f;
+    public int? TopK { get; init; }
+    public bool EnableStreaming { get; init; } = false;
+    public TimeSpan RequestTimeout { get; init; } = TimeSpan.FromMinutes(2);
+    public int MaxRetries { get; init; } = 3;
+    public TimeSpan RetryDelay { get; init; } = TimeSpan.FromSeconds(1);
+    public bool EnableFunctionCalling { get; init; } = true;
+    public string? ProjectId { get; init; }
+    public string Region { get; init; } = "us-central1";
+    public string? ApiBaseUrl { get; init; }
+    
+    // Factory methods for common use cases
+    public static GeminiConfiguration CreateForAgentReasoning();
+    public static GeminiConfiguration CreateForCreativeTasks();
+    public static GeminiConfiguration CreateForCostEfficiency();
+}
+```
+
+#### MistralConfiguration Options
+
+```csharp
+public sealed class MistralConfiguration
+{
+    public string Model { get; init; } = "mistral-large-latest";
+    public int MaxTokens { get; init; } = 4000;
+    public float Temperature { get; init; } = 0.1f;
+    public float TopP { get; init; } = 1.0f;
+    public int? TopK { get; init; }
+    public bool EnableStreaming { get; init; } = false;
+    public TimeSpan RequestTimeout { get; init; } = TimeSpan.FromMinutes(2);
+    public int MaxRetries { get; init; } = 3;
+    public TimeSpan RetryDelay { get; init; } = TimeSpan.FromSeconds(1);
+    public bool EnableFunctionCalling { get; init; } = true;
+    public string? ApiBaseUrl { get; init; }
+    public string? OrganizationId { get; init; }
+    
+    // Factory methods for common use cases
+    public static MistralConfiguration CreateForAgentReasoning();
+    public static MistralConfiguration CreateForCreativeTasks();
+    public static MistralConfiguration CreateForCostEfficiency();
 }
 ```
 
@@ -661,6 +834,367 @@ agent.StatusUpdate += (sender, e) =>
 };
 ```
 
+## Metrics System
+
+The AIAgentSharp framework provides a comprehensive metrics system for monitoring performance, operational health, quality indicators, and resource usage. The metrics system is designed to be lightweight, thread-safe, and non-blocking to ensure it doesn't impact agent performance.
+
+### Core Metrics Categories
+
+The metrics system collects data across four main categories:
+
+#### 1. Performance Metrics
+- **Execution Times**: Agent runs, steps, LLM calls, tool calls, reasoning operations
+- **Throughput**: Requests per second, total operations
+- **Percentiles**: P95 execution times for performance analysis
+- **Counters**: Total operations by type
+
+#### 2. Operational Metrics
+- **Success Rates**: Agent runs, steps, LLM calls, tool calls
+- **Error Rates**: Failure counts by error type
+- **Loop Detection**: Loop detection events and patterns
+- **Deduplication**: Cache hit rates and effectiveness
+
+#### 3. Quality Metrics
+- **Reasoning Confidence**: Confidence scores by reasoning type
+- **Response Quality**: Response length and final output rates
+- **Confidence Distribution**: Distribution of confidence scores
+- **Quality Indicators**: User satisfaction and response completeness
+
+#### 4. Resource Metrics
+- **Token Usage**: Input/output tokens by model
+- **API Calls**: Call counts by type and model
+- **State Store Operations**: Operation counts and timing
+- **Resource Consumption**: Memory and processing metrics
+
+### Metrics Interfaces
+
+#### IMetricsCollector
+
+The core interface for recording metrics:
+
+```csharp
+public interface IMetricsCollector
+{
+    // Performance Metrics
+    void RecordAgentRunExecutionTime(string agentId, long executionTimeMs, int totalTurns);
+    void RecordAgentStepExecutionTime(string agentId, int turnIndex, long executionTimeMs);
+    void RecordLlmCallExecutionTime(string agentId, int turnIndex, long executionTimeMs, string modelName);
+    void RecordToolCallExecutionTime(string agentId, int turnIndex, string toolName, long executionTimeMs);
+    void RecordReasoningExecutionTime(string agentId, ReasoningType reasoningType, long executionTimeMs);
+
+    // Operational Metrics
+    void RecordAgentRunCompletion(string agentId, bool succeeded, int totalTurns, string? errorType = null);
+    void RecordAgentStepCompletion(string agentId, int turnIndex, bool succeeded, bool executedTool, string? errorType = null);
+    void RecordLlmCallCompletion(string agentId, int turnIndex, bool succeeded, string modelName, string? errorType = null);
+    void RecordToolCallCompletion(string agentId, int turnIndex, string toolName, bool succeeded, string? errorType = null);
+    void RecordLoopDetection(string agentId, string loopType, int consecutiveFailures);
+    void RecordDeduplicationEvent(string agentId, string toolName, bool cacheHit);
+
+    // Quality Metrics
+    void RecordReasoningConfidence(string agentId, ReasoningType reasoningType, double confidenceScore);
+    void RecordResponseQuality(string agentId, int responseLength, bool hasFinalOutput);
+
+    // Resource Metrics
+    void RecordTokenUsage(string agentId, int turnIndex, int inputTokens, int outputTokens, string modelName);
+    void RecordApiCall(string agentId, string apiType, string modelName);
+    void RecordStateStoreOperation(string agentId, string operationType, long executionTimeMs);
+
+    // Custom Metrics
+    void RecordCustomMetric(string metricName, double value, Dictionary<string, string>? tags = null);
+    void RecordCustomEvent(string eventName, Dictionary<string, string>? tags = null);
+}
+```
+
+#### IMetricsProvider
+
+The interface for accessing collected metrics:
+
+```csharp
+public interface IMetricsProvider
+{
+    MetricsData GetMetrics();
+    MetricsData? GetAgentMetrics(string agentId);
+    MetricsData GetMetricsForTimeRange(DateTimeOffset startTime, DateTimeOffset endTime);
+    void ResetMetrics();
+    string ExportMetrics(MetricsExportFormat format);
+    event EventHandler<MetricsUpdatedEventArgs>? MetricsUpdated;
+}
+```
+
+### Metrics Data Models
+
+#### MetricsData
+
+The main container for all metrics:
+
+```csharp
+public sealed class MetricsData
+{
+    public DateTimeOffset CollectedAt { get; init; }
+    public PerformanceMetrics Performance { get; init; }
+    public OperationalMetrics Operational { get; init; }
+    public QualityMetrics Quality { get; init; }
+    public ResourceMetrics Resources { get; init; }
+    public Dictionary<string, CustomMetric> CustomMetrics { get; init; }
+    public List<CustomEvent> CustomEvents { get; init; }
+}
+```
+
+#### PerformanceMetrics
+
+```csharp
+public sealed class PerformanceMetrics
+{
+    public double AverageAgentRunTimeMs { get; init; }
+    public double AverageAgentStepTimeMs { get; init; }
+    public double AverageLlmCallTimeMs { get; init; }
+    public double AverageToolCallTimeMs { get; init; }
+    public double AverageReasoningTimeMs { get; init; }
+    public long TotalAgentRuns { get; init; }
+    public long TotalAgentSteps { get; init; }
+    public long TotalLlmCalls { get; init; }
+    public long TotalToolCalls { get; init; }
+    public long TotalReasoningOperations { get; init; }
+    public double RequestsPerSecond { get; init; }
+    public double P95AgentRunTimeMs { get; init; }
+    public double P95LlmCallTimeMs { get; init; }
+    public double P95ToolCallTimeMs { get; init; }
+}
+```
+
+#### OperationalMetrics
+
+```csharp
+public sealed class OperationalMetrics
+{
+    public double AgentRunSuccessRate { get; init; }
+    public double AgentStepSuccessRate { get; init; }
+    public double LlmCallSuccessRate { get; init; }
+    public double ToolCallSuccessRate { get; init; }
+    public long FailedAgentRuns { get; init; }
+    public long FailedAgentSteps { get; init; }
+    public long FailedLlmCalls { get; init; }
+    public long FailedToolCalls { get; init; }
+    public long LoopDetectionEvents { get; init; }
+    public long DeduplicationCacheHits { get; init; }
+    public long DeduplicationCacheMisses { get; init; }
+    public double DeduplicationCacheHitRate { get; init; }
+    public Dictionary<string, long> ErrorCountsByType { get; init; }
+}
+```
+
+#### QualityMetrics
+
+```csharp
+public sealed class QualityMetrics
+{
+    public double AverageReasoningConfidence { get; init; }
+    public double AverageResponseLength { get; init; }
+    public double FinalOutputPercentage { get; init; }
+    public Dictionary<ReasoningType, double> AverageConfidenceByReasoningType { get; init; }
+    public Dictionary<string, long> ConfidenceScoreDistribution { get; init; }
+}
+```
+
+#### ResourceMetrics
+
+```csharp
+public sealed class ResourceMetrics
+{
+    public long TotalInputTokens { get; init; }
+    public long TotalOutputTokens { get; init; }
+    public long TotalTokens { get; init; }
+    public double AverageInputTokensPerCall { get; init; }
+    public double AverageOutputTokensPerCall { get; init; }
+    public Dictionary<string, TokenUsage> TokenUsageByModel { get; init; }
+    public Dictionary<string, long> ApiCallCountsByType { get; init; }
+    public Dictionary<string, long> ApiCallCountsByModel { get; init; }
+    public Dictionary<string, long> StateStoreOperationCounts { get; init; }
+    public double AverageStateStoreOperationTimeMs { get; init; }
+}
+```
+
+### Using Metrics
+
+#### Basic Metrics Access
+
+```csharp
+// Access metrics through the agent
+var metrics = agent.Metrics.GetMetrics();
+
+// Print performance metrics
+Console.WriteLine($"Total Agent Runs: {metrics.Performance.TotalAgentRuns}");
+Console.WriteLine($"Average Run Time: {metrics.Performance.AverageAgentRunTimeMs:F2}ms");
+Console.WriteLine($"Success Rate: {metrics.Operational.AgentRunSuccessRate:P2}");
+Console.WriteLine($"Total Tokens Used: {metrics.Resources.TotalTokens:N0}");
+```
+
+#### Agent-Specific Metrics
+
+```csharp
+// Get metrics for a specific agent
+var agentMetrics = agent.Metrics.GetAgentMetrics("my-agent");
+if (agentMetrics != null)
+{
+    Console.WriteLine($"Agent-specific success rate: {agentMetrics.Operational.AgentRunSuccessRate:P2}");
+    Console.WriteLine($"Agent-specific average run time: {agentMetrics.Performance.AverageAgentRunTimeMs:F2}ms");
+}
+```
+
+#### Time-Range Filtering
+
+```csharp
+// Get metrics for a specific time range
+var startTime = DateTimeOffset.UtcNow.AddHours(-1);
+var endTime = DateTimeOffset.UtcNow;
+var timeRangeMetrics = agent.Metrics.GetMetricsForTimeRange(startTime, endTime);
+
+Console.WriteLine($"Metrics for last hour:");
+Console.WriteLine($"  Runs: {timeRangeMetrics.Performance.TotalAgentRuns}");
+Console.WriteLine($"  Success Rate: {timeRangeMetrics.Operational.AgentRunSuccessRate:P2}");
+```
+
+#### Real-Time Monitoring
+
+```csharp
+// Subscribe to real-time metrics updates
+agent.Metrics.MetricsUpdated += (sender, e) =>
+{
+    Console.WriteLine($"Metrics updated: {string.Join(", ", e.UpdatedMetrics)}");
+    Console.WriteLine($"Latest success rate: {e.Metrics.Operational.AgentRunSuccessRate:P2}");
+    Console.WriteLine($"Total runs: {e.Metrics.Performance.TotalAgentRuns}");
+};
+```
+
+#### Custom Metrics
+
+```csharp
+// Record custom metrics
+agent.Metrics.RecordCustomMetric("user_satisfaction", 4.5, new Dictionary<string, string> 
+{ 
+    ["agent_type"] = "travel_planner",
+    ["user_id"] = "user123"
+});
+
+// Record custom events
+agent.Metrics.RecordCustomEvent("user_feedback", new Dictionary<string, string> 
+{ 
+    ["rating"] = "excellent",
+    ["category"] = "travel_planning",
+    ["user_id"] = "user123"
+});
+```
+
+### Metrics Export
+
+The framework supports multiple export formats for integration with monitoring systems:
+
+#### JSON Export
+
+```csharp
+var jsonMetrics = agent.Metrics.ExportMetrics(MetricsExportFormat.Json);
+Console.WriteLine(jsonMetrics);
+```
+
+#### Prometheus Export
+
+```csharp
+var prometheusMetrics = agent.Metrics.ExportMetrics(MetricsExportFormat.Prometheus);
+Console.WriteLine(prometheusMetrics);
+// Output includes:
+// # HELP aiagentsharp_agent_runs_total Total number of agent runs
+// # TYPE aiagentsharp_agent_runs_total counter
+// aiagentsharp_agent_runs_total 42
+```
+
+#### CSV Export
+
+```csharp
+var csvMetrics = agent.Metrics.ExportMetrics(MetricsExportFormat.Csv);
+Console.WriteLine(csvMetrics);
+// Output includes:
+// Metric,Value
+// TotalAgentRuns,42
+// AgentRunSuccessRate,0.95
+```
+
+#### Text Export
+
+```csharp
+var textMetrics = agent.Metrics.ExportMetrics(MetricsExportFormat.Text);
+Console.WriteLine(textMetrics);
+// Output includes:
+// AIAgentSharp Metrics Report
+// Generated: 2024-01-15 10:30:00 UTC
+// 
+// Performance Metrics:
+//   Total Agent Runs: 42
+//   Average Agent Run Time: 1250.50ms
+```
+
+### Metrics Reset
+
+```csharp
+// Reset all metrics (useful for testing or new monitoring periods)
+agent.Metrics.ResetMetrics();
+
+// Verify reset
+var metrics = agent.Metrics.GetMetrics();
+Console.WriteLine($"After reset - Total runs: {metrics.Performance.TotalAgentRuns}"); // 0
+```
+
+### Integration with Monitoring Systems
+
+#### Prometheus Integration
+
+```csharp
+// Export metrics for Prometheus scraping
+app.MapGet("/metrics", () => agent.Metrics.ExportMetrics(MetricsExportFormat.Prometheus))
+    .WithName("Metrics")
+    .WithOpenApi();
+```
+
+#### Custom Monitoring Dashboard
+
+```csharp
+// Create a metrics endpoint for your dashboard
+app.MapGet("/api/metrics", () =>
+{
+    var metrics = agent.Metrics.GetMetrics();
+    return new
+    {
+        performance = new
+        {
+            totalRuns = metrics.Performance.TotalAgentRuns,
+            averageRunTime = metrics.Performance.AverageAgentRunTimeMs,
+            successRate = metrics.Operational.AgentRunSuccessRate
+        },
+        resources = new
+        {
+            totalTokens = metrics.Resources.TotalTokens,
+            averageTokensPerCall = metrics.Resources.AverageInputTokensPerCall
+        }
+    };
+});
+```
+
+### Performance Considerations
+
+- **Non-blocking**: All metrics operations are designed to be non-blocking
+- **Thread-safe**: All metrics collection is thread-safe for concurrent access
+- **Memory efficient**: Metrics are stored in memory with configurable limits
+- **Real-time**: Metrics are updated in real-time as operations occur
+- **Export efficient**: Export operations are optimized for performance
+
+### Best Practices
+
+1. **Monitor Key Metrics**: Focus on success rates, execution times, and error rates
+2. **Set Up Alerts**: Use the real-time events to set up alerts for critical failures
+3. **Export Regularly**: Export metrics to external monitoring systems for long-term analysis
+4. **Use Custom Metrics**: Record business-specific metrics for better insights
+5. **Reset Periodically**: Reset metrics at appropriate intervals (e.g., daily, weekly)
+6. **Monitor Resource Usage**: Track token usage and API call patterns for cost optimization
+
 ## Configuration
 
 The `AgentConfiguration` class provides extensive configuration options including advanced reasoning settings:
@@ -733,20 +1267,6 @@ var totConfig = new AgentConfiguration
 };
 ```
 
-#### Hybrid Reasoning Configuration
-```csharp
-var hybridConfig = new AgentConfiguration
-{
-    ReasoningType = ReasoningType.Hybrid,
-    MaxReasoningSteps = 6,
-    MaxTreeDepth = 4,
-    MaxTreeNodes = 50,
-    TreeExplorationStrategy = ExplorationStrategy.BeamSearch,
-    EnableReasoningValidation = true,
-    MinReasoningConfidence = 0.65
-};
-```
-
 ## Installation and Setup
 
 ### Prerequisites
@@ -806,13 +1326,7 @@ using AIAgentSharp.OpenAI;
 // Create components
 var llm = new OpenAiLlmClient(apiKey);
 var store = new MemoryAgentStateStore();
-var tools = new List<ITool> 
-{ 
-    new SearchFlightsTool(),
-    new SearchHotelsTool(),
-    new SearchAttractionsTool(),
-    new CalculateTripCostTool()
-};
+var tools = new List<ITool>(); // add your tools here
 
 // Configure agent
 var config = new AgentConfiguration
@@ -950,25 +1464,6 @@ var config = new AgentConfiguration
     TreeExplorationStrategy = ExplorationStrategy.BestFirst,
     EnableReasoningValidation = true,
     MinReasoningConfidence = 0.6
-};
-
-var agent = new Agent(llm, store, config: config);
-```
-
-#### Hybrid Reasoning
-
-Combination of multiple reasoning approaches for optimal results:
-
-```csharp
-var config = new AgentConfiguration
-{
-    ReasoningType = ReasoningType.Hybrid,
-    MaxReasoningSteps = 6,
-    MaxTreeDepth = 4,
-    MaxTreeNodes = 50,
-    TreeExplorationStrategy = ExplorationStrategy.BeamSearch,
-    EnableReasoningValidation = true,
-    MinReasoningConfidence = 0.65
 };
 
 var agent = new Agent(llm, store, config: config);

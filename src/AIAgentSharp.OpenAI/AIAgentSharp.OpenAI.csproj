@@ -1,23 +1,31 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <PackageId>AIAgentSharp.OpenAI</PackageId>
-    <Version>1.0.7</Version>
+    <Version>1.0.8</Version>
     <Authors>AIAgentSharp Contributors</Authors>
     <Description>OpenAI integration for AIAgentSharp - LLM-powered agents with OpenAI models.</Description>
     <PackageTags>ai,agent,llm,openai,automation</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <RepositoryUrl>https://github.com/erwin-beckers/AIAgentSharp</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
     <InternalsVisibleTo>AIAgentSharp.OpenAI.Tests</InternalsVisibleTo>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="OpenAI" Version="2.3.0" />
-    <PackageReference Include="AIAgentSharp" Version="1.0.7" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AIAgentSharp" Version="1.0.8" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="/" />
   </ItemGroup>
 
 </Project>

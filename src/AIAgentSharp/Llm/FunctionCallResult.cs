@@ -29,4 +29,9 @@ public sealed class FunctionCallResult
     ///     Gets or sets the raw text fallback if no function call was made.
     /// </summary>
     public string? RawTextFallback { get; init; }
+
+    /// <summary>
+    ///     Optional token usage metadata reported by the provider for this call.
+    /// </summary>
+    public LlmUsage? Usage { get; init; }
 }

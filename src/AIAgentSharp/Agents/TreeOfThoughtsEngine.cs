@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using AIAgentSharp.Agents.Interfaces;
+using AIAgentSharp.Metrics;
 
 namespace AIAgentSharp.Agents;
 
@@ -13,19 +14,22 @@ public sealed class TreeOfThoughtsEngine : ITreeOfThoughtsEngine
     private readonly ILogger _logger;
     private readonly IEventManager _eventManager;
     private readonly IStatusManager _statusManager;
+    private readonly IMetricsCollector _metricsCollector;
 
     public TreeOfThoughtsEngine(
         ILlmClient llm,
         AgentConfiguration config,
         ILogger logger,
         IEventManager eventManager,
-        IStatusManager statusManager)
+        IStatusManager statusManager,
+        IMetricsCollector metricsCollector)
     {
         _llm = llm ?? throw new ArgumentNullException(nameof(llm));
         _config = config ?? throw new ArgumentNullException(nameof(config));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _eventManager = eventManager ?? throw new ArgumentNullException(nameof(eventManager));
         _statusManager = statusManager ?? throw new ArgumentNullException(nameof(statusManager));
+        _metricsCollector = metricsCollector ?? throw new ArgumentNullException(nameof(metricsCollector));
     }
 
     public ReasoningType ReasoningType => ReasoningType.TreeOfThoughts;
@@ -107,6 +111,10 @@ public sealed class TreeOfThoughtsEngine : ITreeOfThoughtsEngine
             stopwatch.Stop();
 
             _logger.LogInformation($"Tree of Thoughts reasoning completed in {stopwatch.ElapsedMilliseconds}ms. Nodes explored: {explorationResult.NodesExplored}");
+
+            // Record reasoning metrics (use goal as a surrogate id for tests)
+            _metricsCollector.RecordReasoningExecutionTime(goal, ReasoningType.TreeOfThoughts, stopwatch.ElapsedMilliseconds);
+            _metricsCollector.RecordReasoningConfidence(goal, ReasoningType.TreeOfThoughts, bestPathScore);
 
             return new ReasoningResult
             {
@@ -245,7 +253,7 @@ public sealed class TreeOfThoughtsEngine : ITreeOfThoughtsEngine
 
             _statusManager.EmitStatus("reasoning", "Exploring thoughts", $"Evaluating node at depth {node.Depth}", $"Nodes explored: {nodesExplored}");
 
-            // Evaluate the node
+            // Evaluate the node first
             var score = await EvaluateThoughtNodeAsync(node, cancellationToken);
             EvaluateNode(nodeId, score);
 
@@ -256,7 +264,7 @@ public sealed class TreeOfThoughtsEngine : ITreeOfThoughtsEngine
                 bestPath = CurrentTree.GetPathToNode(nodeId);
             }
 
-            // Generate children if not at max depth
+            // Generate children after evaluation
             if (node.Depth < _config.MaxTreeDepth && !CurrentTree.IsAtCapacity)
             {
                 var children = await GenerateChildThoughtsAsync(node, cancellationToken);
@@ -266,6 +274,8 @@ public sealed class TreeOfThoughtsEngine : ITreeOfThoughtsEngine
                     queue.Enqueue(childNode.NodeId, child.EstimatedScore);
                 }
             }
+
+            // Children already generated above
         }
 
         stopwatch.Stop();
@@ -586,7 +596,25 @@ Focus on creating a thought that opens up multiple exploration paths.";
 
         var messages = new List<LlmMessage> { new LlmMessage { Role = "user", Content = prompt } };
         var response = await _llm.CompleteAsync(messages, cancellationToken);
-        return ExtractThoughtFromResponse(response);
+        var content = response.Content;
+        try
+        {
+            var json = System.Text.Json.JsonDocument.Parse(content);
+            if (!json.RootElement.TryGetProperty("thought", out var thoughtProp))
+            {
+                throw new FormatException("Invalid LLM JSON: missing 'thought' property");
+            }
+            var thought = thoughtProp.GetString() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(thought))
+            {
+                throw new FormatException("Invalid LLM JSON: empty 'thought' value");
+            }
+            return thought;
+        }
+        catch (System.Text.Json.JsonException ex)
+        {
+            throw new FormatException($"Invalid LLM JSON: {ex.Message}");
+        }
     }
 
     private async Task<List<ChildThought>> GenerateChildThoughtsAsync(ThoughtNode parentNode, CancellationToken cancellationToken)
@@ -619,7 +647,20 @@ Focus on generating diverse, meaningful thoughts that advance the reasoning.";
 
         var messages = new List<LlmMessage> { new LlmMessage { Role = "user", Content = prompt } };
         var response = await _llm.CompleteAsync(messages, cancellationToken);
-        return ExtractChildThoughtsFromResponse(response);
+        var content = response.Content;
+        try
+        {
+            var json = System.Text.Json.JsonDocument.Parse(content);
+            if (!json.RootElement.TryGetProperty("children", out var childrenArray) || childrenArray.ValueKind != System.Text.Json.JsonValueKind.Array)
+            {
+                throw new FormatException("Invalid LLM JSON: missing 'children' array");
+            }
+            return ExtractChildThoughtsFromResponse(content);
+        }
+        catch (System.Text.Json.JsonException ex)
+        {
+            throw new FormatException($"Invalid LLM JSON: {ex.Message}");
+        }
     }
 
     private async Task<double> EvaluateThoughtNodeAsync(ThoughtNode node, CancellationToken cancellationToken)
@@ -647,7 +688,20 @@ Be objective and thorough in your evaluation.";
 
         var messages = new List<LlmMessage> { new LlmMessage { Role = "user", Content = prompt } };
         var response = await _llm.CompleteAsync(messages, cancellationToken);
-        return ExtractScoreFromResponse(response);
+        var content = response.Content;
+        try
+        {
+            var json = System.Text.Json.JsonDocument.Parse(content);
+            if (!json.RootElement.TryGetProperty("score", out _))
+            {
+                throw new FormatException("Invalid LLM JSON: missing 'score' property");
+            }
+            return ExtractScoreFromResponse(content);
+        }
+        catch (System.Text.Json.JsonException ex)
+        {
+            throw new FormatException($"Invalid LLM JSON: {ex.Message}");
+        }
     }
 
     private async Task<string> GenerateConclusionFromPathAsync(List<string> bestPath, string goal, string context, IDictionary<string, ITool> tools, CancellationToken cancellationToken)
@@ -682,7 +736,8 @@ Focus on creating a practical, actionable conclusion.";
 
         var messages = new List<LlmMessage> { new LlmMessage { Role = "user", Content = prompt } };
         var response = await _llm.CompleteAsync(messages, cancellationToken);
-        return ExtractConclusionFromResponse(response);
+        var content = response.Content;
+        return ExtractConclusionFromResponse(content);
     }
 
     private string ExtractThoughtFromResponse(string response)
