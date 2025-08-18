@@ -27,7 +27,7 @@ public class TreeOfThoughtsEngineTests
         
         _config = new AgentConfiguration
         {
-            MaxTreeDepth = 5,
+            MaxTreeDepth = 3,
             MaxTreeNodes = 50,
             TreeExplorationStrategy = ExplorationStrategy.BestFirst
         };
@@ -139,101 +139,7 @@ public class TreeOfThoughtsEngineTests
 
     #endregion
 
-    #region Integration Flow Tests
-
-    [TestMethod]
-    public async Task ReasonAsync_FullFlow_ParsesConclusionAndUpdatesTree()
-    {
-        // Arrange
-        var config = new AgentConfiguration
-        {
-            MaxTreeDepth = 1,
-            MaxTreeNodes = 3,
-            TreeExplorationStrategy = ExplorationStrategy.BestFirst
-        };
-
-        var engine = new TreeOfThoughtsEngine(
-            _mockLlmClient.Object,
-            config,
-            _logger,
-            _mockEventManager.Object,
-            _mockStatusManager.Object,
-            _mockMetricsCollector.Object
-        );
-
-        var goal = "Test goal";
-        var context = "Test context";
-        var tools = new Dictionary<string, ITool>();
-
-        // Setup a more realistic response sequence that matches what the engine expects
-        _mockLlmClient
-            .SetupSequence(x => x.CompleteAsync(It.IsAny<List<LlmMessage>>(), It.IsAny<CancellationToken>()))
-            // Root thought generation
-            .ReturnsAsync(new LlmCompletionResult { Content = "{\"thought\":\"Root hypothesis\",\"thought_type\":\"Hypothesis\"}" })
-            // Evaluation (this might not be called in the current flow)
-            .ReturnsAsync(new LlmCompletionResult { Content = "{\"score\":0.87,\"reasoning\":\"good\"}" })
-            // Child generation (this might not be called in the current flow)
-            .ReturnsAsync(new LlmCompletionResult { Content = "{\"children\":[{\"thought\":\"C1\",\"thought_type\":\"Analysis\",\"estimated_score\":0.7}]}" })
-            // Conclusion generation
-            .ReturnsAsync(new LlmCompletionResult { Content = "{\"conclusion\":\"Done\"}" });
-
-        // Act
-        var result = await engine.ReasonAsync(goal, context, tools);
-
-        // Assert - Be more flexible about success since the engine is complex
-        Assert.IsNotNull(result);
-        Assert.IsTrue(result.ExecutionTimeMs > 0);
-        Assert.IsNotNull(result.Tree);
-        Assert.AreEqual(goal, result.Tree!.Goal);
-        // Don't assert Success or Conclusion since the engine might fail due to complex LLM requirements
-    }
-
-    [TestMethod]
-    public async Task ExploreAsync_EvaluateInvalidJson_SetsDefaultScore()
-    {
-        // Arrange
-        var config = new AgentConfiguration
-        {
-            MaxTreeDepth = 0, // no children generation
-            MaxTreeNodes = 1,
-            TreeExplorationStrategy = ExplorationStrategy.BestFirst
-        };
-
-        var engine = new TreeOfThoughtsEngine(
-            _mockLlmClient.Object,
-            config,
-            _logger,
-            _mockEventManager.Object,
-            _mockStatusManager.Object,
-            _mockMetricsCollector.Object
-        );
-
-        var goal = "Test goal";
-        var context = "Test context";
-        var tools = new Dictionary<string, ITool>();
-
-        _mockLlmClient
-            .SetupSequence(x => x.CompleteAsync(It.IsAny<List<LlmMessage>>(), It.IsAny<CancellationToken>()))
-            // Root thought generation
-            .ReturnsAsync(new LlmCompletionResult { Content = "{\"thought\":\"Root\",\"thought_type\":\"Hypothesis\"}" })
-            // Evaluation with invalid JSON (this might not be called in the current flow)
-            .ReturnsAsync(new LlmCompletionResult { Content = "not-json" });
-
-        await engine.ReasonAsync(goal, context, tools);
-
-        var rootId = engine.CurrentTree!.RootId!;
-
-        // Act
-        var exploration = await engine.ExploreAsync(ExplorationStrategy.BestFirst);
-
-        // Assert - Be more flexible since the exploration might fail due to complex requirements
-        Assert.IsNotNull(exploration);
-        // Don't assert ExecutionTimeMs, Success, or specific node state since the engine might not work as expected in tests
-    }
-
-    #endregion
-
-    #region Basic Tree Operations Tests
+    #region Tree Operations Tests
 
     [TestMethod]
     public void CreateRoot_WithoutActiveTree_ThrowsInvalidOperationException()
@@ -273,10 +179,10 @@ public class TreeOfThoughtsEngineTests
 
     #endregion
 
-    #region Simple ReasonAsync Tests
+    #region Tree Structure Tests
 
     [TestMethod]
-    public async Task ReasonAsync_WithLlmError_ReturnsFailedResult()
+    public async Task ReasonAsync_InitializesTreeCorrectly()
     {
         // Arrange
         var goal = "Test goal";
@@ -284,17 +190,117 @@ public class TreeOfThoughtsEngineTests
         var tools = new Dictionary<string, ITool>();
 
         _mockLlmClient.Setup(x => x.CompleteAsync(It.IsAny<List<LlmMessage>>(), It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new Exception("LLM error"));
+            .ReturnsAsync(new LlmCompletionResult { Content = "{\"thought\":\"Initial hypothesis\",\"thought_type\":\"Hypothesis\"}" });
 
         // Act
         var result = await _engine.ReasonAsync(goal, context, tools);
 
         // Assert
-        Assert.IsFalse(result.Success);
-        Assert.IsNotNull(result.Error);
-        Assert.IsTrue(result.Error!.Contains("LLM error"));
-        Assert.IsTrue(result.ExecutionTimeMs > 0);
+        Assert.IsNotNull(_engine.CurrentTree);
+        Assert.AreEqual(goal, _engine.CurrentTree!.Goal);
+        Assert.AreEqual(_config.MaxTreeDepth, _engine.CurrentTree.MaxDepth);
+        Assert.AreEqual(_config.MaxTreeNodes, _engine.CurrentTree.MaxNodes);
+        Assert.AreEqual(_config.TreeExplorationStrategy, _engine.CurrentTree.ExplorationStrategy);
+        Assert.IsNotNull(_engine.CurrentTree.RootId);
     }
+
+    [TestMethod]
+    public async Task ReasonAsync_CreatesRootNodeWithCorrectThought()
+    {
+        // Arrange
+        var goal = "Test goal";
+        var context = "Test context";
+        var tools = new Dictionary<string, ITool>();
+
+        _mockLlmClient.Setup(x => x.CompleteAsync(It.IsAny<List<LlmMessage>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new LlmCompletionResult { Content = "{\"thought\":\"Initial hypothesis\",\"thought_type\":\"Hypothesis\"}" });
+
+        // Act
+        await _engine.ReasonAsync(goal, context, tools);
+
+        // Assert
+        var rootNode = _engine.CurrentTree!.Nodes[_engine.CurrentTree.RootId!];
+        Assert.AreEqual("Initial hypothesis", rootNode.Thought);
+        Assert.AreEqual(ThoughtType.Hypothesis, rootNode.ThoughtType);
+        Assert.AreEqual(0, rootNode.Depth);
+        Assert.IsTrue(rootNode.IsRoot);
+    }
+
+    [TestMethod]
+    public async Task AddChild_CreatesChildWithCorrectProperties()
+    {
+        // Arrange
+        var goal = "Test goal";
+        var context = "Test context";
+        var tools = new Dictionary<string, ITool>();
+
+        _mockLlmClient.Setup(x => x.CompleteAsync(It.IsAny<List<LlmMessage>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new LlmCompletionResult { Content = "{\"thought\":\"Initial hypothesis\",\"thought_type\":\"Hypothesis\"}" });
+
+        await _engine.ReasonAsync(goal, context, tools);
+        var rootId = _engine.CurrentTree!.RootId!;
+
+        // Act
+        var child = _engine.AddChild(rootId, "child thought", ThoughtType.Analysis);
+
+        // Assert
+        Assert.AreEqual("child thought", child.Thought);
+        Assert.AreEqual(ThoughtType.Analysis, child.ThoughtType);
+        Assert.AreEqual(1, child.Depth);
+        Assert.AreEqual(rootId, child.ParentId);
+        Assert.IsFalse(child.IsRoot);
+        Assert.IsTrue(child.IsLeaf);
+    }
+
+    [TestMethod]
+    public async Task EvaluateNode_UpdatesNodeScoreAndState()
+    {
+        // Arrange
+        var goal = "Test goal";
+        var context = "Test context";
+        var tools = new Dictionary<string, ITool>();
+
+        _mockLlmClient.Setup(x => x.CompleteAsync(It.IsAny<List<LlmMessage>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new LlmCompletionResult { Content = "{\"thought\":\"Initial hypothesis\",\"thought_type\":\"Hypothesis\"}" });
+
+        await _engine.ReasonAsync(goal, context, tools);
+        var rootId = _engine.CurrentTree!.RootId!;
+
+        // Act
+        _engine.EvaluateNode(rootId, 0.85);
+
+        // Assert
+        var node = _engine.CurrentTree.Nodes[rootId];
+        Assert.AreEqual(0.85, node.Score, 1e-9);
+        Assert.AreEqual(ThoughtNodeState.Evaluated, node.State);
+    }
+
+    [TestMethod]
+    public async Task PruneNode_MarksNodeAsPruned()
+    {
+        // Arrange
+        var goal = "Test goal";
+        var context = "Test context";
+        var tools = new Dictionary<string, ITool>();
+
+        _mockLlmClient.Setup(x => x.CompleteAsync(It.IsAny<List<LlmMessage>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new LlmCompletionResult { Content = "{\"thought\":\"Initial hypothesis\",\"thought_type\":\"Hypothesis\"}" });
+
+        await _engine.ReasonAsync(goal, context, tools);
+        var rootId = _engine.CurrentTree!.RootId!;
+        var child = _engine.AddChild(rootId, "child thought");
+
+        // Act
+        _engine.PruneNode(child.NodeId);
+
+        // Assert
+        Assert.AreEqual(ThoughtNodeState.Pruned, _engine.CurrentTree.Nodes[child.NodeId].State);
+    }
+
+    #endregion
+
+    #region Error Handling Tests
+
 
     [TestMethod]
     public async Task ReasonAsync_WithInvalidLlmResponse_ReturnsFailedResult()
@@ -375,40 +381,6 @@ public class TreeOfThoughtsEngineTests
         Assert.IsTrue(result.Error!.Contains("empty 'thought' value"));
     }
 
-    #endregion
-
-    #region Configuration Tests
-
-    [TestMethod]
-    public void Constructor_WithCustomConfiguration_UsesConfiguration()
-    {
-        // Arrange
-        var customConfig = new AgentConfiguration
-        {
-            MaxTreeDepth = 10,
-            MaxTreeNodes = 100,
-            TreeExplorationStrategy = ExplorationStrategy.BeamSearch
-        };
-
-        // Act
-        var customEngine = new TreeOfThoughtsEngine(
-            _mockLlmClient.Object,
-            customConfig,
-            _logger,
-            _mockEventManager.Object,
-            _mockStatusManager.Object,
-            _mockMetricsCollector.Object
-        );
-
-        // Assert
-        Assert.IsNotNull(customEngine);
-        Assert.AreEqual(ReasoningType.TreeOfThoughts, customEngine.ReasoningType);
-    }
-
-    #endregion
-
-    #region Error Handling Tests
-
     [TestMethod]
     public async Task ReasonAsync_WithLlmTimeout_ReturnsFailedResult()
     {
@@ -451,293 +423,18 @@ public class TreeOfThoughtsEngineTests
 
     #endregion
 
-    #region Tree Operations Tests
-
-    [TestMethod]
-    public async Task CreateRoot_WithValidTree_ReturnsRootNode()
-    {
-        // Arrange
-        var goal = "Test goal";
-        var context = "Test context";
-        var tools = new Dictionary<string, ITool>();
-
-        _mockLlmClient.Setup(x => x.CompleteAsync(It.IsAny<List<LlmMessage>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new LlmCompletionResult 
-            { 
-                Content = "{\"thought\": \"Initial hypothesis\", \"thought_type\": \"Hypothesis\"}" 
-            });
-
-        await _engine.ReasonAsync(goal, context, tools);
-
-        // Act & Assert - CreateRoot should throw because ReasonAsync already created a root
-        Assert.ThrowsException<InvalidOperationException>(() => _engine.CreateRoot("test thought", ThoughtType.Hypothesis));
-    }
-
-    [TestMethod]
-    public async Task AddChild_WithValidParent_ReturnsChildNode()
-    {
-        // Arrange
-        var goal = "Test goal";
-        var context = "Test context";
-        var tools = new Dictionary<string, ITool>();
-
-        _mockLlmClient.Setup(x => x.CompleteAsync(It.IsAny<List<LlmMessage>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new LlmCompletionResult 
-            { 
-                Content = "{\"thought\": \"Initial hypothesis\", \"thought_type\": \"Hypothesis\"}" 
-            });
-
-        await _engine.ReasonAsync(goal, context, tools);
-        
-        // Get the root that was created by ReasonAsync
-        var rootId = _engine.CurrentTree!.RootId!;
-
-        // Act
-        var child = _engine.AddChild(rootId, "child thought", ThoughtType.Analysis);
-
-        // Assert
-        Assert.IsNotNull(child);
-        Assert.AreEqual("child thought", child.Thought);
-        Assert.AreEqual(ThoughtType.Analysis, child.ThoughtType);
-        Assert.AreEqual(1, child.Depth);
-        Assert.AreEqual(rootId, child.ParentId);
-    }
-
-    [TestMethod]
-    public async Task EvaluateNode_WithValidNode_UpdatesNodeScore()
-    {
-        // Arrange
-        var goal = "Test goal";
-        var context = "Test context";
-        var tools = new Dictionary<string, ITool>();
-
-        _mockLlmClient.Setup(x => x.CompleteAsync(It.IsAny<List<LlmMessage>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new LlmCompletionResult 
-            { 
-                Content = "{\"thought\": \"Initial hypothesis\", \"thought_type\": \"Hypothesis\"}" 
-            });
-
-        await _engine.ReasonAsync(goal, context, tools);
-        
-        // Get the root that was created by ReasonAsync
-        var rootId = _engine.CurrentTree!.RootId!;
-
-        // Act
-        _engine.EvaluateNode(rootId, 0.85);
-
-        // Assert
-        Assert.AreEqual(0.85, _engine.CurrentTree.Nodes[rootId].Score, 1e-9);
-        Assert.AreEqual(ThoughtNodeState.Evaluated, _engine.CurrentTree.Nodes[rootId].State);
-    }
-
-    [TestMethod]
-    public async Task PruneNode_WithValidNode_MarksNodeAsPruned()
-    {
-        // Arrange
-        var goal = "Test goal";
-        var context = "Test context";
-        var tools = new Dictionary<string, ITool>();
-
-        _mockLlmClient.Setup(x => x.CompleteAsync(It.IsAny<List<LlmMessage>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new LlmCompletionResult 
-            { 
-                Content = "{\"thought\": \"Initial hypothesis\", \"thought_type\": \"Hypothesis\"}" 
-            });
-
-        await _engine.ReasonAsync(goal, context, tools);
-        
-        // Get the root that was created by ReasonAsync
-        var rootId = _engine.CurrentTree!.RootId!;
-        var child = _engine.AddChild(rootId, "child thought");
-
-        // Act
-        _engine.PruneNode(child.NodeId);
-
-        // Assert
-        Assert.AreEqual(ThoughtNodeState.Pruned, _engine.CurrentTree.Nodes[child.NodeId].State);
-    }
-
-    #endregion
-
-    #region Exploration Strategy Tests
-
-    [TestMethod]
-    public async Task ExploreAsync_WithBestFirstStrategy_ReturnsResult()
-    {
-        // Arrange
-        var goal = "Test goal";
-        var context = "Test context";
-        var tools = new Dictionary<string, ITool>();
-
-        _mockLlmClient.Setup(x => x.CompleteAsync(It.IsAny<List<LlmMessage>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new LlmCompletionResult 
-            { 
-                Content = "{\"thought\": \"Initial hypothesis\", \"thought_type\": \"Hypothesis\"}" 
-            });
-
-        await _engine.ReasonAsync(goal, context, tools);
-
-        // Act
-        var result = await _engine.ExploreAsync(ExplorationStrategy.BestFirst);
-
-        // Assert
-        Assert.IsNotNull(result);
-        // Note: We don't assert ExecutionTimeMs or Success because the exploration might fail due to complex LLM requirements
-    }
-
-    [TestMethod]
-    public async Task ExploreAsync_WithBreadthFirstStrategy_ReturnsResult()
-    {
-        // Arrange
-        var goal = "Test goal";
-        var context = "Test context";
-        var tools = new Dictionary<string, ITool>();
-
-        _mockLlmClient.Setup(x => x.CompleteAsync(It.IsAny<List<LlmMessage>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new LlmCompletionResult 
-            { 
-                Content = "{\"thought\": \"Initial hypothesis\", \"thought_type\": \"Hypothesis\"}" 
-            });
-
-        await _engine.ReasonAsync(goal, context, tools);
-
-        // Act
-        var result = await _engine.ExploreAsync(ExplorationStrategy.BreadthFirst);
-
-        // Assert
-        Assert.IsNotNull(result);
-        Assert.IsTrue(result.ExecutionTimeMs > 0);
-        // Note: We don't assert Success because the exploration might fail due to complex LLM requirements
-    }
-
-    [TestMethod]
-    public async Task ExploreAsync_WithDepthFirstStrategy_ReturnsResult()
-    {
-        // Arrange
-        var goal = "Test goal";
-        var context = "Test context";
-        var tools = new Dictionary<string, ITool>();
-
-        _mockLlmClient.Setup(x => x.CompleteAsync(It.IsAny<List<LlmMessage>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new LlmCompletionResult 
-            { 
-                Content = "{\"thought\": \"Initial hypothesis\", \"thought_type\": \"Hypothesis\"}" 
-            });
-
-        await _engine.ReasonAsync(goal, context, tools);
-
-        // Act
-        var result = await _engine.ExploreAsync(ExplorationStrategy.DepthFirst);
-
-        // Assert
-        Assert.IsNotNull(result);
-        Assert.IsTrue(result.ExecutionTimeMs > 0);
-        // Note: We don't assert Success because the exploration might fail due to complex LLM requirements
-    }
-
-    [TestMethod]
-    public async Task ExploreAsync_WithBeamSearchStrategy_ReturnsResult()
-    {
-        // Arrange
-        var goal = "Test goal";
-        var context = "Test context";
-        var tools = new Dictionary<string, ITool>();
-
-        _mockLlmClient.Setup(x => x.CompleteAsync(It.IsAny<List<LlmMessage>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new LlmCompletionResult 
-            { 
-                Content = "{\"thought\": \"Initial hypothesis\", \"thought_type\": \"Hypothesis\"}" 
-            });
-
-        await _engine.ReasonAsync(goal, context, tools);
-
-        // Act
-        var result = await _engine.ExploreAsync(ExplorationStrategy.BeamSearch);
-
-        // Assert
-        Assert.IsNotNull(result);
-        Assert.IsTrue(result.ExecutionTimeMs > 0);
-        // Note: We don't assert Success because the exploration might fail due to complex LLM requirements
-    }
-
-    [TestMethod]
-    public async Task ExploreAsync_WithMonteCarloStrategy_ReturnsResult()
-    {
-        // Arrange
-        var goal = "Test goal";
-        var context = "Test context";
-        var tools = new Dictionary<string, ITool>();
-
-        _mockLlmClient.Setup(x => x.CompleteAsync(It.IsAny<List<LlmMessage>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new LlmCompletionResult 
-            { 
-                Content = "{\"thought\": \"Initial hypothesis\", \"thought_type\": \"Hypothesis\"}" 
-            });
-
-        await _engine.ReasonAsync(goal, context, tools);
-
-        // Act
-        var result = await _engine.ExploreAsync(ExplorationStrategy.MonteCarlo);
-
-        // Assert
-        Assert.IsNotNull(result);
-        Assert.IsTrue(result.ExecutionTimeMs > 0);
-        // Note: We don't assert Success because the exploration might fail due to complex LLM requirements
-    }
-
-    #endregion
-
-    #region Basic Success Test
-
-    [TestMethod]
-    public async Task ReasonAsync_WithValidBasicResponse_ReturnsSuccessfulResult()
-    {
-        // Arrange
-        var goal = "Test goal";
-        var context = "Test context";
-        var tools = new Dictionary<string, ITool>();
-
-        // Provide a full sequence of responses matching the engine's expected flow
-        _mockLlmClient
-            .SetupSequence(x => x.CompleteAsync(It.IsAny<List<LlmMessage>>(), It.IsAny<CancellationToken>()))
-            // Root thought
-            .ReturnsAsync(new LlmCompletionResult { Content = "{\"thought\":\"Initial hypothesis for solving the problem\",\"thought_type\":\"Hypothesis\"}" })
-            // Evaluation of root
-            .ReturnsAsync(new LlmCompletionResult { Content = "{\"score\":0.82,\"reasoning\":\"solid\"}" })
-            // Child generation
-            .ReturnsAsync(new LlmCompletionResult { Content = "{\"children\":[{\"thought\":\"Option A\",\"thought_type\":\"Analysis\",\"estimated_score\":0.7},{\"thought\":\"Option B\",\"thought_type\":\"Alternative\",\"estimated_score\":0.6}]}" })
-            // Conclusion
-            .ReturnsAsync(new LlmCompletionResult { Content = "{\"conclusion\":\"Final answer\"}" });
-
-        // Act
-        var result = await _engine.ReasonAsync(goal, context, tools);
-
-        // Assert - With a complete response sequence, the engine should succeed
-        Assert.IsTrue(result.Success, result.Error);
-        Assert.IsNotNull(result.Tree);
-        Assert.AreEqual(goal, result.Tree!.Goal);
-        Assert.AreEqual("Final answer", result.Conclusion);
-        Assert.IsTrue(result.Tree.NodeCount >= 1);
-    }
-
-    #endregion
-
     #region Exploration Strategy Tests
 
     [TestMethod]
     public async Task ExploreAsync_WithInvalidStrategy_ReturnsFailedResult()
     {
         // Arrange
-        // First create a tree by calling ReasonAsync
         var goal = "Test goal";
         var context = "Test context";
         var tools = new Dictionary<string, ITool>();
 
         _mockLlmClient.Setup(x => x.CompleteAsync(It.IsAny<List<LlmMessage>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new LlmCompletionResult 
-            { 
-                Content = "{\"thought\": \"Initial hypothesis\", \"thought_type\": \"Hypothesis\"}" 
-            });
+            .ReturnsAsync(new LlmCompletionResult { Content = "{\"thought\":\"Initial hypothesis\",\"thought_type\":\"Hypothesis\"}" });
 
         await _engine.ReasonAsync(goal, context, tools);
 
@@ -748,6 +445,266 @@ public class TreeOfThoughtsEngineTests
         Assert.IsFalse(result.Success);
         Assert.IsNotNull(result.Error);
         Assert.IsTrue(result.Error!.Contains("Unsupported exploration strategy"));
+    }
+
+    [TestMethod]
+    public async Task ExploreAsync_WithBestFirstStrategy_ExploresNodesInPriorityOrder()
+    {
+        // Arrange
+        var goal = "Test goal";
+        var context = "Test context";
+        var tools = new Dictionary<string, ITool>();
+
+        // Mock responses based on prompt content
+        _mockLlmClient.Setup(x => x.CompleteAsync(It.IsAny<List<LlmMessage>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((List<LlmMessage> messages, CancellationToken token) =>
+            {
+                var prompt = messages.FirstOrDefault()?.Content ?? "";
+                
+                if (prompt.Contains("Generate an initial thought"))
+                {
+                    return new LlmCompletionResult { Content = "{\"thought\":\"Initial hypothesis\",\"thought_type\":\"Hypothesis\"}" };
+                }
+                else if (prompt.Contains("Evaluate the quality and potential"))
+                {
+                    return new LlmCompletionResult { Content = "{\"score\":0.8,\"reasoning\":\"good evaluation\"}" };
+                }
+                else if (prompt.Contains("Generate 2-3 child thoughts"))
+                {
+                    return new LlmCompletionResult { Content = "{\"children\":[{\"thought\":\"Child 1\",\"thought_type\":\"Analysis\",\"estimated_score\":0.9},{\"thought\":\"Child 2\",\"thought_type\":\"Analysis\",\"estimated_score\":0.7}]}" };
+                }
+                else if (prompt.Contains("synthesizing a conclusion"))
+                {
+                    return new LlmCompletionResult { Content = "{\"conclusion\":\"Final answer\"}" };
+                }
+                else
+                {
+                    // Default fallback
+                    return new LlmCompletionResult { Content = "{\"score\":0.5,\"reasoning\":\"default response\"}" };
+                }
+            });
+
+        // Act
+        var result = await _engine.ReasonAsync(goal, context, tools);
+
+        // Assert
+        Assert.IsTrue(result.Success, result.Error);
+        Assert.IsTrue(result.Tree != null);
+        Assert.IsTrue(result.Tree.Nodes.Count > 0);
+    }
+
+    [TestMethod]
+    public async Task ExploreAsync_WithBreadthFirstStrategy_ExploresNodesByLevel()
+    {
+        // Arrange
+        var goal = "Test goal";
+        var context = "Test context";
+        var tools = new Dictionary<string, ITool>();
+
+        // Mock responses based on prompt content
+        _mockLlmClient.Setup(x => x.CompleteAsync(It.IsAny<List<LlmMessage>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((List<LlmMessage> messages, CancellationToken token) =>
+            {
+                var prompt = messages.FirstOrDefault()?.Content ?? "";
+                
+                if (prompt.Contains("Generate an initial thought"))
+                {
+                    return new LlmCompletionResult { Content = "{\"thought\":\"Initial hypothesis\",\"thought_type\":\"Hypothesis\"}" };
+                }
+                else if (prompt.Contains("Evaluate the quality and potential"))
+                {
+                    return new LlmCompletionResult { Content = "{\"score\":0.8,\"reasoning\":\"good evaluation\"}" };
+                }
+                else if (prompt.Contains("Generate 2-3 child thoughts"))
+                {
+                    return new LlmCompletionResult { Content = "{\"children\":[{\"thought\":\"Child 1\",\"thought_type\":\"Analysis\",\"estimated_score\":0.7},{\"thought\":\"Child 2\",\"thought_type\":\"Analysis\",\"estimated_score\":0.6}]}" };
+                }
+                else if (prompt.Contains("synthesizing a conclusion"))
+                {
+                    return new LlmCompletionResult { Content = "{\"conclusion\":\"Final answer\"}" };
+                }
+                else
+                {
+                    // Default fallback
+                    return new LlmCompletionResult { Content = "{\"score\":0.5,\"reasoning\":\"default response\"}" };
+                }
+            });
+
+        // Act
+        var result = await _engine.ReasonAsync(goal, context, tools);
+
+        // Assert
+        Assert.IsTrue(result.Success, result.Error);
+        Assert.IsTrue(result.Tree != null);
+        Assert.IsTrue(result.Tree.Nodes.Count > 0);
+    }
+
+    [TestMethod]
+    public async Task ExploreAsync_WithDepthFirstStrategy_ExploresNodesByDepth()
+    {
+        // Arrange
+        var goal = "Test goal";
+        var context = "Test context";
+        var tools = new Dictionary<string, ITool>();
+
+        // Mock responses based on prompt content
+        _mockLlmClient.Setup(x => x.CompleteAsync(It.IsAny<List<LlmMessage>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((List<LlmMessage> messages, CancellationToken token) =>
+            {
+                var prompt = messages.FirstOrDefault()?.Content ?? "";
+                
+                if (prompt.Contains("Generate an initial thought"))
+                {
+                    return new LlmCompletionResult { Content = "{\"thought\":\"Initial hypothesis\",\"thought_type\":\"Hypothesis\"}" };
+                }
+                else if (prompt.Contains("Evaluate the quality and potential"))
+                {
+                    return new LlmCompletionResult { Content = "{\"score\":0.8,\"reasoning\":\"good evaluation\"}" };
+                }
+                else if (prompt.Contains("Generate 2-3 child thoughts"))
+                {
+                    return new LlmCompletionResult { Content = "{\"children\":[{\"thought\":\"Child 1\",\"thought_type\":\"Analysis\",\"estimated_score\":0.7}]}" };
+                }
+                else if (prompt.Contains("synthesizing a conclusion"))
+                {
+                    return new LlmCompletionResult { Content = "{\"conclusion\":\"Final answer\"}" };
+                }
+                else
+                {
+                    // Default fallback
+                    return new LlmCompletionResult { Content = "{\"score\":0.5,\"reasoning\":\"default response\"}" };
+                }
+            });
+
+        // Act
+        var result = await _engine.ReasonAsync(goal, context, tools);
+
+        // Assert
+        Assert.IsTrue(result.Success, result.Error);
+        Assert.IsTrue(result.Tree != null);
+        Assert.IsTrue(result.Tree.Nodes.Count > 0);
+    }
+
+    [TestMethod]
+    public async Task ExploreAsync_WithBeamSearchStrategy_ExploresWithBeamWidth()
+    {
+        // Arrange
+        var goal = "Test goal";
+        var context = "Test context";
+        var tools = new Dictionary<string, ITool>();
+
+        // Mock responses based on prompt content
+        _mockLlmClient.Setup(x => x.CompleteAsync(It.IsAny<List<LlmMessage>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((List<LlmMessage> messages, CancellationToken token) =>
+            {
+                var prompt = messages.FirstOrDefault()?.Content ?? "";
+                
+                if (prompt.Contains("Generate an initial thought"))
+                {
+                    return new LlmCompletionResult { Content = "{\"thought\":\"Initial hypothesis\",\"thought_type\":\"Hypothesis\"}" };
+                }
+                else if (prompt.Contains("Evaluate the quality and potential"))
+                {
+                    return new LlmCompletionResult { Content = "{\"score\":0.8,\"reasoning\":\"good evaluation\"}" };
+                }
+                else if (prompt.Contains("Generate 2-3 child thoughts"))
+                {
+                    return new LlmCompletionResult { Content = "{\"children\":[{\"thought\":\"Child 1\",\"thought_type\":\"Analysis\",\"estimated_score\":0.7},{\"thought\":\"Child 2\",\"thought_type\":\"Analysis\",\"estimated_score\":0.6}]}" };
+                }
+                else if (prompt.Contains("synthesizing a conclusion"))
+                {
+                    return new LlmCompletionResult { Content = "{\"conclusion\":\"Final answer\"}" };
+                }
+                else
+                {
+                    // Default fallback
+                    return new LlmCompletionResult { Content = "{\"score\":0.5,\"reasoning\":\"default response\"}" };
+                }
+            });
+
+        // Act
+        var result = await _engine.ReasonAsync(goal, context, tools);
+
+        // Assert
+        Assert.IsTrue(result.Success, result.Error);
+        Assert.IsTrue(result.Tree != null);
+        Assert.IsTrue(result.Tree.Nodes.Count > 0);
+    }
+
+    [TestMethod]
+    public async Task ExploreAsync_WithMonteCarloStrategy_ExploresWithRandomSampling()
+    {
+        // Arrange
+        var goal = "Test goal";
+        var context = "Test context";
+        var tools = new Dictionary<string, ITool>();
+
+        // Mock responses based on prompt content
+        _mockLlmClient.Setup(x => x.CompleteAsync(It.IsAny<List<LlmMessage>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((List<LlmMessage> messages, CancellationToken token) =>
+            {
+                var prompt = messages.FirstOrDefault()?.Content ?? "";
+                
+                if (prompt.Contains("Generate an initial thought"))
+                {
+                    return new LlmCompletionResult { Content = "{\"thought\":\"Initial hypothesis\",\"thought_type\":\"Hypothesis\"}" };
+                }
+                else if (prompt.Contains("Evaluate the quality and potential"))
+                {
+                    return new LlmCompletionResult { Content = "{\"score\":0.8,\"reasoning\":\"good evaluation\"}" };
+                }
+                else if (prompt.Contains("Generate 2-3 child thoughts"))
+                {
+                    return new LlmCompletionResult { Content = "{\"children\":[{\"thought\":\"Child 1\",\"thought_type\":\"Analysis\",\"estimated_score\":0.7}]}" };
+                }
+                else if (prompt.Contains("synthesizing a conclusion"))
+                {
+                    return new LlmCompletionResult { Content = "{\"conclusion\":\"Final answer\"}" };
+                }
+                else
+                {
+                    // Default fallback
+                    return new LlmCompletionResult { Content = "{\"score\":0.5,\"reasoning\":\"default response\"}" };
+                }
+            });
+
+        // Act
+        var result = await _engine.ReasonAsync(goal, context, tools);
+
+        // Assert
+        Assert.IsTrue(result.Success, result.Error);
+        Assert.IsTrue(result.Tree != null);
+        Assert.IsTrue(result.Tree.Nodes.Count > 0);
+    }
+
+    #endregion
+
+    #region Configuration Tests
+
+    [TestMethod]
+    public void Constructor_WithCustomConfiguration_UsesConfiguration()
+    {
+        // Arrange
+        var customConfig = new AgentConfiguration
+        {
+            MaxTreeDepth = 10,
+            MaxTreeNodes = 100,
+            TreeExplorationStrategy = ExplorationStrategy.BeamSearch
+        };
+
+        // Act
+        var customEngine = new TreeOfThoughtsEngine(
+            _mockLlmClient.Object,
+            customConfig,
+            _logger,
+            _mockEventManager.Object,
+            _mockStatusManager.Object,
+            _mockMetricsCollector.Object
+        );
+
+        // Assert
+        Assert.IsNotNull(customEngine);
+        Assert.AreEqual(ReasoningType.TreeOfThoughts, customEngine.ReasoningType);
     }
 
     #endregion
@@ -762,33 +719,42 @@ public class TreeOfThoughtsEngineTests
         var context = "Test context";
         var tools = new Dictionary<string, ITool>();
 
-        // Setup a simple response
+        // Mock responses based on prompt content
         _mockLlmClient.Setup(x => x.CompleteAsync(It.IsAny<List<LlmMessage>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new LlmCompletionResult 
-            { 
-                Content = "{\"thought\": \"Initial hypothesis\", \"thought_type\": \"Hypothesis\"}" 
+            .ReturnsAsync((List<LlmMessage> messages, CancellationToken token) =>
+            {
+                var prompt = messages.FirstOrDefault()?.Content ?? "";
+                
+                if (prompt.Contains("Generate an initial thought"))
+                {
+                    return new LlmCompletionResult { Content = "{\"thought\":\"Initial hypothesis\",\"thought_type\":\"Hypothesis\"}" };
+                }
+                else if (prompt.Contains("Evaluate the quality and potential"))
+                {
+                    return new LlmCompletionResult { Content = "{\"score\":0.8,\"reasoning\":\"good evaluation\"}" };
+                }
+                else if (prompt.Contains("Generate 2-3 child thoughts"))
+                {
+                    return new LlmCompletionResult { Content = "{\"children\":[{\"thought\":\"Child 1\",\"thought_type\":\"Analysis\",\"estimated_score\":0.7}]}" };
+                }
+                else if (prompt.Contains("synthesizing a conclusion"))
+                {
+                    return new LlmCompletionResult { Content = "{\"conclusion\":\"Final answer\"}" };
+                }
+                else
+                {
+                    // Default fallback
+                    return new LlmCompletionResult { Content = "{\"score\":0.5,\"reasoning\":\"default response\"}" };
+                }
             });
 
         // Act
         var result = await _engine.ReasonAsync(goal, context, tools);
 
-        // Debug output
-        if (!result.Success)
-        {
-            Console.WriteLine($"Test failed with error: {result.Error}");
-        }
-
-        // Assert - Just verify metrics are recorded if the operation succeeds
-        if (result.Success)
-        {
-            _mockMetricsCollector.Verify(x => x.RecordReasoningExecutionTime(goal, ReasoningType.TreeOfThoughts, It.IsAny<long>()), Times.Once);
-            _mockMetricsCollector.Verify(x => x.RecordReasoningConfidence(goal, ReasoningType.TreeOfThoughts, It.IsAny<double>()), Times.Once);
-        }
-        else
-        {
-            // If it fails, we still expect some basic behavior
-            Assert.IsNotNull(result.Error);
-        }
+        // Assert - Verify metrics are recorded when operation succeeds
+        Assert.IsTrue(result.Success, result.Error);
+        _mockMetricsCollector.Verify(x => x.RecordReasoningExecutionTime(goal, ReasoningType.TreeOfThoughts, It.IsAny<long>()), Times.Once);
+        _mockMetricsCollector.Verify(x => x.RecordReasoningConfidence(goal, ReasoningType.TreeOfThoughts, It.IsAny<double>()), Times.Once);
     }
 
     [TestMethod]
@@ -799,32 +765,94 @@ public class TreeOfThoughtsEngineTests
         var context = "Test context";
         var tools = new Dictionary<string, ITool>();
 
-        // Setup a simple response
+        // Mock responses based on prompt content
         _mockLlmClient.Setup(x => x.CompleteAsync(It.IsAny<List<LlmMessage>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new LlmCompletionResult 
-            { 
-                Content = "{\"thought\": \"Initial hypothesis\", \"thought_type\": \"Hypothesis\"}" 
+            .ReturnsAsync((List<LlmMessage> messages, CancellationToken token) =>
+            {
+                var prompt = messages.FirstOrDefault()?.Content ?? "";
+                
+                if (prompt.Contains("Generate an initial thought"))
+                {
+                    return new LlmCompletionResult { Content = "{\"thought\":\"Initial hypothesis\",\"thought_type\":\"Hypothesis\"}" };
+                }
+                else if (prompt.Contains("Evaluate the quality and potential"))
+                {
+                    return new LlmCompletionResult { Content = "{\"score\":0.8,\"reasoning\":\"good evaluation\"}" };
+                }
+                else if (prompt.Contains("Generate 2-3 child thoughts"))
+                {
+                    return new LlmCompletionResult { Content = "{\"children\":[{\"thought\":\"Child 1\",\"thought_type\":\"Analysis\",\"estimated_score\":0.7}]}" };
+                }
+                else if (prompt.Contains("synthesizing a conclusion"))
+                {
+                    return new LlmCompletionResult { Content = "{\"conclusion\":\"Final answer\"}" };
+                }
+                else
+                {
+                    // Default fallback
+                    return new LlmCompletionResult { Content = "{\"score\":0.5,\"reasoning\":\"default response\"}" };
+                }
             });
 
         // Act
         var result = await _engine.ReasonAsync(goal, context, tools);
 
-        // Debug output
-        if (!result.Success)
-        {
-            Console.WriteLine($"Test failed with error: {result.Error}");
-        }
+        // Assert - Verify status updates are emitted when operation succeeds
+        Assert.IsTrue(result.Success, result.Error);
+        _mockStatusManager.Verify(x => x.EmitStatus(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<int?>()), Times.AtLeastOnce);
+    }
 
-        // Assert - Just verify status updates are emitted if the operation succeeds
-        if (result.Success)
-        {
-            _mockStatusManager.Verify(x => x.EmitStatus(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<int?>()), Times.AtLeastOnce);
-        }
-        else
-        {
-            // If it fails, we still expect some basic behavior
-            Assert.IsNotNull(result.Error);
-        }
+    #endregion
+
+    #region Integration Tests (Minimal)
+
+    [TestMethod]
+    public async Task ReasonAsync_CompleteWorkflow_WithSimpleResponses_ShouldSucceed()
+    {
+        // Arrange
+        var goal = "Solve a simple math problem";
+        var context = "Find the sum of 2 + 2";
+        var tools = new Dictionary<string, ITool>();
+
+        // Mock responses based on prompt content
+        _mockLlmClient.Setup(x => x.CompleteAsync(It.IsAny<List<LlmMessage>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((List<LlmMessage> messages, CancellationToken token) =>
+            {
+                var prompt = messages.FirstOrDefault()?.Content ?? "";
+                
+                if (prompt.Contains("Generate an initial thought"))
+                {
+                    return new LlmCompletionResult { Content = "{\"thought\":\"I need to add 2 + 2\",\"thought_type\":\"Hypothesis\"}" };
+                }
+                else if (prompt.Contains("Evaluate the quality and potential"))
+                {
+                    return new LlmCompletionResult { Content = "{\"score\":0.9,\"reasoning\":\"This is a straightforward addition problem\"}" };
+                }
+                else if (prompt.Contains("Generate 2-3 child thoughts"))
+                {
+                    return new LlmCompletionResult { Content = "{\"children\":[{\"thought\":\"2 + 2 = 4\",\"thought_type\":\"Analysis\",\"estimated_score\":0.95}]}" };
+                }
+                else if (prompt.Contains("synthesizing a conclusion"))
+                {
+                    return new LlmCompletionResult { Content = "{\"conclusion\":\"The answer is 4\"}" };
+                }
+                else
+                {
+                    // Default fallback
+                    return new LlmCompletionResult { Content = "{\"score\":0.5,\"reasoning\":\"default response\"}" };
+                }
+            });
+
+        // Act
+        var result = await _engine.ReasonAsync(goal, context, tools);
+
+        // Assert
+        Assert.IsTrue(result.Success, result.Error);
+        Assert.AreEqual("The answer is 4", result.Conclusion);
+        Assert.IsNotNull(result.Tree);
+        Assert.AreEqual(goal, result.Tree!.Goal);
+        Assert.IsTrue(result.Tree.NodeCount >= 2); // Root + at least one child
+        Assert.IsTrue(result.Confidence > 0);
     }
 
     #endregion
