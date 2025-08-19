@@ -214,10 +214,10 @@ agent.Metrics.MetricsUpdated += (sender, e) =>
 
 For comprehensive documentation, API reference, architecture details, and advanced features:
 
-- **[Complete Documentation](DOCUMENTATION.md)** - Detailed documentation covering all components, architecture, and usage examples
-- **[API Reference](DOCUMENTATION.md#api-reference)** - Complete API reference with examples  
-- **[Advanced Features](DOCUMENTATION.md#advanced-features)** - Reasoning engines, tool framework, monitoring, and more
-- **[Architecture](DOCUMENTATION.md#architecture)** - Detailed architecture and component documentation
+- **[Complete Documentation](documentation.md)** - Detailed documentation covering all components, architecture, and usage examples
+- **[API Reference](documentation.md#api-reference)** - Complete API reference with examples  
+- **[Advanced Features](documentation.md#advanced-features)** - Reasoning engines, tool framework, monitoring, and more
+- **[Architecture](documentation.md#architecture)** - Detailed architecture and component documentation
 
 ## 🧪 Testing
 
@@ -231,7 +231,7 @@ The framework includes 600+ tests covering all components and features.
 
 ## 🤝 Contributing
 
-We welcome contributions! Please see our [Contributing Guidelines](DOCUMENTATION.md#contributing) for details.
+We welcome contributions! Please see our [Contributing Guidelines](documentation.md#contributing) for details.
 
 ## 📄 License
 
