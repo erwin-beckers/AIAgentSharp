@@ -94,20 +94,43 @@ public sealed class AnthropicLlmClient : ILlmClient
 
         // Map messages to Anthropic message types
         var anthropicMessages = new List<Message>();
+        var systemMessages = new List<string>();
 
+        // First pass: collect system messages
+        foreach (var m in request.Messages)
+        {
+            if (m.Role == "system")
+            {
+                systemMessages.Add(m.Content);
+            }
+        }
+
+        // Second pass: convert messages and prepend system content to first user message
+        bool systemMessagesPrepended = false;
         foreach (var m in request.Messages)
         {
             switch (m.Role)
             {
                 case "system":
-                    // Anthropic doesn't support system messages in the same way
-                    // We'll prepend system content to the first user message
+                    // Already handled in first pass
                     break;
                 case "assistant":
                     anthropicMessages.Add(new Message(RoleType.Assistant, m.Content));
                     break;
                 case "user":
-                    anthropicMessages.Add(new Message(RoleType.User, m.Content));
+                    var userContent = m.Content;
+                    
+                    // Prepend system messages to the first user message
+                    if (!systemMessagesPrepended && systemMessages.Any())
+                    {
+                        var combinedContent = string.Join("\n\n", systemMessages) + "\n\n" + userContent;
+                        anthropicMessages.Add(new Message(RoleType.User, combinedContent));
+                        systemMessagesPrepended = true;
+                    }
+                    else
+                    {
+                        anthropicMessages.Add(new Message(RoleType.User, userContent));
+                    }
                     break;
                 case "tool":
                     // Anthropic uses tool results differently

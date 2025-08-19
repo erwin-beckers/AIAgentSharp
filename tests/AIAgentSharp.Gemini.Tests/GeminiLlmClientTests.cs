@@ -269,4 +269,121 @@ public class GeminiLlmClientTests
         Assert.IsNotNull(finalChunk.FunctionCall);
         Assert.AreEqual("get_weather", finalChunk.FunctionCall.Name);
     }
+
+    [TestMethod]
+    public async Task StreamAsync_WithSystemRole_ConvertsToUserRole()
+    {
+        // Arrange
+        var mockHttpHandler = new Mock<HttpMessageHandler>();
+        var httpClient = new HttpClient(mockHttpHandler.Object);
+        var client = new GeminiLlmClient(httpClient, "test-api-key", "gemini-1.5-flash");
+        
+        var request = new LlmRequest
+        {
+            Messages = new List<LlmMessage>
+            {
+                new LlmMessage { Role = "system", Content = "You are a helpful assistant." },
+                new LlmMessage { Role = "user", Content = "Hello" }
+            }
+        };
+
+        // Mock successful response
+        var responseContent = @"{
+            ""candidates"": [{
+                ""content"": {
+                    ""parts"": [{
+                        ""text"": ""Hello! How can I help you today?""
+                    }]
+                }
+            }],
+            ""usageMetadata"": {
+                ""promptTokenCount"": 10,
+                ""candidatesTokenCount"": 5
+            }
+        }";
+
+        mockHttpHandler.Protected()
+            .Setup<Task<HttpResponseMessage>>(
+                "SendAsync",
+                ItExpr.IsAny<HttpRequestMessage>(),
+                ItExpr.IsAny<CancellationToken>())
+            .ReturnsAsync(new HttpResponseMessage
+            {
+                StatusCode = System.Net.HttpStatusCode.OK,
+                Content = new StringContent(responseContent)
+            });
+
+        // Act
+        var chunks = new List<LlmStreamingChunk>();
+        await foreach (var chunk in client.StreamAsync(request))
+        {
+            chunks.Add(chunk);
+        }
+
+        // Assert
+        Assert.IsNotNull(chunks);
+        Assert.IsTrue(chunks.Count > 0);
+        var finalChunk = chunks.Last();
+        Assert.IsTrue(finalChunk.IsFinal);
+        Assert.AreEqual("Hello! How can I help you today?", finalChunk.Content);
+    }
+
+    [TestMethod]
+    public async Task StreamAsync_WithAssistantRole_ConvertsToModelRole()
+    {
+        // Arrange
+        var mockHttpHandler = new Mock<HttpMessageHandler>();
+        var httpClient = new HttpClient(mockHttpHandler.Object);
+        var client = new GeminiLlmClient(httpClient, "test-api-key", "gemini-1.5-flash");
+        
+        var request = new LlmRequest
+        {
+            Messages = new List<LlmMessage>
+            {
+                new LlmMessage { Role = "user", Content = "Hello" },
+                new LlmMessage { Role = "assistant", Content = "Hi there!" },
+                new LlmMessage { Role = "user", Content = "How are you?" }
+            }
+        };
+
+        // Mock successful response
+        var responseContent = @"{
+            ""candidates"": [{
+                ""content"": {
+                    ""parts"": [{
+                        ""text"": ""I'm doing well, thank you for asking!""
+                    }]
+                }
+            }],
+            ""usageMetadata"": {
+                ""promptTokenCount"": 10,
+                ""candidatesTokenCount"": 5
+            }
+        }";
+
+        mockHttpHandler.Protected()
+            .Setup<Task<HttpResponseMessage>>(
+                "SendAsync",
+                ItExpr.IsAny<HttpRequestMessage>(),
+                ItExpr.IsAny<CancellationToken>())
+            .ReturnsAsync(new HttpResponseMessage
+            {
+                StatusCode = System.Net.HttpStatusCode.OK,
+                Content = new StringContent(responseContent)
+            });
+
+        // Act
+        var chunks = new List<LlmStreamingChunk>();
+        await foreach (var chunk in client.StreamAsync(request))
+        {
+            chunks.Add(chunk);
+        }
+
+        // Assert
+        Assert.IsNotNull(chunks);
+        Assert.IsTrue(chunks.Count > 0);
+        var finalChunk = chunks.Last();
+        Assert.IsTrue(finalChunk.IsFinal);
+        Assert.AreEqual("I'm doing well, thank you for asking!", finalChunk.Content);
+    }
 }

@@ -36,7 +36,7 @@ public static class JsonUtil
         // Clean the JSON response to handle malformed responses from LLMs
         var cleanedJson = JsonResponseCleaner.CleanJsonResponse(json);
         
-        using var doc = JsonDocument.Parse(cleanedJson);
+         using var doc = JsonDocument.Parse(cleanedJson);
         var root = doc.RootElement;
 
         if (root.ValueKind != JsonValueKind.Object)

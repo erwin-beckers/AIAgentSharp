@@ -1,6 +1,9 @@
 ﻿using AIAgentSharp;
 using AIAgentSharp.Agents;
+using AIAgentSharp.Anthropic;
 using AIAgentSharp.Examples;
+using AIAgentSharp.Gemini;
+using AIAgentSharp.Mistral;
 using AIAgentSharp.OpenAI;
 
 namespace example;
@@ -29,7 +32,7 @@ internal class ReactExample
         var config = new AgentConfiguration
         {
             MaxTurns = 40,
-            UseFunctionCalling = false, 
+            UseFunctionCalling = false,
             EmitPublicStatus = true // Enable public status updates
         };
         var agent = new Agent(llm, store, config: config);
@@ -84,19 +87,7 @@ internal class ReactExample
         {
             if (!string.IsNullOrEmpty(e.Chunk.Content))
             {
-                var content = e.Chunk.Content;
-                
-                // Only show content that's not internal JSON structure
-                // Skip JSON responses that contain internal agent fields
-                if (!content.TrimStart().StartsWith("{") || 
-                    (!content.Contains("\"thoughts\"") && 
-                     !content.Contains("\"action\"") && 
-                     !content.Contains("\"action_input\"") &&
-                     !content.Contains("\"reasoning_confidence\"") &&
-                     !content.Contains("\"reasoning_type\"")))
-                {
-                    Console.Write(content);
-                }
+                Console.Write(e.Chunk.Content);
             }
         };
 

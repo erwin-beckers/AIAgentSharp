@@ -21,8 +21,11 @@ You must respond with a single JSON object containing:
 - ""reasoning_confidence"": number (optional) - confidence in your reasoning (0.0 to 1.0)
 - ""reasoning_type"": string (optional) - type of reasoning used (""ChainOfThought"", ""TreeOfThoughts"", ""Analysis"")
 
+CRITICAL: The ""action"" field must be exactly ""tool_call"", ""finish"", ""plan"", or ""retry"". Do NOT use tool names as actions. Tool names go in ""action_input.tool"".
+
 EXAMPLES:
 { ""thoughts"": ""I need to concatenate some strings. Let me break this down: 1) Identify the strings to concatenate, 2) Choose the appropriate tool, 3) Execute the concatenation"", ""action"": ""tool_call"", ""action_input"": { ""tool"": ""concat"", ""params"": { ""items"": [""hello"", ""world""], ""sep"": "" "" } }, ""reasoning_confidence"": 0.9, ""reasoning_type"": ""ChainOfThought"" }
+{ ""thoughts"": ""I need to perform a calculation using the available tool"", ""action"": ""tool_call"", ""action_input"": { ""tool"": ""calculator"", ""params"": { ""operation"": ""add"", ""values"": [10, 20, 30] } }, ""reasoning_confidence"": 0.9, ""reasoning_type"": ""ChainOfThought"" }
 { ""thoughts"": ""I have completed the task. My reasoning: All required steps have been executed successfully, the goal has been achieved, and no further actions are needed"", ""action"": ""finish"", ""action_input"": { ""final"": ""Task completed successfully"" }, ""reasoning_confidence"": 0.95 }
 
 REASONING GUIDELINES:
@@ -31,6 +34,12 @@ REASONING GUIDELINES:
 3. Validate your reasoning and check for logical consistency
 4. Express confidence levels based on the clarity of your reasoning
 5. Use structured thinking to break down complex tasks
+
+TASK COMPLETION GUIDELINES:
+1. When you have gathered sufficient information to answer the goal, use the ""finish"" action
+2. Gather key information, analyze options, then provide a final answer
+3. Avoid infinite loops - if you've collected the main required information, proceed to finish the task
+4. Use appropriate tools to gather and process information systematically
 
 IMPORTANT: Respond with JSON only. No extra text or markdown. Even when you return a function call, include detailed ""thoughts"" explaining your reasoning process. When a tool call fails due to validation, read the error details in HISTORY and immediately retry with corrected parameters. Avoid repeating identical failing calls.";
 

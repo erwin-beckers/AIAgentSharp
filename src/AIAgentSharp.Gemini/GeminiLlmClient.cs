@@ -347,9 +347,22 @@ public sealed class GeminiLlmClient : ILlmClient
     {
         return messages.Select(msg => new GeminiContent
         {
-            Role = msg.Role,
-            Parts = new List<GeminiPart> { new GeminiPart { Text = msg.Content } }
+            Role = MapRoleForGemini(msg.Role),
+            Parts = [new GeminiPart { Text = msg.Content }]
         }).ToList();
+    }
+
+    [ExcludeFromCodeCoverage]
+    private static string MapRoleForGemini(string role)
+    {
+        return role.ToLowerInvariant() switch
+        {
+            "system" => "user",    // Gemini doesn't support system role, treat as user input
+            "assistant" => "model", // Gemini's equivalent of assistant responses
+            "user" => "user",      // Stays the same
+            "model" => "model",    // Already in Gemini format
+            _ => "user"            // Default to user for unknown roles
+        };
     }
 
     [ExcludeFromCodeCoverage]

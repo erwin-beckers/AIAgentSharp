@@ -23,7 +23,7 @@ public static class LlmResponseAggregator
 
         // Aggregate content from all chunks
         var content = string.Join("", chunkList.Select(c => c.Content));
-        
+
         _logger.LogDebug($"Aggregated {chunkList.Count} chunks into content of length {content.Length}");
         _logger.LogDebug($"Final aggregated content: {content}");
 
@@ -73,14 +73,16 @@ public static class LlmResponseAggregator
     /// <param name="onChunkReceived">Callback to be called for each chunk received.</param>
     /// <returns>A task that completes with the aggregated LlmResponse.</returns>
     public static async Task<LlmResponse> ProcessChunksWithCallbackAsync(
-        IAsyncEnumerable<LlmStreamingChunk> chunks, 
+        IAsyncEnumerable<LlmStreamingChunk> chunks,
         Action<LlmStreamingChunk> onChunkReceived)
     {
         var chunkList = new List<LlmStreamingChunk>();
+        var chunkIndex = 0;
         await foreach (var chunk in chunks)
         {
             chunkList.Add(chunk);
             onChunkReceived(chunk);
+            chunkIndex++;
         }
 
         return AggregateChunks(chunkList);

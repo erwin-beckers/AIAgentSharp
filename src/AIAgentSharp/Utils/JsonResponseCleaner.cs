@@ -32,10 +32,64 @@ public static class JsonResponseCleaner
         }
         cleaned = cleaned.Trim();
 
-        // Find the first complete JSON object
+        // Check for duplicate JSON objects (common LLM issue)
+        var jsonObjects = new List<string>();
         var braceCount = 0;
         var startIndex = -1;
         var endIndex = -1;
+
+        for (int i = 0; i < cleaned.Length; i++)
+        {
+            if (cleaned[i] == '{')
+            {
+                if (startIndex == -1)
+                {
+                    startIndex = i;
+                }
+                braceCount++;
+            }
+            else if (cleaned[i] == '}')
+            {
+                braceCount--;
+                if (braceCount == 0 && startIndex != -1)
+                {
+                    endIndex = i;
+                    var jsonObject = cleaned.Substring(startIndex, endIndex - startIndex + 1);
+                    jsonObjects.Add(jsonObject);
+                    
+                    // Reset for next object
+                    startIndex = -1;
+                    endIndex = -1;
+                }
+            }
+        }
+
+        // If we found multiple JSON objects, check if they're duplicates
+        if (jsonObjects.Count > 1)
+        {
+            // Check if all objects are identical (common LLM duplication issue)
+            var firstObject = jsonObjects[0];
+            var allIdentical = jsonObjects.All(obj => obj == firstObject);
+            
+            if (allIdentical)
+            {
+                // Return the first object (they're all the same)
+                return firstObject;
+            }
+            
+            // If they're different, log a warning and return the first one
+            Console.WriteLine($"Warning: Found {jsonObjects.Count} different JSON objects in LLM response. Using the first one.");
+            return firstObject;
+        }
+        else if (jsonObjects.Count == 1)
+        {
+            return jsonObjects[0];
+        }
+
+        // Fallback: try to find just the first complete JSON object
+        braceCount = 0;
+        startIndex = -1;
+        endIndex = -1;
 
         for (int i = 0; i < cleaned.Length; i++)
         {

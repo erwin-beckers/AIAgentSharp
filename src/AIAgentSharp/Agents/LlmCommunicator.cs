@@ -65,8 +65,12 @@ public sealed class LlmCommunicator : ILlmCommunicator
             _llm.StreamAsync(request, timeoutCts.Token),
             chunk => 
             {
-                // Emit real-time chunk events for UI updates
-                _eventManager.RaiseLlmChunkReceived(agentId, turnIndex, chunk);
+                // Filter out JSON content before emitting chunk events for UI
+                var filteredChunk = FilterJsonContentFromChunk(chunk);
+                if (filteredChunk != null)
+                {
+                    _eventManager.RaiseLlmChunkReceived(agentId, turnIndex, filteredChunk);
+                }
             });
         
         stopwatch.Stop();
@@ -312,8 +316,12 @@ public sealed class LlmCommunicator : ILlmCommunicator
             _llm.StreamAsync(request, timeoutCts.Token),
             chunk => 
             {
-                // Emit real-time chunk events for UI updates
-                _eventManager.RaiseLlmChunkReceived(agentId, turnIndex, chunk);
+                // Filter out JSON content before emitting chunk events for UI
+                var filteredChunk = FilterJsonContentFromChunk(chunk);
+                if (filteredChunk != null)
+                {
+                    _eventManager.RaiseLlmChunkReceived(agentId, turnIndex, filteredChunk);
+                }
             });
         
         sw.Stop();
@@ -383,5 +391,39 @@ public sealed class LlmCommunicator : ILlmCommunicator
 
         // Fallback to double
         return element.GetDouble();
+    }
+
+    /// <summary>
+    /// Filters out JSON content from streaming chunks to prevent showing internal agent responses to users.
+    /// </summary>
+    /// <param name="chunk">The original streaming chunk.</param>
+    /// <returns>A filtered chunk with JSON content removed, or null if the entire chunk should be filtered.</returns>
+    private LlmStreamingChunk? FilterJsonContentFromChunk(LlmStreamingChunk chunk)
+    {
+        if (string.IsNullOrEmpty(chunk.Content))
+        {
+            return chunk; // Keep empty chunks
+        }
+
+        var content = chunk.Content;
+
+        // Check if this chunk contains JSON content that should be filtered
+        if (content.TrimStart().StartsWith("{") || 
+            content.Contains("\"thoughts\"") ||
+            content.Contains("\"action\"") ||
+            content.Contains("\"action_input\"") ||
+            content.Contains("\"reasoning_confidence\"") ||
+            content.Contains("\"reasoning_type\"") ||
+            content.Contains("\"status_title\"") ||
+            content.Contains("\"status_details\"") ||
+            content.Contains("\"next_step_hint\"") ||
+            content.Contains("\"progress_pct\""))
+        {
+            // Return null to indicate this chunk should be filtered out
+            return null;
+        }
+
+        // Return the original chunk if it doesn't contain JSON content
+        return chunk;
     }
 }
