@@ -26,11 +26,11 @@ public sealed class ToolExecutor : IToolExecutor
         IStatusManager statusManager,
         IMetricsCollector metricsCollector)
     {
-        _config = config;
-        _logger = logger;
-        _eventManager = eventManager;
-        _statusManager = statusManager;
-        _metricsCollector = metricsCollector;
+        _config = config ?? throw new ArgumentNullException(nameof(config));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _eventManager = eventManager ?? throw new ArgumentNullException(nameof(eventManager));
+        _statusManager = statusManager ?? throw new ArgumentNullException(nameof(statusManager));
+        _metricsCollector = metricsCollector ?? throw new ArgumentNullException(nameof(metricsCollector));
         _toolTimeout = config.ToolTimeout;
     }
 
@@ -67,6 +67,11 @@ public sealed class ToolExecutor : IToolExecutor
     /// <exception cref="OperationCanceledException">Thrown when the operation is cancelled or times out.</exception>
     public async Task<ToolExecutionResult> ExecuteToolAsync(string toolName, Dictionary<string, object?> parameters, IDictionary<string, ITool> tools, string agentId, int turnIndex, CancellationToken ct)
     {
+        if (string.IsNullOrEmpty(toolName)) throw new ArgumentNullException(nameof(toolName));
+        if (parameters == null) throw new ArgumentNullException(nameof(parameters));
+        if (tools == null) throw new ArgumentNullException(nameof(tools));
+        if (string.IsNullOrEmpty(agentId)) throw new ArgumentNullException(nameof(agentId));
+        
         var dedupeId = HashToolCall(toolName, parameters);
 
         // Raise tool call started event

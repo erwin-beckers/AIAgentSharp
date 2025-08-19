@@ -7,7 +7,7 @@ namespace example;
 
 internal class ReactExample
 {
-    public static async Task RunAsync(string[] args, string apiKey)
+    public static async Task RunAsync(string apiKey)
     {
         // Create the appropriate state store
         IAgentStateStore store = new MemoryAgentStateStore();
@@ -29,7 +29,7 @@ internal class ReactExample
         var config = new AgentConfiguration
         {
             MaxTurns = 40,
-            UseFunctionCalling = true,
+            UseFunctionCalling = false, 
             EmitPublicStatus = true // Enable public status updates
         };
         var agent = new Agent(llm, store, config: config);
@@ -76,6 +76,27 @@ internal class ReactExample
             else
             {
                 Console.WriteLine($"[EVENT] LLM call completed for {e.AgentId} turn {e.TurnIndex + 1} - Action: {e.LlmMessage?.Action}");
+            }
+        };
+
+        // Subscribe to streaming chunks for real-time display (only works when UseFunctionCalling = false)
+        agent.LlmChunkReceived += (sender, e) =>
+        {
+            if (!string.IsNullOrEmpty(e.Chunk.Content))
+            {
+                var content = e.Chunk.Content;
+                
+                // Only show content that's not internal JSON structure
+                // Skip JSON responses that contain internal agent fields
+                if (!content.TrimStart().StartsWith("{") || 
+                    (!content.Contains("\"thoughts\"") && 
+                     !content.Contains("\"action\"") && 
+                     !content.Contains("\"action_input\"") &&
+                     !content.Contains("\"reasoning_confidence\"") &&
+                     !content.Contains("\"reasoning_type\"")))
+                {
+                    Console.Write(content);
+                }
             }
         };
 

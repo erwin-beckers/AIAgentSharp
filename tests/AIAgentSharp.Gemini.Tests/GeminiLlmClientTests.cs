@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Moq;
 using Moq.Protected;
+using System.Linq;
 
 namespace AIAgentSharp.Gemini.Tests;
 
@@ -114,16 +115,19 @@ public class GeminiLlmClientTests
     }
 
     [TestMethod]
-    public async Task CompleteAsync_WithValidMessages_ReturnsResult()
+    public async Task StreamAsync_WithValidInput_ReturnsResult()
     {
         // Arrange
         var mockHttpHandler = new Mock<HttpMessageHandler>();
         var httpClient = new HttpClient(mockHttpHandler.Object);
         var client = new GeminiLlmClient(httpClient, "test-api-key", "gemini-1.5-flash");
         
-        var messages = new List<LlmMessage>
+        var request = new LlmRequest
         {
-            new LlmMessage { Role = "user", Content = "Hello" }
+            Messages = new List<LlmMessage>
+            {
+                new LlmMessage { Role = "user", Content = "Hello" }
+            }
         };
 
         // Mock successful response
@@ -153,60 +157,69 @@ public class GeminiLlmClientTests
             });
 
         // Act
-        var result = await client.CompleteAsync(messages);
+        var chunks = new List<LlmStreamingChunk>();
+        await foreach (var chunk in client.StreamAsync(request))
+        {
+            chunks.Add(chunk);
+        }
 
         // Assert
-        Assert.IsNotNull(result);
-        Assert.AreEqual("Hello! How can I help you today?", result.Content);
-        Assert.IsNotNull(result.Usage);
-        Assert.AreEqual(5, result.Usage.InputTokens);
-        Assert.AreEqual(10, result.Usage.OutputTokens);
+        Assert.IsNotNull(chunks);
+        Assert.IsTrue(chunks.Count > 0);
+        var finalChunk = chunks.Last();
+        Assert.AreEqual("Hello! How can I help you today?", finalChunk.Content);
+        Assert.IsNotNull(finalChunk.Usage);
+        Assert.AreEqual(5, finalChunk.Usage.InputTokens);
+        Assert.AreEqual(10, finalChunk.Usage.OutputTokens);
     }
 
     [TestMethod]
     [ExpectedException(typeof(ArgumentNullException))]
-    public async Task CompleteAsync_WithNullMessages_ThrowsArgumentNullException()
+    public async Task StreamAsync_WithNullRequest_ThrowsArgumentNullException()
     {
         // Arrange
         var client = new GeminiLlmClient("test-api-key");
 
         // Act
-        await client.CompleteAsync(null!);
+        await foreach (var chunk in client.StreamAsync(null!)) { }
     }
 
     [TestMethod]
     [ExpectedException(typeof(ArgumentException))]
-    public async Task CompleteAsync_WithEmptyMessages_ThrowsArgumentException()
+    public async Task StreamAsync_WithEmptyMessages_ThrowsArgumentException()
     {
         // Arrange
         var client = new GeminiLlmClient("test-api-key");
-        var messages = new List<LlmMessage>();
+        var request = new LlmRequest { Messages = new List<LlmMessage>() };
 
         // Act
-        await client.CompleteAsync(messages);
+        await foreach (var chunk in client.StreamAsync(request)) { }
     }
 
     [TestMethod]
-    public async Task CompleteWithFunctionsAsync_WithValidInput_ReturnsResult()
+    public async Task StreamAsync_WithFunctionCalling_ReturnsFunctionCall()
     {
         // Arrange
         var mockHttpHandler = new Mock<HttpMessageHandler>();
         var httpClient = new HttpClient(mockHttpHandler.Object);
         var client = new GeminiLlmClient(httpClient, "test-api-key", "gemini-1.5-flash");
         
-        var messages = new List<LlmMessage>
+        var request = new LlmRequest
         {
-            new LlmMessage { Role = "user", Content = "What's the weather?" }
-        };
-
-        var functions = new List<OpenAiFunctionSpec>
-        {
-            new OpenAiFunctionSpec
+            Messages = new List<LlmMessage>
             {
-                Name = "get_weather",
-                Description = "Get weather information",
-                ParametersSchema = new { type = "object", properties = new { } }
-            }
+                new LlmMessage { Role = "user", Content = "What's the weather?" }
+            },
+            Functions = new List<FunctionSpec>
+            {
+                new FunctionSpec
+                {
+                    Name = "get_weather",
+                    Description = "Get weather information",
+                    ParametersSchema = new { type = "object", properties = new { } }
+                }
+            },
+            ResponseType = LlmResponseType.FunctionCall
         };
 
         // Mock successful response
@@ -242,35 +255,18 @@ public class GeminiLlmClientTests
             });
 
         // Act
-        var result = await client.CompleteWithFunctionsAsync(messages, functions);
+        var chunks = new List<LlmStreamingChunk>();
+        await foreach (var chunk in client.StreamAsync(request))
+        {
+            chunks.Add(chunk);
+        }
 
         // Assert
-        Assert.IsNotNull(result);
-        Assert.IsTrue(result.HasFunctionCall);
-        Assert.AreEqual("get_weather", result.FunctionName);
-    }
-
-    [TestMethod]
-    [ExpectedException(typeof(ArgumentNullException))]
-    public async Task CompleteWithFunctionsAsync_WithNullMessages_ThrowsArgumentNullException()
-    {
-        // Arrange
-        var client = new GeminiLlmClient("test-api-key");
-        var functions = new List<OpenAiFunctionSpec>();
-
-        // Act
-        await client.CompleteWithFunctionsAsync(null!, functions);
-    }
-
-    [TestMethod]
-    [ExpectedException(typeof(ArgumentNullException))]
-    public async Task CompleteWithFunctionsAsync_WithNullFunctions_ThrowsArgumentNullException()
-    {
-        // Arrange
-        var client = new GeminiLlmClient("test-api-key");
-        var messages = new List<LlmMessage> { new LlmMessage { Role = "user", Content = "Hello" } };
-
-        // Act
-        await client.CompleteWithFunctionsAsync(messages, null!);
+        Assert.IsNotNull(chunks);
+        Assert.IsTrue(chunks.Count > 0);
+        var finalChunk = chunks.Last();
+        Assert.IsTrue(finalChunk.ActualResponseType == LlmResponseType.FunctionCall);
+        Assert.IsNotNull(finalChunk.FunctionCall);
+        Assert.AreEqual("get_weather", finalChunk.FunctionCall.Name);
     }
 }

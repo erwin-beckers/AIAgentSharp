@@ -6,24 +6,24 @@ namespace AIAgentSharp;
 public sealed class LlmUsage
 {
     /// <summary>
-    /// Gets the number of input/prompt tokens counted by the provider.
+    /// Gets or sets the number of input/prompt tokens counted by the provider.
     /// </summary>
-    public long InputTokens { get; init; }
+    public long InputTokens { get; set; }
 
     /// <summary>
-    /// Gets the number of output/completion tokens counted by the provider.
+    /// Gets or sets the number of output/completion tokens counted by the provider.
     /// </summary>
-    public long OutputTokens { get; init; }
+    public long OutputTokens { get; set; }
 
     /// <summary>
-    /// Gets the model name as reported by the provider (if available).
+    /// Gets or sets the model name as reported by the provider (if available).
     /// </summary>
-    public string Model { get; init; } = string.Empty;
+    public string Model { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets the logical provider name (e.g., "OpenAI", "Anthropic").
+    /// Gets or sets the logical provider name (e.g., "OpenAI", "Anthropic").
     /// </summary>
-    public string Provider { get; init; } = string.Empty;
+    public string Provider { get; set; } = string.Empty;
 }
 
 

@@ -108,7 +108,12 @@ public sealed class Agent : IAgent
             var stepStopwatch = System.Diagnostics.Stopwatch.StartNew();
             var step = await _orchestrator.ExecuteStepAsync(state, registry, ct);
             stepStopwatch.Stop();
+            
+            // Record state store operation metrics
+            var storeStopwatch = System.Diagnostics.Stopwatch.StartNew();
             await _store.SaveAsync(agentId, state, ct);
+            storeStopwatch.Stop();
+            _metricsCollector.RecordStateStoreOperation(agentId, "Save", storeStopwatch.ElapsedMilliseconds);
 
             // Record step metrics
             _metricsCollector.RecordAgentStepExecutionTime(agentId, state.Turns.Count, stepStopwatch.ElapsedMilliseconds);
@@ -322,6 +327,12 @@ public sealed class Agent : IAgent
         remove => _eventManager.LlmCallCompleted -= value;
     }
 
+    public event EventHandler<AgentLlmChunkReceivedEventArgs>? LlmChunkReceived
+    {
+        add => _eventManager.LlmChunkReceived += value;
+        remove => _eventManager.LlmChunkReceived -= value;
+    }
+
     public event EventHandler<AgentToolCallStartedEventArgs>? ToolCallStarted
     {
         add => _eventManager.ToolCallStarted += value;
@@ -362,12 +373,16 @@ public sealed class Agent : IAgent
 
     private async Task<AgentState> EnsureState(string agentId, string goal, CancellationToken ct)
     {
+        var loadStopwatch = System.Diagnostics.Stopwatch.StartNew();
         var state = await _store.LoadAsync(agentId, ct) ?? new AgentState
         {
             AgentId = agentId,
             Goal = goal,
             Turns = new List<AgentTurn>()
         };
+        loadStopwatch.Stop();
+        _metricsCollector.RecordStateStoreOperation(agentId, "Load", loadStopwatch.ElapsedMilliseconds);
+        
         state.Goal = string.IsNullOrWhiteSpace(state.Goal) ? goal : state.Goal;
         return state;
     }

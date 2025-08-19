@@ -1,4 +1,6 @@
 using AIAgentSharp.Agents.Interfaces;
+using AIAgentSharp.Agents.TreeOfThoughts;
+using AIAgentSharp.Agents.ChainOfThought;
 using AIAgentSharp.Metrics;
 
 namespace AIAgentSharp.Agents;
@@ -6,7 +8,7 @@ namespace AIAgentSharp.Agents;
 /// <summary>
 /// Manages reasoning engines and coordinates reasoning activities within the agent framework.
 /// </summary>
-public sealed class ReasoningManager
+public sealed class ReasoningManager : IReasoningManager
 {
     private readonly ILlmClient _llm;
     private readonly AgentConfiguration _config;
@@ -76,6 +78,11 @@ public sealed class ReasoningManager
     /// <exception cref="OperationCanceledException">Thrown when the operation is cancelled via <paramref name="cancellationToken"/>.</exception>
     public async Task<ReasoningResult> ReasonAsync(string goal, string context, IDictionary<string, ITool> tools, CancellationToken cancellationToken = default)
     {
+        if (string.IsNullOrEmpty(goal)) throw new ArgumentNullException(nameof(goal));
+        if (context == null) throw new ArgumentNullException(nameof(context));
+        if (tools == null) throw new ArgumentNullException(nameof(tools));
+        cancellationToken.ThrowIfCancellationRequested();
+
         _logger.LogInformation($"Starting reasoning with type: {_config.ReasoningType}");
 
         if (!_reasoningEngines.TryGetValue(_config.ReasoningType, out var engine))
@@ -124,6 +131,11 @@ public sealed class ReasoningManager
     /// <exception cref="OperationCanceledException">Thrown when the operation is cancelled via <paramref name="cancellationToken"/>.</exception>
     public async Task<ReasoningResult> ReasonAsync(ReasoningType reasoningType, string goal, string context, IDictionary<string, ITool> tools, CancellationToken cancellationToken = default)
     {
+        if (string.IsNullOrEmpty(goal)) throw new ArgumentNullException(nameof(goal));
+        if (context == null) throw new ArgumentNullException(nameof(context));
+        if (tools == null) throw new ArgumentNullException(nameof(tools));
+        cancellationToken.ThrowIfCancellationRequested();
+
         _logger.LogInformation($"Starting reasoning with type: {reasoningType}");
 
         if (!_reasoningEngines.TryGetValue(reasoningType, out var engine))
@@ -215,6 +227,11 @@ public sealed class ReasoningManager
     /// <returns>The combined reasoning result.</returns>
     public async Task<ReasoningResult> PerformHybridReasoningAsync(string goal, string context, IDictionary<string, ITool> tools, CancellationToken cancellationToken = default)
     {
+        if (string.IsNullOrEmpty(goal)) throw new ArgumentNullException(nameof(goal));
+        if (context == null) throw new ArgumentNullException(nameof(context));
+        if (tools == null) throw new ArgumentNullException(nameof(tools));
+        cancellationToken.ThrowIfCancellationRequested();
+
         _logger.LogInformation("Starting hybrid reasoning combining multiple approaches");
 
         var results = new List<ReasoningResult>();
@@ -319,7 +336,12 @@ Provide your synthesized conclusion in the following JSON format:
 Focus on creating a unified, actionable conclusion that leverages the strengths of all approaches.";
 
         var messages = new List<LlmMessage> { new LlmMessage { Role = "user", Content = prompt } };
-        var response = await _llm.CompleteAsync(messages, cancellationToken);
+        var request = new LlmRequest { Messages = messages, ResponseType = LlmResponseType.Text };
+        var response = await LlmResponseAggregator.AggregateChunksAsync(_llm.StreamAsync(request, cancellationToken));
+        
+        // Record API call for reasoning manager conclusion
+        _metricsCollector.RecordApiCall(string.Empty, "LLM", "reasoning-conclusion");
+        
         var content = response.Content;
         return ExtractConclusionFromResponse(content);
     }

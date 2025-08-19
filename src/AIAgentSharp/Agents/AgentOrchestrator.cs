@@ -23,7 +23,7 @@ public sealed class AgentOrchestrator : IAgentOrchestrator
     private readonly IToolExecutor _toolExecutor;
     private readonly ILoopDetector _loopDetector;
     private readonly IMessageBuilder _messageBuilder;
-    private readonly ReasoningManager _reasoningManager;
+    private readonly IReasoningManager _reasoningManager;
 
     public AgentOrchestrator(
         ILlmClient llm,
@@ -32,22 +32,27 @@ public sealed class AgentOrchestrator : IAgentOrchestrator
         ILogger logger,
         IEventManager eventManager,
         IStatusManager statusManager,
-        IMetricsCollector metricsCollector)
+        IMetricsCollector metricsCollector,
+        ILlmCommunicator? llmCommunicator = null,
+        IToolExecutor? toolExecutor = null,
+        ILoopDetector? loopDetector = null,
+        IMessageBuilder? messageBuilder = null,
+        IReasoningManager? reasoningManager = null)
     {
-        _llm = llm;
-        _store = store;
-        _config = config;
-        _logger = logger;
-        _eventManager = eventManager;
-        _statusManager = statusManager;
-        _metricsCollector = metricsCollector;
+        _llm = llm ?? throw new ArgumentNullException(nameof(llm));
+        _store = store ?? throw new ArgumentNullException(nameof(store));
+        _config = config ?? throw new ArgumentNullException(nameof(config));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _eventManager = eventManager ?? throw new ArgumentNullException(nameof(eventManager));
+        _statusManager = statusManager ?? throw new ArgumentNullException(nameof(statusManager));
+        _metricsCollector = metricsCollector ?? throw new ArgumentNullException(nameof(metricsCollector));
 
-        // Initialize specialized components
-        _llmCommunicator = new LlmCommunicator(_llm, _config, _logger, _eventManager, _statusManager, _metricsCollector);
-        _toolExecutor = new ToolExecutor(_config, _logger, _eventManager, _statusManager, _metricsCollector);
-        _loopDetector = new LoopDetector(_config, _logger);
-        _messageBuilder = new MessageBuilder(_config);
-        _reasoningManager = new ReasoningManager(_llm, _config, _logger, _eventManager, _statusManager, _metricsCollector);
+        // Allow dependency injection for testing, but create defaults if not provided
+        _llmCommunicator = llmCommunicator ?? new LlmCommunicator(_llm, _config, _logger, _eventManager, _statusManager, _metricsCollector);
+        _toolExecutor = toolExecutor ?? new ToolExecutor(_config, _logger, _eventManager, _statusManager, _metricsCollector);
+        _loopDetector = loopDetector ?? new LoopDetector(_config, _logger);
+        _messageBuilder = messageBuilder ?? new MessageBuilder(_config);
+        _reasoningManager = reasoningManager ?? new ReasoningManager(_llm, _config, _logger, _eventManager, _statusManager, _metricsCollector);
     }
 
     /// <summary>
@@ -80,6 +85,9 @@ public sealed class AgentOrchestrator : IAgentOrchestrator
     /// <exception cref="OperationCanceledException">Thrown when the operation is cancelled via <paramref name="ct"/>.</exception>
     public async Task<AgentStepResult> ExecuteStepAsync(AgentState state, IDictionary<string, ITool> tools, CancellationToken ct)
     {
+        if (state == null) throw new ArgumentNullException(nameof(state));
+        if (tools == null) throw new ArgumentNullException(nameof(tools));
+        
         var turnIndex = state.Turns.Count;
         var turnId = GenerateTurnId(turnIndex);
 
@@ -114,7 +122,7 @@ public sealed class AgentOrchestrator : IAgentOrchestrator
             {
                 var functionSpecs = tools.Values
                     .OfType<IFunctionSchemaProvider>()
-                    .Select(t => new OpenAiFunctionSpec
+                    .Select(t => new FunctionSpec
                     {
                         Name = t.Name,
                         Description = t.Description,
@@ -129,7 +137,7 @@ public sealed class AgentOrchestrator : IAgentOrchestrator
 
                     if (functionResult.HasFunctionCall)
                     {
-                        _logger.LogInformation($"Function call received: {functionResult.FunctionName}");
+                        _logger.LogInformation($"Function call received: {functionResult.FunctionCall?.Name}");
 
                         try
                         {
@@ -137,7 +145,7 @@ public sealed class AgentOrchestrator : IAgentOrchestrator
                             modelMsg = _llmCommunicator.NormalizeFunctionCallToReact(functionResult, turnIndex);
 
                             // Emit status after parsing model action
-                            _statusManager.EmitStatus(state.AgentId, "Tool call detected", $"Calling {functionResult.FunctionName}", "Executing tool");
+                            _statusManager.EmitStatus(state.AgentId, "Tool call detected", $"Calling {functionResult.FunctionCall?.Name}", "Executing tool");
 
                             // Continue with tool execution (same as JSON path)
                             return await ProcessToolCall(modelMsg, state, tools, turnIndex, turnId, ct);
@@ -153,7 +161,7 @@ public sealed class AgentOrchestrator : IAgentOrchestrator
                     }
                     // Function calling failed, fall back to JSON parsing
                     _logger.LogDebug("Function calling returned no function call, falling back to JSON parsing");
-                    var llmRaw = functionResult.RawTextFallback ?? functionResult.AssistantContent ?? "";
+                    var llmRaw = functionResult.Content ?? "";
                     modelMsg = await _llmCommunicator.ParseJsonResponse(llmRaw, turnIndex, turnId, state, ct);
 
                     if (modelMsg != null)
@@ -244,6 +252,10 @@ public sealed class AgentOrchestrator : IAgentOrchestrator
             if (prior?.ToolResult != null)
             {
                 _logger.LogInformation($"Reusing existing successful tool result for id {dedupeId} (age: {DateTimeOffset.UtcNow - prior.ToolResult.CreatedUtc})");
+                
+                // Record deduplication cache hit
+                _metricsCollector.RecordDeduplicationEvent(state.AgentId, toolName, true);
+                
                 return new AgentStepResult
                 {
                     Continue = true,
@@ -258,6 +270,9 @@ public sealed class AgentOrchestrator : IAgentOrchestrator
         var turn = new AgentTurn { Index = turnIndex, TurnId = turnId, LlmMessage = modelMsg };
         turn.ToolCall = new ToolCallRequest { Tool = toolName, Params = prms, TurnId = dedupeId };
 
+        // Record deduplication cache miss (tool is being executed, not reused)
+        _metricsCollector.RecordDeduplicationEvent(state.AgentId, toolName, false);
+        
         // Execute the tool
         var execResult = await _toolExecutor.ExecuteToolAsync(toolName, prms, tools, state.AgentId, turnIndex, ct);
 
@@ -338,7 +353,7 @@ public sealed class AgentOrchestrator : IAgentOrchestrator
         }
     }
 
-    private Task<AgentStepResult> HandleFunctionArgumentError(AgentState state, FunctionCallResult functionResult, int turnIndex, string turnId, string errorMessage)
+    private Task<AgentStepResult> HandleFunctionArgumentError(AgentState state, LlmResponse functionResult, int turnIndex, string turnId, string errorMessage)
     {
         _logger.LogWarning($"Function argument parsing failed: {errorMessage}");
         _statusManager.EmitStatus(state.AgentId, "Function call error", "Invalid function arguments", "Will retry with corrected parameters");
@@ -350,7 +365,7 @@ public sealed class AgentOrchestrator : IAgentOrchestrator
             LlmMessage = null,
             ToolCall = new ToolCallRequest
             {
-                Tool = functionResult.FunctionName ?? "unknown",
+                Tool = functionResult.FunctionCall?.Name ?? "unknown",
                 Params = new Dictionary<string, object?>(),
                 TurnId = turnId
             },
@@ -358,7 +373,7 @@ public sealed class AgentOrchestrator : IAgentOrchestrator
             {
                 Success = false,
                 Error = errorMessage,
-                Tool = functionResult.FunctionName ?? "unknown",
+                Tool = functionResult.FunctionCall?.Name ?? "unknown",
                 Params = new Dictionary<string, object?>(),
                 TurnId = turnId,
                 CreatedUtc = DateTimeOffset.UtcNow
@@ -375,7 +390,7 @@ public sealed class AgentOrchestrator : IAgentOrchestrator
         });
     }
 
-    private Task<AgentStepResult> HandleUnknownToolError(AgentState state, FunctionCallResult functionResult, int turnIndex, string turnId, string errorMessage)
+    private Task<AgentStepResult> HandleUnknownToolError(AgentState state, LlmResponse functionResult, int turnIndex, string turnId, string errorMessage)
     {
         _logger.LogWarning($"Unknown tool in function call: {errorMessage}");
         _statusManager.EmitStatus(state.AgentId, "Tool not found", errorMessage, "Will try different approach");
@@ -387,7 +402,7 @@ public sealed class AgentOrchestrator : IAgentOrchestrator
             LlmMessage = null,
             ToolCall = new ToolCallRequest
             {
-                Tool = functionResult.FunctionName ?? "unknown",
+                Tool = functionResult.FunctionCall?.Name ?? "unknown",
                 Params = new Dictionary<string, object?>(),
                 TurnId = turnId
             },
@@ -395,7 +410,7 @@ public sealed class AgentOrchestrator : IAgentOrchestrator
             {
                 Success = false,
                 Error = errorMessage,
-                Tool = functionResult.FunctionName ?? "unknown",
+                Tool = functionResult.FunctionCall?.Name ?? "unknown",
                 Params = new Dictionary<string, object?>(),
                 TurnId = turnId,
                 CreatedUtc = DateTimeOffset.UtcNow
@@ -438,6 +453,9 @@ public sealed class AgentOrchestrator : IAgentOrchestrator
         {
             _logger.LogWarning($"Loop-breaker triggered for {toolName} with repeated failures");
             _statusManager.EmitStatus(state.AgentId, "Loop breaker triggered", "Repeated failures detected", "Will try different approach");
+            
+            // Record loop detection metrics
+            _metricsCollector.RecordLoopDetection(state.AgentId, toolName, _config.ConsecutiveFailureThreshold);
             state.Turns.Add(new AgentTurn
             {
                 Index = turnIndex + 2,

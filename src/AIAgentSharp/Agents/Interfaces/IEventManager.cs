@@ -12,6 +12,7 @@ public interface IEventManager
     event EventHandler<AgentStepStartedEventArgs>? StepStarted;
     event EventHandler<AgentLlmCallStartedEventArgs>? LlmCallStarted;
     event EventHandler<AgentLlmCallCompletedEventArgs>? LlmCallCompleted;
+    event EventHandler<AgentLlmChunkReceivedEventArgs>? LlmChunkReceived;
     event EventHandler<AgentToolCallStartedEventArgs>? ToolCallStarted;
     event EventHandler<AgentToolCallCompletedEventArgs>? ToolCallCompleted;
     event EventHandler<AgentStepCompletedEventArgs>? StepCompleted;
@@ -23,6 +24,7 @@ public interface IEventManager
     void RaiseStepStarted(string agentId, int turnIndex);
     void RaiseLlmCallStarted(string agentId, int turnIndex);
     void RaiseLlmCallCompleted(string agentId, int turnIndex, ModelMessage? llmMessage, string? error = null);
+    void RaiseLlmChunkReceived(string agentId, int turnIndex, LlmStreamingChunk chunk);
     void RaiseToolCallStarted(string agentId, int turnIndex, string toolName, Dictionary<string, object?> parameters);
     void RaiseToolCallCompleted(string agentId, int turnIndex, string toolName, bool success, object? output = null, string? error = null, TimeSpan? executionTime = null);
     void RaiseStepCompleted(string agentId, int turnIndex, AgentStepResult stepResult);

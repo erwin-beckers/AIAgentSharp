@@ -1,13 +1,12 @@
 using OpenAI;
 using OpenAI.Chat;
 using System.ClientModel;
-using System.Diagnostics.CodeAnalysis;
 
 namespace AIAgentSharp.OpenAI;
 
 /// <summary>
 /// OpenAI LLM client implementation that integrates with the OpenAI SDK.
-/// This client supports both regular chat completion and function calling.
+/// This client supports text completion, function calling, and streaming through a unified interface.
 /// </summary>
 public sealed class OpenAiLlmClient : ILlmClient
 {
@@ -83,143 +82,226 @@ public sealed class OpenAiLlmClient : ILlmClient
     }
 
     /// <summary>
-    /// Completes a conversation with function calling capabilities.
+    /// Streams chunks from the OpenAI LLM based on the provided request.
+    /// This method always returns chunks, regardless of whether streaming is enabled.
     /// </summary>
-    /// <param name="messages">The conversation messages to send to the LLM.</param>
-    /// <param name="functions">The available functions that the LLM can call.</param>
+    /// <param name="request">The unified request containing messages, functions, and configuration.</param>
     /// <param name="ct">Cancellation token for the operation.</param>
-    /// <returns>The result of the function calling operation.</returns>
+    /// <returns>An async enumerable of LLM streaming chunks.</returns>
     /// <exception cref="OperationCanceledException">Thrown when the operation is cancelled.</exception>
-    public async Task<FunctionCallResult> CompleteWithFunctionsAsync(
-        IEnumerable<LlmMessage> messages,
-        IEnumerable<OpenAiFunctionSpec> functions,
-        CancellationToken ct = default)
+    public async IAsyncEnumerable<LlmStreamingChunk> StreamAsync(LlmRequest request, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
     {
-        try
+        if (request == null)
         {
-            _logger.LogDebug($"Starting function calling completion with model {_model}");
+            throw new ArgumentNullException(nameof(request));
+        }
 
-            // Map messages to OpenAI.Chat message types
-            var chatMessages = new List<ChatMessage>();
+        if (request.Messages == null || !request.Messages.Any())
+        {
+            throw new ArgumentException("Request must contain at least one message.", nameof(request));
+        }
 
-            foreach (var m in messages)
+        _logger.LogDebug($"Starting streaming completion with model {_model}, response type: {request.ResponseType}");
+
+        // Map messages to OpenAI.Chat message types
+        var chatMessages = new List<ChatMessage>();
+
+        foreach (var m in request.Messages)
+        {
+            switch (m.Role)
             {
-                switch (m.Role)
-                {
-                    case "system":
-                        chatMessages.Add(new SystemChatMessage(m.Content));
-                        break;
-                    case "assistant":
-                        chatMessages.Add(new AssistantChatMessage(m.Content));
-                        break;
-                    case "user":
-                        chatMessages.Add(new UserChatMessage(m.Content));
-                        break;
-                    case "tool":
-                        chatMessages.Add(new ToolChatMessage(m.Content));
-                        break;
-                    default:
-                        _logger.LogWarning($"Unknown message role: {m.Role}, treating as user message");
-                        chatMessages.Add(new UserChatMessage(m.Content));
-                        break;
-                }
+                case "system":
+                    chatMessages.Add(new SystemChatMessage(m.Content));
+                    break;
+                case "assistant":
+                    chatMessages.Add(new AssistantChatMessage(m.Content));
+                    break;
+                case "user":
+                    chatMessages.Add(new UserChatMessage(m.Content));
+                    break;
+                case "tool":
+                    chatMessages.Add(new ToolChatMessage(m.Content));
+                    break;
+                default:
+                    _logger.LogWarning($"Unknown message role: {m.Role}, treating as user message");
+                    chatMessages.Add(new UserChatMessage(m.Content));
+                    break;
+            }
+        }
+
+        // Create chat completion options
+        var options = new ChatCompletionOptions();
+        
+        // Set temperature and top_p if provided
+        if (request.Temperature.HasValue)
+        {
+            options.Temperature = (float)request.Temperature.Value;
+        }
+        
+        if (request.TopP.HasValue)
+        {
+            options.TopP = (float)request.TopP.Value;
+        }
+
+        // Convert functions to tools if provided
+        if (request.Functions != null && request.Functions.Any())
+        {
+            var tools = ConvertToOpenAiTools(request.Functions);
+            foreach (var tool in tools)
+            {
+                options.Tools.Add(tool);
+            }
+        }
+
+        var chatClient = _client.GetChatClient(_model);
+        var usage = new LlmUsage
+        {
+            Model = _model,
+            Provider = "OpenAI"
+        };
+
+        // For function calls, use non-streaming API since they're typically returned as complete objects
+        if (request.Functions != null && request.Functions.Any())
+        {
+            var response = await chatClient.CompleteChatAsync(chatMessages, options, ct);
+            var completion = response.Value;
+            
+            var content = string.Empty;
+            if (completion.Content.Count > 0)
+            {
+                content = completion.Content[0].Text;
             }
 
-            // For now, implement a simplified version that falls back to regular completion
-            // This will be enhanced once we understand the correct API for function calling
-            var chatClient = _client.GetChatClient(_model);
-            var response = await chatClient.CompleteChatAsync(chatMessages, cancellationToken: ct);
-            var completion = response.Value;
+            usage.InputTokens = completion.Usage.InputTokenCount;
+            usage.OutputTokens = completion.Usage.OutputTokenCount;
 
-            // Access the content from the completion
-            var content = completion.Content?.FirstOrDefault()?.Text ?? string.Empty;
-            _logger.LogDebug($"Regular completion returned: {content.Length} characters");
-
-            return new FunctionCallResult
+            // Check if there are tool calls
+            if (completion.ToolCalls != null && completion.ToolCalls.Count > 0)
             {
-                HasFunctionCall = false,
-                AssistantContent = content,
-                RawTextFallback = content,
-                Usage = new LlmUsage
+                foreach (var toolCall in completion.ToolCalls)
                 {
-                    InputTokens = completion.Usage.InputTokenCount,
-                    OutputTokens = completion.Usage.OutputTokenCount,
-                    Model = _model,
-                    Provider = "OpenAI"
+                    var functionCall = new LlmFunctionCall
+                    {
+                        Name = toolCall.FunctionName ?? string.Empty,
+                        ArgumentsJson = toolCall.FunctionArguments?.ToString() ?? "{}",
+                        Arguments = !string.IsNullOrEmpty(toolCall.FunctionArguments?.ToString())
+                            ? System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object>>(toolCall.FunctionArguments.ToString()) ?? new Dictionary<string, object>()
+                            : new Dictionary<string, object>()
+                    };
+
+                    yield return new LlmStreamingChunk
+                    {
+                        Content = content,
+                        IsFinal = true,
+                        FinishReason = "tool_calls",
+                        ActualResponseType = LlmResponseType.FunctionCall,
+                        FunctionCall = functionCall,
+                        Usage = usage
+                    };
                 }
-            };
+            }
+            else
+            {
+                // No tool calls, return as text
+                yield return new LlmStreamingChunk
+                {
+                    Content = content,
+                    IsFinal = true,
+                    FinishReason = "stop",
+                    ActualResponseType = LlmResponseType.Text,
+                    Usage = usage
+                };
+            }
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        else
         {
-            _logger.LogError($"Error in function calling completion: {ex.Message}");
-            throw new InvalidOperationException($"OpenAI function calling failed: {ex.Message}", ex);
+            // Use streaming API for text responses
+            var completionUpdates = chatClient.CompleteChatStreamingAsync(chatMessages, options);
+            var contentBuilder = new System.Text.StringBuilder();
+
+            await foreach (var completionUpdate in completionUpdates.WithCancellation(ct))
+            {
+                // Accumulate the text content as new updates arrive
+                foreach (var contentPart in completionUpdate.ContentUpdate)
+                {
+                    contentBuilder.Append(contentPart.Text);
+                    
+                    // Yield a chunk for each content update
+                    yield return new LlmStreamingChunk
+                    {
+                        Content = contentPart.Text,
+                        IsFinal = false,
+                        ActualResponseType = LlmResponseType.Streaming,
+                        Usage = usage
+                    };
+                }
+
+                // Handle finish reasons
+                if (completionUpdate.FinishReason.HasValue)
+                {
+                    switch (completionUpdate.FinishReason.Value)
+                    {
+                        case ChatFinishReason.Stop:
+                            // Final chunk with complete content
+                            yield return new LlmStreamingChunk
+                            {
+                                Content = contentBuilder.ToString(),
+                                IsFinal = true,
+                                FinishReason = "stop",
+                                ActualResponseType = LlmResponseType.Text,
+                                Usage = usage
+                            };
+                            break;
+
+                        case ChatFinishReason.Length:
+                            yield return new LlmStreamingChunk
+                            {
+                                Content = contentBuilder.ToString(),
+                                IsFinal = true,
+                                FinishReason = "length",
+                                ActualResponseType = LlmResponseType.Text,
+                                Usage = usage
+                            };
+                            break;
+
+                        case ChatFinishReason.ContentFilter:
+                            yield return new LlmStreamingChunk
+                            {
+                                Content = contentBuilder.ToString(),
+                                IsFinal = true,
+                                FinishReason = "content_filter",
+                                ActualResponseType = LlmResponseType.Text,
+                                Usage = usage
+                            };
+                            break;
+                    }
+                }
+            }
         }
     }
 
-    /// <summary>
-    /// Completes a conversation by sending messages to the OpenAI LLM.
-    /// </summary>
-    /// <param name="messages">The conversation messages to send to the LLM.</param>
-    /// <param name="ct">Cancellation token for the operation.</param>
-    /// <returns>The LLM's response with usage metadata.</returns>
-    /// <exception cref="OperationCanceledException">Thrown when the operation is cancelled.</exception>
-    public async Task<LlmCompletionResult> CompleteAsync(IEnumerable<LlmMessage> messages, CancellationToken ct = default)
+    private static List<ChatTool> ConvertToOpenAiTools(IEnumerable<FunctionSpec> functions)
     {
-        try
+        var tools = new List<ChatTool>();
+        
+        foreach (var function in functions)
         {
-            _logger.LogDebug($"Starting regular completion with model {_model}");
-
-            // Map messages to OpenAI.Chat message types
-            var chatMessages = new List<ChatMessage>();
-
-            foreach (var m in messages)
+            string? parametersJson = null;
+            if (function.ParametersSchema != null)
             {
-                switch (m.Role)
-                {
-                    case "system":
-                        chatMessages.Add(new SystemChatMessage(m.Content));
-                        break;
-                    case "assistant":
-                        chatMessages.Add(new AssistantChatMessage(m.Content));
-                        break;
-                    case "user":
-                        chatMessages.Add(new UserChatMessage(m.Content));
-                        break;
-                    case "tool":
-                        chatMessages.Add(new ToolChatMessage(m.Content));
-                        break;
-                    default:
-                        _logger.LogWarning($"Unknown message role: {m.Role}, treating as user message");
-                        chatMessages.Add(new UserChatMessage(m.Content));
-                        break;
-                }
+                parametersJson = System.Text.Json.JsonSerializer.Serialize(function.ParametersSchema);
             }
-
-            // Get chat client and complete
-            var chatClient = _client.GetChatClient(_model);
-            var response = await chatClient.CompleteChatAsync(chatMessages, cancellationToken: ct);
-            var completion = response.Value;
-
-            // Access the content from the completion
-            var content = completion.Content?.FirstOrDefault()?.Text ?? string.Empty;
-            _logger.LogDebug($"Completion successful: {content.Length} characters");
-
-            return new LlmCompletionResult
-            {
-                Content = content,
-                Usage = new LlmUsage
-                {
-                    InputTokens = completion.Usage.InputTokenCount,
-                    OutputTokens = completion.Usage.OutputTokenCount,
-                    Model = _model,
-                    Provider = "OpenAI"
-                }
-            };
+            
+            var tool = ChatTool.CreateFunctionTool(
+                functionName: function.Name,
+                functionDescription: function.Description ?? string.Empty,
+                functionParameters: !string.IsNullOrEmpty(parametersJson) 
+                    ? BinaryData.FromBytes(System.Text.Encoding.UTF8.GetBytes(parametersJson))
+                    : null
+            );
+            tools.Add(tool);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            _logger.LogError($"Error in regular completion: {ex.Message}");
-            throw new InvalidOperationException($"OpenAI completion failed: {ex.Message}", ex);
-        }
+        
+        return tools;
     }
 }

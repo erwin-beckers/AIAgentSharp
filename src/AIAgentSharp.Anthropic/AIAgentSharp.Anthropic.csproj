@@ -18,11 +18,14 @@
 
   <ItemGroup>
     <PackageReference Include="Anthropic.SDK" Version="5.5.0" />
-    <PackageReference Include="AIAgentSharp" Version="1.0.8" />
   </ItemGroup>
 
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="/" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AIAgentSharp\AIAgentSharp.csproj" />
   </ItemGroup>
 
 </Project>

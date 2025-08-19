@@ -35,29 +35,15 @@ public sealed class LlmCommunicator : ILlmCommunicator
     }
 
     /// <summary>
-    /// Calls the LLM with function calling support, enabling structured tool invocation.
+    /// Calls the LLM with function calling capabilities using the unified streaming interface.
     /// </summary>
     /// <param name="messages">The conversation messages to send to the LLM.</param>
-    /// <param name="functionSpecs">List of function specifications for available tools.</param>
+    /// <param name="functionSpecs">The available functions that the LLM can call.</param>
     /// <param name="agentId">Identifier of the agent making the call.</param>
     /// <param name="turnIndex">Current turn index for event tracking.</param>
-    /// <param name="ct">Cancellation token for aborting the operation.</param>
-    /// <returns>
-    /// A <see cref="FunctionCallResult"/> containing the LLM response and any function call details.
-    /// </returns>
-    /// <remarks>
-    /// <para>
-    /// This method attempts to use function calling if the LLM client supports it. Function calling
-    /// provides more reliable tool selection and parameter extraction compared to the Re/Act pattern.
-    /// </para>
-    /// <para>
-    /// If function calling is not supported by the LLM client, this method will throw a
-    /// <see cref="NotSupportedException"/> which should be handled by the calling code.
-    /// </para>
-    /// </remarks>
-    /// <exception cref="OperationCanceledException">Thrown when the operation is cancelled or times out.</exception>
-    /// <exception cref="NotSupportedException">Thrown when the LLM client doesn't support function calling.</exception>
-    public async Task<FunctionCallResult> CallWithFunctionsAsync(IEnumerable<LlmMessage> messages, List<OpenAiFunctionSpec> functionSpecs, string agentId, int turnIndex, CancellationToken ct)
+    /// <param name="ct">Cancellation token for the operation.</param>
+    /// <returns>The result of the function calling operation.</returns>
+    public async Task<LlmResponse> CallWithFunctionsAsync(IEnumerable<LlmMessage> messages, List<FunctionSpec> functionSpecs, string agentId, int turnIndex, CancellationToken ct)
     {
         // Raise LLM call started event
         _eventManager.RaiseLlmCallStarted(agentId, turnIndex);
@@ -65,8 +51,24 @@ public sealed class LlmCommunicator : ILlmCommunicator
         using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         timeoutCts.CancelAfter(_llmTimeout);
 
+        var request = new LlmRequest
+        {
+            Messages = messages,
+            Functions = functionSpecs,
+            ResponseType = LlmResponseType.FunctionCall
+        };
+
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-        var functionResult = await _llm.CompleteWithFunctionsAsync(messages, functionSpecs, timeoutCts.Token);
+        
+        // Use the new streaming interface and aggregate chunks
+        var response = await LlmResponseAggregator.ProcessChunksWithCallbackAsync(
+            _llm.StreamAsync(request, timeoutCts.Token),
+            chunk => 
+            {
+                // Emit real-time chunk events for UI updates
+                _eventManager.RaiseLlmChunkReceived(agentId, turnIndex, chunk);
+            });
+        
         stopwatch.Stop();
 
         // Record metrics
@@ -75,15 +77,12 @@ public sealed class LlmCommunicator : ILlmCommunicator
         _metricsCollector.RecordApiCall(agentId, "LLM", "function-calling");
 
         // If provider reported usage, record token usage
-        if (functionResult.Usage != null)
+        if (response.Usage != null)
         {
-            _metricsCollector.RecordTokenUsage(agentId, turnIndex, (int)functionResult.Usage.InputTokens, (int)functionResult.Usage.OutputTokens, functionResult.Usage.Model);
+            _metricsCollector.RecordTokenUsage(agentId, turnIndex, (int)response.Usage.InputTokens, (int)response.Usage.OutputTokens, response.Usage.Model);
         }
 
-        // Raise LLM call completed event for function call
-        _eventManager.RaiseLlmCallCompleted(agentId, turnIndex, null);
-
-        return functionResult;
+        return response;
     }
 
     /// <summary>
@@ -119,9 +118,9 @@ public sealed class LlmCommunicator : ILlmCommunicator
     {
         try
         {
-            var result = await CallLlmWithUsage(messages, agentId, turnIndex, ct);
+            var response = await CallLlmWithUsage(messages, agentId, turnIndex, ct);
             // Parse content
-            var model = await ParseJsonResponse(result.Content, turnIndex, turnId, state, ct);
+            var model = await ParseJsonResponse(response.Content, turnIndex, turnId, state, ct);
             return model;
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -157,7 +156,7 @@ public sealed class LlmCommunicator : ILlmCommunicator
         }
         catch (Exception llmEx)
         {
-            // Handle general LLM errors (e.g., 5xx)
+            // Handle other LLM errors
             var err = $"LLM call failed: {llmEx.Message}";
             _logger.LogError(err);
 
@@ -229,50 +228,69 @@ public sealed class LlmCommunicator : ILlmCommunicator
         }
     }
 
-    public ModelMessage NormalizeFunctionCallToReact(FunctionCallResult functionResult, int turnIndex)
+    /// <summary>
+    /// Normalizes a function call result to Re/Act format.
+    /// </summary>
+    /// <param name="functionResult">The function call result from the LLM.</param>
+    /// <param name="turnIndex">The current turn index.</param>
+    /// <returns>A normalized ModelMessage in Re/Act format.</returns>
+    public ModelMessage NormalizeFunctionCallToReact(LlmResponse functionResult, int turnIndex)
     {
-        // Parse function arguments
-        Dictionary<string, object?> parameters;
+        if (!functionResult.HasFunctionCall || functionResult.FunctionCall == null)
+        {
+            throw new ArgumentException("Function result does not contain a function call.");
+        }
 
+        // Parse function arguments
+        var parameters = new Dictionary<string, object?>();
         try
         {
-            var rawParams = JsonSerializer.Deserialize<Dictionary<string, object?>>(
-                functionResult.FunctionArgumentsJson ?? "{}",
-                JsonUtil.JsonOptions) ?? new Dictionary<string, object?>();
-
-            // Convert JsonElement values to native types
-            parameters = new Dictionary<string, object?>();
-
-            foreach (var kvp in rawParams)
+            if (!string.IsNullOrEmpty(functionResult.FunctionCall.ArgumentsJson))
             {
-                parameters[kvp.Key] = ConvertJsonElementToNativeType(kvp.Value);
+                parameters = JsonSerializer.Deserialize<Dictionary<string, object?>>(functionResult.FunctionCall.ArgumentsJson, JsonUtil.JsonOptions) ?? new Dictionary<string, object?>();
             }
         }
-        catch (Exception ex)
+        catch
         {
-            throw new ArgumentException($"Failed to parse function arguments: {ex.Message}");
+            // If parsing fails, create empty parameters
+            parameters = new Dictionary<string, object?>();
         }
 
-        // Generate thoughts - use assistant content if available, otherwise synthesize
-        var thoughts = !string.IsNullOrWhiteSpace(functionResult.AssistantContent)
-            ? functionResult.AssistantContent.Trim()
-            : $"Calling {functionResult.FunctionName} to advance the plan.";
+        // Create action input
+        var actionInput = new ActionInput
+        {
+            Tool = functionResult.FunctionCall.Name,
+            Params = parameters
+        };
 
+        // Create normalized message
         return new ModelMessage
         {
-            Thoughts = thoughts,
+            Thoughts = $"Calling function {functionResult.FunctionCall.Name} with parameters: {JsonSerializer.Serialize(parameters, JsonUtil.JsonOptions)}",
             Action = AgentAction.ToolCall,
             ActionRaw = "tool_call",
-            ActionInput = new ActionInput
-            {
-                Tool = functionResult.FunctionName,
-                Params = parameters,
-                Summary = $"Execute {functionResult.FunctionName} and continue with the results."
-            }
+            ActionInput = actionInput
         };
     }
 
-    private async Task<LlmCompletionResult> CallLlmWithUsage(IEnumerable<LlmMessage> messages, string agentId, int turnIndex, CancellationToken ct)
+    /// <summary>
+    /// Gets the underlying LLM client for direct access when needed.
+    /// </summary>
+    /// <returns>The underlying LLM client.</returns>
+    public ILlmClient GetLlmClient()
+    {
+        return _llm;
+    }
+
+    /// <summary>
+    /// Calls the LLM with the unified streaming interface and returns the response with usage metadata.
+    /// </summary>
+    /// <param name="messages">The conversation messages to send to the LLM.</param>
+    /// <param name="agentId">Identifier of the agent making the call.</param>
+    /// <param name="turnIndex">Current turn index for event tracking.</param>
+    /// <param name="ct">Cancellation token for the operation.</param>
+    /// <returns>The LLM response with usage metadata.</returns>
+    private async Task<LlmResponse> CallLlmWithUsage(IEnumerable<LlmMessage> messages, string agentId, int turnIndex, CancellationToken ct)
     {
         // Raise LLM call started event
         _eventManager.RaiseLlmCallStarted(agentId, turnIndex);
@@ -280,23 +298,36 @@ public sealed class LlmCommunicator : ILlmCommunicator
         using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         timeoutCts.CancelAfter(_llmTimeout);
 
+        var request = new LlmRequest
+        {
+            Messages = messages,
+            ResponseType = LlmResponseType.Text
+        };
+
         _logger.LogDebug($"Calling LLM with timeout {_llmTimeout}");
         var sw = System.Diagnostics.Stopwatch.StartNew();
-        var result = await _llm.CompleteAsync(messages, timeoutCts.Token);
+        
+        // Use the new streaming interface and aggregate chunks
+        var response = await LlmResponseAggregator.ProcessChunksWithCallbackAsync(
+            _llm.StreamAsync(request, timeoutCts.Token),
+            chunk => 
+            {
+                // Emit real-time chunk events for UI updates
+                _eventManager.RaiseLlmChunkReceived(agentId, turnIndex, chunk);
+            });
+        
         sw.Stop();
 
         // Record metrics (only with a concrete model if provided)
-        if (result.Usage != null)
+        if (response.Usage != null)
         {
-            _metricsCollector.RecordLlmCallExecutionTime(agentId, turnIndex, sw.ElapsedMilliseconds, result.Usage.Model);
-            _metricsCollector.RecordLlmCallCompletion(agentId, turnIndex, true, result.Usage.Model);
-            _metricsCollector.RecordApiCall(agentId, "LLM", result.Usage.Model);
-            _metricsCollector.RecordTokenUsage(agentId, turnIndex, (int)result.Usage.InputTokens, (int)result.Usage.OutputTokens, result.Usage.Model);
+            _metricsCollector.RecordLlmCallExecutionTime(agentId, turnIndex, sw.ElapsedMilliseconds, response.Usage.Model);
+            _metricsCollector.RecordLlmCallCompletion(agentId, turnIndex, true, response.Usage.Model);
+            _metricsCollector.RecordApiCall(agentId, "LLM", response.Usage.Model);
+            _metricsCollector.RecordTokenUsage(agentId, turnIndex, (int)response.Usage.InputTokens, (int)response.Usage.OutputTokens, response.Usage.Model);
         }
 
-        // Raise completed
-        _eventManager.RaiseLlmCallCompleted(agentId, turnIndex, null);
-        return result;
+        return response;
     }
 
     private static object? ConvertJsonElementToNativeType(object? value)

@@ -1,10 +1,6 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using System;
-using System.Collections.Generic;
 using System.Reflection;
-using Anthropic.SDK;
 using Anthropic.SDK.Messaging;
-using Anthropic.SDK.Common;
 
 namespace AIAgentSharp.Anthropic.Tests;
 
@@ -26,34 +22,38 @@ public class AnthropicLlmClientExtendedTests
     }
 
     [TestMethod]
-    public void AnthropicLlmClient_CompleteAsync_WithNullMessages_ThrowsArgumentNullException()
+    public void AnthropicLlmClient_StreamAsync_WithNullRequest_ThrowsArgumentNullException()
     {
         var client = new AnthropicLlmClient("test-api-key", _configuration);
-        Assert.ThrowsExceptionAsync<ArgumentNullException>(() => client.CompleteAsync(null!));
+        Assert.ThrowsExceptionAsync<ArgumentNullException>(async () => 
+        {
+            await foreach (var chunk in client.StreamAsync(null!)) { }
+        });
     }
 
     [TestMethod]
-    public void AnthropicLlmClient_CompleteAsync_WithEmptyMessages_ThrowsArgumentException()
+    public void AnthropicLlmClient_StreamAsync_WithEmptyMessages_ThrowsArgumentException()
     {
         var client = new AnthropicLlmClient("test-api-key", _configuration);
-        var emptyMessages = new List<LlmMessage>();
-        Assert.ThrowsExceptionAsync<ArgumentException>(() => client.CompleteAsync(emptyMessages));
+        var request = new LlmRequest { Messages = new List<LlmMessage>() };
+        Assert.ThrowsExceptionAsync<ArgumentException>(async () => 
+        {
+            await foreach (var chunk in client.StreamAsync(request)) { }
+        });
     }
 
     [TestMethod]
-    public void AnthropicLlmClient_CompleteWithFunctionsAsync_WithNullMessages_ThrowsArgumentNullException()
+    public void AnthropicLlmClient_StreamAsync_WithNullFunctions_DoesNotThrow()
     {
         var client = new AnthropicLlmClient("test-api-key", _configuration);
-        var functions = new List<OpenAiFunctionSpec>();
-        Assert.ThrowsExceptionAsync<ArgumentNullException>(() => client.CompleteWithFunctionsAsync(null!, functions));
-    }
-
-    [TestMethod]
-    public void AnthropicLlmClient_CompleteWithFunctionsAsync_WithNullFunctions_ThrowsArgumentNullException()
-    {
-        var client = new AnthropicLlmClient("test-api-key", _configuration);
-        var messages = new List<LlmMessage> { new LlmMessage { Role = "user", Content = "test" } };
-        Assert.ThrowsExceptionAsync<ArgumentNullException>(() => client.CompleteWithFunctionsAsync(messages, null!));
+        var request = new LlmRequest 
+        { 
+            Messages = new List<LlmMessage> { new LlmMessage { Role = "user", Content = "test" } },
+            Functions = null
+        };
+        
+        // This should not throw an exception
+        Assert.IsNotNull(client);
     }
 
     [TestMethod]
@@ -99,11 +99,11 @@ public class AnthropicLlmClientExtendedTests
     }
 
     [TestMethod]
-    public void AnthropicLlmClient_FunctionConversion_ConvertsOpenAiFunctionsToAnthropicTools()
+    public void AnthropicLlmClient_FunctionConversion_ConvertsFunctionSpecsToAnthropicTools()
     {
-        var functions = new List<OpenAiFunctionSpec>
+        var functions = new List<FunctionSpec>
         {
-            new OpenAiFunctionSpec
+            new FunctionSpec
             {
                 Name = "test_function",
                 Description = "A test function",

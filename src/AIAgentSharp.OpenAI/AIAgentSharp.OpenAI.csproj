@@ -21,7 +21,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="AIAgentSharp" Version="1.0.8" />
+    <ProjectReference Include="../AIAgentSharp/AIAgentSharp.csproj" />
   </ItemGroup>
 
   <ItemGroup>

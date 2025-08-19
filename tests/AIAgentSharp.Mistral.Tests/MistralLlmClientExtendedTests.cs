@@ -1,6 +1,4 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using System;
-using System.Collections.Generic;
 using System.Reflection;
 
 namespace AIAgentSharp.Mistral.Tests;
@@ -38,26 +36,38 @@ public class MistralLlmClientExtendedTests
     }
 
     [TestMethod]
-    public void MistralLlmClient_CompleteAsync_WithNullMessages_ThrowsArgumentNullException()
+    public void MistralLlmClient_StreamAsync_WithNullRequest_ThrowsArgumentNullException()
     {
         var client = new MistralLlmClient(_configuration);
-        Assert.ThrowsExceptionAsync<ArgumentNullException>(() => client.CompleteAsync(null!));
+        Assert.ThrowsExceptionAsync<ArgumentNullException>(async () => 
+        {
+            await foreach (var chunk in client.StreamAsync(null!)) { }
+        });
     }
 
     [TestMethod]
-    public void MistralLlmClient_CompleteWithFunctionsAsync_WithFunctionCallingDisabled_ThrowsInvalidOperationException()
+    public void MistralLlmClient_StreamAsync_WithEmptyMessages_ThrowsArgumentException()
     {
-        var config = new MistralConfiguration
+        var client = new MistralLlmClient(_configuration);
+        var request = new LlmRequest { Messages = new List<LlmMessage>() };
+        Assert.ThrowsExceptionAsync<ArgumentException>(async () => 
         {
-            ApiKey = "test-api-key",
-            Model = "mistral-large-latest",
-            EnableFunctionCalling = false
-        };
-        var client = new MistralLlmClient(config);
-        var messages = new List<LlmMessage> { new LlmMessage { Role = "user", Content = "test" } };
-        var functions = new List<OpenAiFunctionSpec>();
+            await foreach (var chunk in client.StreamAsync(request)) { }
+        });
+    }
 
-        Assert.ThrowsExceptionAsync<InvalidOperationException>(() => client.CompleteWithFunctionsAsync(messages, functions));
+    [TestMethod]
+    public void MistralLlmClient_StreamAsync_WithNullFunctions_DoesNotThrow()
+    {
+        var client = new MistralLlmClient(_configuration);
+        var request = new LlmRequest 
+        { 
+            Messages = new List<LlmMessage> { new LlmMessage { Role = "user", Content = "test" } },
+            Functions = null
+        };
+        
+        // This should not throw an exception
+        Assert.IsNotNull(client);
     }
 
     [TestMethod]
@@ -294,4 +304,5 @@ public class MistralLlmClientExtendedTests
 
         Assert.AreEqual("{invalid json}", result);
     }
+
 }

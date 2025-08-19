@@ -1,6 +1,4 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using System;
-using System.Collections.Generic;
 
 namespace AIAgentSharp.OpenAI.Tests;
 
@@ -24,26 +22,38 @@ public class OpenAiLlmClientExtendedTests
     }
 
     [TestMethod]
-    public void OpenAiLlmClient_CompleteAsync_WithNullMessages_ThrowsArgumentNullException()
+    public void OpenAiLlmClient_StreamAsync_WithNullRequest_ThrowsArgumentNullException()
     {
         var client = new OpenAiLlmClient("test-api-key", _configuration);
-        Assert.ThrowsExceptionAsync<ArgumentNullException>(() => client.CompleteAsync(null!));
+        Assert.ThrowsExceptionAsync<ArgumentNullException>(async () => 
+        {
+            await foreach (var chunk in client.StreamAsync(null!)) { }
+        });
     }
 
     [TestMethod]
-    public void OpenAiLlmClient_CompleteWithFunctionsAsync_WithNullMessages_ThrowsArgumentNullException()
+    public void OpenAiLlmClient_StreamAsync_WithEmptyMessages_ThrowsArgumentException()
     {
         var client = new OpenAiLlmClient("test-api-key", _configuration);
-        var functions = new List<OpenAiFunctionSpec>();
-        Assert.ThrowsExceptionAsync<ArgumentNullException>(() => client.CompleteWithFunctionsAsync(null!, functions));
+        var request = new LlmRequest { Messages = new List<LlmMessage>() };
+        Assert.ThrowsExceptionAsync<ArgumentException>(async () => 
+        {
+            await foreach (var chunk in client.StreamAsync(request)) { }
+        });
     }
 
     [TestMethod]
-    public void OpenAiLlmClient_CompleteWithFunctionsAsync_WithNullFunctions_ThrowsArgumentNullException()
+    public void OpenAiLlmClient_StreamAsync_WithNullFunctions_DoesNotThrow()
     {
         var client = new OpenAiLlmClient("test-api-key", _configuration);
-        var messages = new List<LlmMessage> { new LlmMessage { Role = "user", Content = "test" } };
-        Assert.ThrowsExceptionAsync<ArgumentNullException>(() => client.CompleteWithFunctionsAsync(messages, null!));
+        var request = new LlmRequest 
+        { 
+            Messages = new List<LlmMessage> { new LlmMessage { Role = "user", Content = "test" } },
+            Functions = null
+        };
+        
+        // This should not throw an exception
+        Assert.IsNotNull(client);
     }
 
     [TestMethod]

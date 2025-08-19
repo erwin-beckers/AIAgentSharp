@@ -6,6 +6,7 @@ namespace AIAgentSharp.Mistral;
 
 /// <summary>
 /// Mistral AI LLM client implementation using direct HTTP API calls.
+/// This client supports text completion, function calling, and streaming through a unified interface.
 /// Note: This implementation uses HttpClient directly since the official Mistral AI .NET SDK is not yet available on NuGet.
 /// </summary>
 public class MistralLlmClient : ILlmClient
@@ -42,25 +43,112 @@ public class MistralLlmClient : ILlmClient
         }
     }
 
-    public async Task<LlmCompletionResult> CompleteAsync(IEnumerable<LlmMessage> messages, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Streams chunks from the Mistral LLM based on the provided request.
+    /// This method always returns chunks, regardless of whether streaming is enabled.
+    /// </summary>
+    /// <param name="request">The unified request containing messages, functions, and configuration.</param>
+    /// <param name="ct">Cancellation token for the operation.</param>
+    /// <returns>An async enumerable of LLM streaming chunks.</returns>
+    /// <exception cref="OperationCanceledException">Thrown when the operation is cancelled.</exception>
+    public async IAsyncEnumerable<LlmStreamingChunk> StreamAsync(LlmRequest request, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
     {
-        var request = new
+        if (request == null)
+        {
+            throw new ArgumentNullException(nameof(request));
+        }
+
+        if (request.Messages == null || !request.Messages.Any())
+        {
+            throw new ArgumentException("Request must contain at least one message.", nameof(request));
+        }
+
+        // Determine the actual response type based on request and available functions
+        var actualResponseType = DetermineActualResponseType(request);
+
+        // Handle different response types
+        switch (actualResponseType)
+        {
+            case LlmResponseType.FunctionCall:
+                await foreach (var chunk in HandleFunctionCallRequestSafe(request, ct))
+                {
+                    yield return chunk;
+                }
+                break;
+
+            case LlmResponseType.Streaming:
+                await foreach (var chunk in HandleStreamingRequestSafe(request, ct))
+                {
+                    yield return chunk;
+                }
+                break;
+
+            case LlmResponseType.Text:
+            default:
+                await foreach (var chunk in HandleTextRequestSafe(request, ct))
+                {
+                    yield return chunk;
+                }
+                break;
+        }
+    }
+
+    private LlmResponseType DetermineActualResponseType(LlmRequest request)
+    {
+        // If streaming is explicitly requested, use streaming
+        if (request.ResponseType == LlmResponseType.Streaming || request.EnableStreaming)
+        {
+            return LlmResponseType.Streaming;
+        }
+
+        // If functions are provided and function calling is requested, use function calling
+        if (request.Functions != null && request.Functions.Any() && 
+            (request.ResponseType == LlmResponseType.FunctionCall || request.ResponseType == LlmResponseType.Auto))
+        {
+            return LlmResponseType.FunctionCall;
+        }
+
+        // Default to text completion
+        return LlmResponseType.Text;
+    }
+
+    private async IAsyncEnumerable<LlmStreamingChunk> HandleTextRequestSafe(LlmRequest request, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
+    {
+        IAsyncEnumerable<LlmStreamingChunk> result;
+        try
+        {
+            result = HandleTextRequest(request, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            throw new InvalidOperationException($"Mistral text request failed: {ex.Message}", ex);
+        }
+
+        await foreach (var chunk in result)
+        {
+            yield return chunk;
+        }
+    }
+
+    private async IAsyncEnumerable<LlmStreamingChunk> HandleTextRequest(LlmRequest request, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
+    {
+        var mistralRequest = new
         {
             model = _configuration.Model,
-            messages = ConvertToMistralMessages(messages),
-            max_tokens = _configuration.MaxTokens,
-            temperature = _configuration.Temperature,
-            top_p = _configuration.TopP,
-            stream = _configuration.EnableStreaming
+            messages = ConvertToMistralMessages(request.Messages),
+            max_tokens = request.MaxTokens ?? _configuration.MaxTokens,
+            temperature = request.Temperature ?? _configuration.Temperature,
+            top_p = request.TopP ?? _configuration.TopP,
+            stream = false
         };
 
-        var json = JsonSerializer.Serialize(request, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower });
+        var json = JsonSerializer.Serialize(mistralRequest, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower });
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-        var response = await _httpClient.PostAsync("chat/completions", content, cancellationToken);
+        var response = await _httpClient.PostAsync("chat/completions", content, ct);
         response.EnsureSuccessStatusCode();
 
-        var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
+        var responseContent = await response.Content.ReadAsStringAsync(ct);
         var mistralResponse = JsonSerializer.Deserialize<MistralChatCompletionResponse>(responseContent, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower });
 
         if (mistralResponse?.Choices?.FirstOrDefault()?.Message == null)
@@ -68,9 +156,14 @@ public class MistralLlmClient : ILlmClient
             throw new InvalidOperationException("Invalid response from Mistral AI API");
         }
 
-        return new LlmCompletionResult
+        var extractedContent = ExtractJsonFromMarkdown(mistralResponse.Choices[0].Message.Content);
+
+        yield return new LlmStreamingChunk
         {
-            Content = ExtractJsonFromMarkdown(mistralResponse.Choices[0].Message.Content),
+            Content = extractedContent,
+            IsFinal = true,
+            FinishReason = "stop",
+            ActualResponseType = LlmResponseType.Text,
             Usage = mistralResponse.Usage != null ? new LlmUsage
             {
                 InputTokens = mistralResponse.Usage.PromptTokens,
@@ -81,10 +174,25 @@ public class MistralLlmClient : ILlmClient
         };
     }
 
-    public async Task<FunctionCallResult> CompleteWithFunctionsAsync(
-        IEnumerable<LlmMessage> messages,
-        IEnumerable<OpenAiFunctionSpec> functions,
-        CancellationToken cancellationToken = default)
+    private async IAsyncEnumerable<LlmStreamingChunk> HandleFunctionCallRequestSafe(LlmRequest request, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
+    {
+        IAsyncEnumerable<LlmStreamingChunk> result;
+        try
+        {
+            result = HandleFunctionCallRequest(request, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            throw new InvalidOperationException($"Mistral function call request failed: {ex.Message}", ex);
+        }
+
+        await foreach (var chunk in result)
+        {
+            yield return chunk;
+        }
+    }
+
+    private async IAsyncEnumerable<LlmStreamingChunk> HandleFunctionCallRequest(LlmRequest request, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
     {
         if (!_configuration.EnableFunctionCalling)
         {
@@ -93,8 +201,8 @@ public class MistralLlmClient : ILlmClient
 
         // For Mistral, we need to include function definitions in the system message
         // since Mistral doesn't support the tools parameter in the same way as OpenAI
-        var messagesList = messages.ToList();
-        var systemMessage = CreateSystemMessageWithFunctions(functions);
+        var messagesList = request.Messages.ToList();
+        var systemMessage = CreateSystemMessageWithFunctions(request.Functions!);
         
         // Add or update system message
         var updatedMessages = new List<LlmMessage>();
@@ -118,23 +226,23 @@ public class MistralLlmClient : ILlmClient
             updatedMessages.Insert(0, new LlmMessage { Role = "system", Content = systemMessage });
         }
 
-        var request = new
+        var mistralRequest = new
         {
             model = _configuration.Model,
             messages = ConvertToMistralMessages(updatedMessages),
-            max_tokens = _configuration.MaxTokens,
-            temperature = _configuration.Temperature,
-            top_p = _configuration.TopP,
-            stream = _configuration.EnableStreaming
+            max_tokens = request.MaxTokens ?? _configuration.MaxTokens,
+            temperature = request.Temperature ?? _configuration.Temperature,
+            top_p = request.TopP ?? _configuration.TopP,
+            stream = false
         };
 
-        var json = JsonSerializer.Serialize(request, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower });
+        var json = JsonSerializer.Serialize(mistralRequest, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower });
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-        var response = await _httpClient.PostAsync("chat/completions", content, cancellationToken);
+        var response = await _httpClient.PostAsync("chat/completions", content, ct);
         response.EnsureSuccessStatusCode();
 
-        var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
+        var responseContent = await response.Content.ReadAsStringAsync(ct);
         var mistralResponse = JsonSerializer.Deserialize<MistralChatCompletionResponse>(responseContent, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower });
 
         if (mistralResponse?.Choices?.FirstOrDefault()?.Message == null)
@@ -143,9 +251,14 @@ public class MistralLlmClient : ILlmClient
         }
 
         var choice = mistralResponse.Choices[0];
-        var result = new FunctionCallResult
+        var extractedContent = ExtractJsonFromMarkdown(choice.Message.Content);
+
+        var chunk = new LlmStreamingChunk
         {
-            AssistantContent = ExtractJsonFromMarkdown(choice.Message.Content),
+            Content = extractedContent,
+            IsFinal = true,
+            FinishReason = "stop",
+            ActualResponseType = LlmResponseType.Text, // Default to text, will update if function call found
             Usage = mistralResponse.Usage != null ? new LlmUsage
             {
                 InputTokens = mistralResponse.Usage.PromptTokens,
@@ -159,27 +272,48 @@ public class MistralLlmClient : ILlmClient
         var functionCall = ParseFunctionCallFromContent(choice.Message.Content);
         if (functionCall.HasValue)
         {
-            result = new FunctionCallResult
+            chunk.ActualResponseType = LlmResponseType.FunctionCall;
+            chunk.FunctionCall = new LlmFunctionCall
             {
-                HasFunctionCall = true,
-                FunctionName = functionCall.Value.FunctionName,
-                FunctionArgumentsJson = functionCall.Value.Arguments,
-                AssistantContent = ExtractJsonFromMarkdown(choice.Message.Content),
-                Usage = mistralResponse.Usage != null ? new LlmUsage
-                {
-                    InputTokens = mistralResponse.Usage.PromptTokens,
-                    OutputTokens = mistralResponse.Usage.CompletionTokens,
-                    Model = _configuration.Model,
-                    Provider = "Mistral"
-                } : null
+                Name = functionCall.Value.FunctionName,
+                ArgumentsJson = functionCall.Value.Arguments,
+                Arguments = JsonSerializer.Deserialize<Dictionary<string, object>>(functionCall.Value.Arguments) ?? new Dictionary<string, object>()
             };
         }
 
-        return result;
+        yield return chunk;
+    }
+
+    private async IAsyncEnumerable<LlmStreamingChunk> HandleStreamingRequestSafe(LlmRequest request, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
+    {
+        IAsyncEnumerable<LlmStreamingChunk> result;
+        try
+        {
+            result = HandleStreamingRequest(request, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            throw new InvalidOperationException($"Mistral streaming request failed: {ex.Message}", ex);
+        }
+
+        await foreach (var chunk in result)
+        {
+            yield return chunk;
+        }
+    }
+
+    private async IAsyncEnumerable<LlmStreamingChunk> HandleStreamingRequest(LlmRequest request, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
+    {
+        // For now, use the same logic as text request until streaming is properly implemented
+        await foreach (var chunk in HandleTextRequest(request, ct))
+        {
+            chunk.ActualResponseType = LlmResponseType.Streaming;
+            yield return chunk;
+        }
     }
 
     [ExcludeFromCodeCoverage]
-    private static string CreateSystemMessageWithFunctions(IEnumerable<OpenAiFunctionSpec> functions)
+    private static string CreateSystemMessageWithFunctions(IEnumerable<FunctionSpec> functions)
     {
         var functionDefinitions = functions.Select(f => $@"
 Function: {f.Name}

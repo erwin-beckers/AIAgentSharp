@@ -1,9 +1,4 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using Moq;
-using Anthropic.SDK;
-using Anthropic.SDK.Messaging;
-using Anthropic.SDK.Common;
-using System.Text.Json;
 
 namespace AIAgentSharp.Anthropic.Tests;
 

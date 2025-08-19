@@ -21,6 +21,11 @@ public class AgentLlmCallCompletedEventArgs : EventArgs
     public ModelMessage? LlmMessage { get; set; }
 
     /// <summary>
+    ///     Gets or sets the streaming chunk from the LLM, if streaming.
+    /// </summary>
+    public LlmStreamingChunk? StreamingChunk { get; set; }
+
+    /// <summary>
     ///     Gets or sets the error message if the LLM call failed.
     /// </summary>
     public string? Error { get; set; }

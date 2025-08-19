@@ -19,6 +19,7 @@ public sealed class EventManager : IEventManager
     public event EventHandler<AgentStepStartedEventArgs>? StepStarted;
     public event EventHandler<AgentLlmCallStartedEventArgs>? LlmCallStarted;
     public event EventHandler<AgentLlmCallCompletedEventArgs>? LlmCallCompleted;
+    public event EventHandler<AgentLlmChunkReceivedEventArgs>? LlmChunkReceived;
     public event EventHandler<AgentToolCallStartedEventArgs>? ToolCallStarted;
     public event EventHandler<AgentToolCallCompletedEventArgs>? ToolCallCompleted;
     public event EventHandler<AgentStepCompletedEventArgs>? StepCompleted;
@@ -88,6 +89,23 @@ public sealed class EventManager : IEventManager
         catch (Exception ex)
         {
             _logger.LogWarning($"LlmCallCompleted event handler threw exception: {ex.Message}");
+        }
+    }
+
+    public void RaiseLlmChunkReceived(string agentId, int turnIndex, LlmStreamingChunk chunk)
+    {
+        try
+        {
+            LlmChunkReceived?.Invoke(this, new AgentLlmChunkReceivedEventArgs
+            {
+                AgentId = agentId,
+                TurnIndex = turnIndex,
+                Chunk = chunk
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning($"LlmChunkReceived event handler threw exception: {ex.Message}");
         }
     }
 

@@ -13,12 +13,14 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
-  <ItemGroup>
-    <PackageReference Include="AIAgentSharp" Version="1.0.8" />
-  </ItemGroup>
 
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="/" />
+  </ItemGroup>
+
+
+  <ItemGroup>
+    <ProjectReference Include="..\AIAgentSharp\AIAgentSharp.csproj" />
   </ItemGroup>
 
 </Project>

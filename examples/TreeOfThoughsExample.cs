@@ -42,8 +42,8 @@ public class TreeOfThoughsExample
         var config = new AgentConfiguration
         {
             ReasoningType = ReasoningType.TreeOfThoughts,
-            MaxTreeDepth = 6,
-            MaxTreeNodes = 80,
+            MaxTreeDepth = 3,
+            MaxTreeNodes = 20,
             TreeExplorationStrategy = ExplorationStrategy.BestFirst,
             EnableReasoningValidation = true,
             MinReasoningConfidence = 0.6,

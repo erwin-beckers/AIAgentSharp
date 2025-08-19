@@ -8,9 +8,9 @@ namespace AIAgentSharp.Agents.Interfaces;
 public interface ILlmCommunicator
 {
     /// <summary>
-    /// Calls the LLM with function calling support.
+    /// Calls the LLM with function calling support using the unified interface.
     /// </summary>
-    Task<FunctionCallResult> CallWithFunctionsAsync(IEnumerable<LlmMessage> messages, List<OpenAiFunctionSpec> functionSpecs, string agentId, int turnIndex, CancellationToken ct);
+    Task<LlmResponse> CallWithFunctionsAsync(IEnumerable<LlmMessage> messages, List<FunctionSpec> functionSpecs, string agentId, int turnIndex, CancellationToken ct);
 
     /// <summary>
     /// Calls the LLM and parses the JSON response.
@@ -25,5 +25,10 @@ public interface ILlmCommunicator
     /// <summary>
     /// Normalizes a function call result to Re/Act format.
     /// </summary>
-    ModelMessage NormalizeFunctionCallToReact(FunctionCallResult functionResult, int turnIndex);
+    ModelMessage NormalizeFunctionCallToReact(LlmResponse functionResult, int turnIndex);
+
+    /// <summary>
+    /// Gets the underlying LLM client for direct access when needed.
+    /// </summary>
+    ILlmClient GetLlmClient();
 }

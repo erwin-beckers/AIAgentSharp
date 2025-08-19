@@ -141,6 +141,15 @@ public interface IMetricsCollector
     /// <param name="hasFinalOutput">Whether the response includes a final output.</param>
     void RecordResponseQuality(string agentId, int responseLength, bool hasFinalOutput);
 
+    /// <summary>
+    /// Records validation results.
+    /// </summary>
+    /// <param name="agentId">The unique identifier of the agent.</param>
+    /// <param name="validationType">The type of validation performed.</param>
+    /// <param name="passed">Whether the validation passed.</param>
+    /// <param name="errorMessage">The error message if validation failed.</param>
+    void RecordValidation(string agentId, string validationType, bool passed, string? errorMessage = null);
+
     // Resource Metrics
     /// <summary>
     /// Records token usage for LLM calls.

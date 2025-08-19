@@ -93,22 +93,22 @@ public interface IMetricsProvider
     void ResetMetrics();
 
     /// <summary>
-    /// Exports metrics data to a specified format.
+    /// Gets all collected metrics data in a comprehensive format.
     /// </summary>
-    /// <param name="format">The format to export the metrics in.</param>
     /// <returns>
-    /// A string representation of the metrics data in the specified format.
+    /// An <see cref="AllMetrics"/> object containing all collected metrics from all collectors.
     /// </returns>
     /// <remarks>
     /// <para>
-    /// This method exports the current metrics data in various formats for external
-    /// analysis or integration with monitoring systems.
+    /// This method returns all metrics data including performance, operational, quality, 
+    /// resource, and custom metrics. Users can then export this data to any format they prefer.
     /// </para>
     /// <para>
-    /// Supported formats include JSON, CSV, and Prometheus format.
+    /// The returned data includes metrics from all collectors and represents the complete
+    /// state of the metrics system at the time of the call.
     /// </para>
     /// </remarks>
-    string ExportMetrics(MetricsExportFormat format);
+    AllMetrics GetAllMetrics();
 
     /// <summary>
     /// Event that is raised when metrics are updated.
@@ -125,32 +125,6 @@ public interface IMetricsProvider
     /// </para>
     /// </remarks>
     event EventHandler<MetricsUpdatedEventArgs>? MetricsUpdated;
-}
-
-/// <summary>
-/// Defines the supported formats for exporting metrics data.
-/// </summary>
-public enum MetricsExportFormat
-{
-    /// <summary>
-    /// JSON format for easy parsing and integration.
-    /// </summary>
-    Json,
-
-    /// <summary>
-    /// CSV format for spreadsheet analysis.
-    /// </summary>
-    Csv,
-
-    /// <summary>
-    /// Prometheus format for monitoring system integration.
-    /// </summary>
-    Prometheus,
-
-    /// <summary>
-    /// Human-readable text format for console output.
-    /// </summary>
-    Text
 }
 
 /// <summary>

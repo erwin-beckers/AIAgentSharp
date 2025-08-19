@@ -82,4 +82,58 @@ public sealed class ModelMessage
     /// </summary>
     [JsonPropertyName("reasoning_type")]
     public ReasoningType? ReasoningType { get; set; }
+
+    /// <summary>
+    ///     Optional reasoning content for Chain of Thought responses.
+    /// </summary>
+    [JsonPropertyName("reasoning")]
+    public string? Reasoning { get; set; }
+
+    /// <summary>
+    ///     Optional insights list for Chain of Thought responses.
+    /// </summary>
+    [JsonPropertyName("insights")]
+    public List<string>? Insights { get; set; }
+
+    /// <summary>
+    ///     Optional conclusion for Chain of Thought evaluation responses.
+    /// </summary>
+    [JsonPropertyName("conclusion")]
+    public string? Conclusion { get; set; }
+
+    /// <summary>
+    ///     Optional validation result for Chain of Thought validation responses.
+    /// </summary>
+    [JsonPropertyName("is_valid")]
+    public bool? IsValid { get; set; }
+
+    /// <summary>
+    ///     Optional validation error message for Chain of Thought validation responses.
+    /// </summary>
+    [JsonPropertyName("error")]
+    public string? Error { get; set; }
+
+    /// <summary>
+    ///     Optional thought content for Tree of Thoughts responses.
+    /// </summary>
+    [JsonPropertyName("thought")]
+    public string? Thought { get; set; }
+
+    /// <summary>
+    ///     Optional thought type for Tree of Thoughts responses.
+    /// </summary>
+    [JsonPropertyName("thought_type")]
+    public string? ThoughtType { get; set; }
+
+    /// <summary>
+    ///     Optional score for Tree of Thoughts evaluation responses.
+    /// </summary>
+    [JsonPropertyName("score")]
+    public double? Score { get; set; }
+
+    /// <summary>
+    ///     Optional children thoughts for Tree of Thoughts responses.
+    /// </summary>
+    [JsonPropertyName("children")]
+    public List<object>? Children { get; set; }
 }

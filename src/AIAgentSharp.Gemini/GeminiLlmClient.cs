@@ -6,13 +6,12 @@ using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Threading;
-using System.Threading.Tasks;
 
 namespace AIAgentSharp.Gemini;
 
 /// <summary>
 /// Google Gemini LLM client implementation that integrates with the Gemini API.
-/// This client supports both regular chat completion and function calling via tools.
+/// This client supports text completion, function calling, and streaming through a unified interface.
 /// </summary>
 /// <remarks>
 /// This client uses the official Gemini API to access Gemini models.
@@ -89,45 +88,112 @@ public sealed class GeminiLlmClient : ILlmClient
     }
 
     /// <summary>
-    /// Sends a collection of messages to the LLM and returns the generated response.
+    /// Streams chunks from the Gemini LLM based on the provided request.
+    /// This method always returns chunks, regardless of whether streaming is enabled.
     /// </summary>
-    /// <param name="messages">The conversation messages to send to the LLM.</param>
+    /// <param name="request">The unified request containing messages, functions, and configuration.</param>
     /// <param name="ct">Cancellation token for the operation.</param>
-    /// <returns>The result of the LLM completion.</returns>
-    /// <exception cref="ArgumentNullException">Thrown when messages is null.</exception>
-    /// <exception cref="ArgumentException">Thrown when messages is empty.</exception>
+    /// <returns>An async enumerable of LLM streaming chunks.</returns>
     /// <exception cref="OperationCanceledException">Thrown when the operation is cancelled.</exception>
-    public async Task<LlmCompletionResult> CompleteAsync(IEnumerable<LlmMessage> messages, CancellationToken ct = default)
+    public async IAsyncEnumerable<LlmStreamingChunk> StreamAsync(LlmRequest request, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
     {
-        if (messages == null)
+        if (request == null)
         {
-            throw new ArgumentNullException(nameof(messages));
+            throw new ArgumentNullException(nameof(request));
         }
 
-        var messageList = messages.ToList();
-        if (messageList.Count == 0)
+        if (request.Messages == null || !request.Messages.Any())
         {
-            throw new ArgumentException("Messages cannot be empty.", nameof(messages));
+            throw new ArgumentException("Request must contain at least one message.", nameof(request));
         }
 
         // Convert AIAgentSharp messages to Gemini messages
-        var geminiContents = ConvertToGeminiContents(messageList);
+        var geminiContents = ConvertToGeminiContents(request.Messages.ToList());
 
-        var request = new GeminiGenerateContentRequest
+        // Determine the actual response type based on request and available functions
+        var actualResponseType = DetermineActualResponseType(request);
+
+        // Handle different response types
+        switch (actualResponseType)
+        {
+            case LlmResponseType.FunctionCall:
+                await foreach (var chunk in HandleFunctionCallRequestSafe(request, geminiContents, ct))
+                {
+                    yield return chunk;
+                }
+                break;
+
+            case LlmResponseType.Streaming:
+                await foreach (var chunk in HandleStreamingRequestSafe(request, geminiContents, ct))
+                {
+                    yield return chunk;
+                }
+                break;
+
+            case LlmResponseType.Text:
+            default:
+                await foreach (var chunk in HandleTextRequestSafe(request, geminiContents, ct))
+                {
+                    yield return chunk;
+                }
+                break;
+        }
+    }
+
+    private LlmResponseType DetermineActualResponseType(LlmRequest request)
+    {
+        // If streaming is explicitly requested, use streaming
+        if (request.ResponseType == LlmResponseType.Streaming || request.EnableStreaming)
+        {
+            return LlmResponseType.Streaming;
+        }
+
+        // If functions are provided and function calling is requested, use function calling
+        if (request.Functions != null && request.Functions.Any() && 
+            (request.ResponseType == LlmResponseType.FunctionCall || request.ResponseType == LlmResponseType.Auto))
+        {
+            return LlmResponseType.FunctionCall;
+        }
+
+        // Default to text completion
+        return LlmResponseType.Text;
+    }
+
+    private async IAsyncEnumerable<LlmStreamingChunk> HandleTextRequestSafe(LlmRequest request, List<GeminiContent> geminiContents, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
+    {
+        IAsyncEnumerable<LlmStreamingChunk> result;
+        try
+        {
+            result = HandleTextRequest(request, geminiContents, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            throw new InvalidOperationException($"Gemini text request failed: {ex.Message}", ex);
+        }
+
+        await foreach (var chunk in result)
+        {
+            yield return chunk;
+        }
+    }
+
+    private async IAsyncEnumerable<LlmStreamingChunk> HandleTextRequest(LlmRequest request, List<GeminiContent> geminiContents, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
+    {
+        var geminiRequest = new GeminiGenerateContentRequest
         {
             Contents = geminiContents,
             GenerationConfig = new GeminiGenerationConfig
             {
-                MaxOutputTokens = Configuration.MaxTokens,
-                Temperature = Configuration.Temperature,
-                TopP = Configuration.TopP,
+                MaxOutputTokens = request.MaxTokens ?? Configuration.MaxTokens,
+                Temperature = (float?)(request.Temperature ?? Configuration.Temperature),
+                TopP = (float?)(request.TopP ?? Configuration.TopP),
                 TopK = Configuration.TopK
             }
         };
 
         var response = await _httpClient.PostAsJsonAsync(
             $"https://generativelanguage.googleapis.com/v1beta/models/{_model}:generateContent?key={_apiKey}",
-            request,
+            geminiRequest,
             cancellationToken: ct);
 
         response.EnsureSuccessStatusCode();
@@ -144,9 +210,12 @@ public sealed class GeminiLlmClient : ILlmClient
         // Extract JSON from markdown code blocks if present
         var extractedContent = ExtractJsonFromMarkdown(content ?? string.Empty);
 
-        return new LlmCompletionResult
+        yield return new LlmStreamingChunk
         {
             Content = extractedContent,
+            IsFinal = true,
+            FinishReason = "stop",
+            ActualResponseType = LlmResponseType.Text,
             Usage = new LlmUsage
             {
                 InputTokens = geminiResponse.UsageMetadata?.PromptTokenCount ?? 0,
@@ -157,57 +226,45 @@ public sealed class GeminiLlmClient : ILlmClient
         };
     }
 
-    /// <summary>
-    /// Completes a conversation with function calling capabilities.
-    /// </summary>
-    /// <param name="messages">The conversation messages to send to the LLM.</param>
-    /// <param name="functions">The available functions that the LLM can call.</param>
-    /// <param name="ct">Cancellation token for the operation.</param>
-    /// <returns>The result of the function calling operation.</returns>
-    /// <exception cref="OperationCanceledException">Thrown when the operation is cancelled.</exception>
-    public async Task<FunctionCallResult> CompleteWithFunctionsAsync(
-        IEnumerable<LlmMessage> messages,
-        IEnumerable<OpenAiFunctionSpec> functions,
-        CancellationToken ct = default)
+    private async IAsyncEnumerable<LlmStreamingChunk> HandleFunctionCallRequestSafe(LlmRequest request, List<GeminiContent> geminiContents, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
     {
-        if (messages == null)
+        IAsyncEnumerable<LlmStreamingChunk> result;
+        try
         {
-            throw new ArgumentNullException(nameof(messages));
+            result = HandleFunctionCallRequest(request, geminiContents, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            throw new InvalidOperationException($"Gemini function call request failed: {ex.Message}", ex);
         }
 
-        if (functions == null)
+        await foreach (var chunk in result)
         {
-            throw new ArgumentNullException(nameof(functions));
+            yield return chunk;
         }
+    }
 
-        var messageList = messages.ToList();
-        if (messageList.Count == 0)
-        {
-            throw new ArgumentException("Messages cannot be empty.", nameof(messages));
-        }
+    private async IAsyncEnumerable<LlmStreamingChunk> HandleFunctionCallRequest(LlmRequest request, List<GeminiContent> geminiContents, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
+    {
+        // Convert FunctionSpec to Gemini tools
+        var geminiTools = ConvertToGeminiTools(request.Functions!);
 
-        // Convert AIAgentSharp messages to Gemini messages
-        var geminiContents = ConvertToGeminiContents(messageList);
-        
-        // Convert OpenAI function specs to Gemini tools
-        var geminiTools = ConvertToGeminiTools(functions);
-
-        var request = new GeminiGenerateContentRequest
+        var geminiRequest = new GeminiGenerateContentRequest
         {
             Contents = geminiContents,
             Tools = geminiTools,
             GenerationConfig = new GeminiGenerationConfig
             {
-                MaxOutputTokens = Configuration.MaxTokens,
-                Temperature = Configuration.Temperature,
-                TopP = Configuration.TopP,
+                MaxOutputTokens = request.MaxTokens ?? Configuration.MaxTokens,
+                Temperature = (float?)(request.Temperature ?? Configuration.Temperature),
+                TopP = (float?)(request.TopP ?? Configuration.TopP),
                 TopK = Configuration.TopK
             }
         };
 
         var response = await _httpClient.PostAsJsonAsync(
             $"https://generativelanguage.googleapis.com/v1beta/models/{_model}:generateContent?key={_apiKey}",
-            request,
+            geminiRequest,
             cancellationToken: ct);
 
         response.EnsureSuccessStatusCode();
@@ -225,9 +282,12 @@ public sealed class GeminiLlmClient : ILlmClient
         // Extract JSON from markdown code blocks if present
         var extractedContent = ExtractJsonFromMarkdown(content ?? string.Empty);
 
-        var result = new FunctionCallResult
+        var chunk = new LlmStreamingChunk
         {
-            AssistantContent = extractedContent,
+            Content = extractedContent,
+            IsFinal = true,
+            FinishReason = "stop",
+            ActualResponseType = LlmResponseType.Text, // Default to text, will update if function call found
             Usage = new LlmUsage
             {
                 InputTokens = geminiResponse.UsageMetadata?.PromptTokenCount ?? 0,
@@ -240,23 +300,46 @@ public sealed class GeminiLlmClient : ILlmClient
         // Check for function calls
         if (candidate.FunctionCall != null)
         {
-            result = new FunctionCallResult
+            chunk.ActualResponseType = LlmResponseType.FunctionCall;
+            chunk.FunctionCall = new LlmFunctionCall
             {
-                HasFunctionCall = true,
-                FunctionName = candidate.FunctionCall.Name,
-                FunctionArgumentsJson = JsonSerializer.Serialize(candidate.FunctionCall.Args),
-                AssistantContent = extractedContent,
-                Usage = new LlmUsage
-                {
-                    InputTokens = geminiResponse.UsageMetadata?.PromptTokenCount ?? 0,
-                    OutputTokens = geminiResponse.UsageMetadata?.CandidatesTokenCount ?? 0,
-                    Model = _model,
-                    Provider = "Gemini"
-                }
+                Name = candidate.FunctionCall.Name,
+                ArgumentsJson = JsonSerializer.Serialize(candidate.FunctionCall.Args),
+                Arguments = candidate.FunctionCall.Args != null 
+                    ? JsonSerializer.Deserialize<Dictionary<string, object>>(JsonSerializer.Serialize(candidate.FunctionCall.Args)) ?? new Dictionary<string, object>()
+                    : new Dictionary<string, object>()
             };
         }
 
-        return result;
+        yield return chunk;
+    }
+
+    private async IAsyncEnumerable<LlmStreamingChunk> HandleStreamingRequestSafe(LlmRequest request, List<GeminiContent> geminiContents, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
+    {
+        IAsyncEnumerable<LlmStreamingChunk> result;
+        try
+        {
+            result = HandleStreamingRequest(request, geminiContents, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            throw new InvalidOperationException($"Gemini streaming request failed: {ex.Message}", ex);
+        }
+
+        await foreach (var chunk in result)
+        {
+            yield return chunk;
+        }
+    }
+
+    private async IAsyncEnumerable<LlmStreamingChunk> HandleStreamingRequest(LlmRequest request, List<GeminiContent> geminiContents, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
+    {
+        // For now, use the same logic as text request until streaming is properly implemented
+        await foreach (var chunk in HandleTextRequest(request, geminiContents, ct))
+        {
+            chunk.ActualResponseType = LlmResponseType.Streaming;
+            yield return chunk;
+        }
     }
 
     [ExcludeFromCodeCoverage]
@@ -270,7 +353,7 @@ public sealed class GeminiLlmClient : ILlmClient
     }
 
     [ExcludeFromCodeCoverage]
-    private static List<GeminiTool> ConvertToGeminiTools(IEnumerable<OpenAiFunctionSpec> functions)
+    private static List<GeminiTool> ConvertToGeminiTools(IEnumerable<FunctionSpec> functions)
     {
         return new List<GeminiTool>
         {
@@ -395,3 +478,4 @@ public sealed class GeminiLlmClient : ILlmClient
         public int? TotalTokenCount { get; set; }
     }
 }
+

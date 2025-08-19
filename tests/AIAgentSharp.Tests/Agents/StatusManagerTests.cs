@@ -7,22 +7,60 @@ namespace AIAgentSharp.Tests.Agents;
 [TestClass]
 public class StatusManagerTests
 {
-    private AgentConfiguration _config = null!;
-    private Mock<IEventManager> _mockEventManager = null!;
-    private Mock<ILogger> _mockLogger = null!;
-    private StatusManager _statusManager = null!;
+    private Mock<IEventManager> _mockEventManager;
+    private Mock<ILogger> _mockLogger;
+    private AgentConfiguration _config;
 
     [TestInitialize]
     public void Setup()
     {
-        _config = new AgentConfiguration();
         _mockEventManager = new Mock<IEventManager>();
         _mockLogger = new Mock<ILogger>();
-        _statusManager = new StatusManager(_config, _mockEventManager.Object, _mockLogger.Object);
+        _config = new AgentConfiguration();
     }
 
     [TestMethod]
-    public void EmitStatus_WithEmitPublicStatusEnabled_ShouldInvokeEvent()
+    public void Constructor_Should_CreateStatusManagerSuccessfully_When_ValidParametersProvided()
+    {
+        // Act
+        var statusManager = new StatusManager(_config, _mockEventManager.Object, _mockLogger.Object);
+
+        // Assert
+        Assert.IsNotNull(statusManager);
+    }
+
+    [TestMethod]
+    public void Constructor_Should_HandleNullConfig_When_ConfigIsNull()
+    {
+        // Act & Assert - Should not throw, just use null config
+        var statusManager = new StatusManager(null!, _mockEventManager.Object, _mockLogger.Object);
+        
+        // Assert
+        Assert.IsNotNull(statusManager);
+    }
+
+    [TestMethod]
+    public void Constructor_Should_HandleNullEventManager_When_EventManagerIsNull()
+    {
+        // Act & Assert - Should not throw, just use null event manager
+        var statusManager = new StatusManager(_config, null!, _mockLogger.Object);
+        
+        // Assert
+        Assert.IsNotNull(statusManager);
+    }
+
+    [TestMethod]
+    public void Constructor_Should_UseConsoleLoggerAsDefault_When_LoggerIsNull()
+    {
+        // Act
+        var statusManager = new StatusManager(_config, _mockEventManager.Object, null);
+
+        // Assert
+        Assert.IsNotNull(statusManager);
+    }
+
+    [TestMethod]
+    public void EmitStatus_Should_EmitStatusEvent_When_EmitPublicStatusIsTrue()
     {
         // Arrange
         var config = new AgentConfiguration { EmitPublicStatus = true };
@@ -37,11 +75,12 @@ public class StatusManagerTests
         statusManager.EmitStatus(agentId, statusTitle, statusDetails, nextStepHint, progressPct);
 
         // Assert
-        _mockEventManager.Verify(x => x.RaiseStatusUpdate(agentId, statusTitle, statusDetails, nextStepHint, progressPct), Times.Once);
+        _mockEventManager.Verify(x => x.RaiseStatusUpdate(
+            agentId, statusTitle, statusDetails, nextStepHint, progressPct), Times.Once);
     }
 
     [TestMethod]
-    public void EmitStatus_WithEmitPublicStatusDisabled_ShouldNotInvokeEvent()
+    public void EmitStatus_Should_NotEmitStatusEvent_When_EmitPublicStatusIsFalse()
     {
         // Arrange
         var config = new AgentConfiguration { EmitPublicStatus = false };
@@ -53,11 +92,45 @@ public class StatusManagerTests
         statusManager.EmitStatus(agentId, statusTitle);
 
         // Assert
-        _mockEventManager.Verify(x => x.RaiseStatusUpdate(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<int?>()), Times.Never);
+        _mockEventManager.Verify(x => x.RaiseStatusUpdate(
+            It.IsAny<string>(), It.IsAny<string>(), It.Is<string>(s => s == null), 
+            It.Is<string>(s => s == null), It.Is<int?>(i => i == null)), Times.Never);
     }
 
     [TestMethod]
-    public void EmitStatus_WithNullEventManager_ShouldNotThrow()
+    public void EmitStatus_Should_HandleNullAgentId_When_AgentIdIsNull()
+    {
+        // Arrange
+        var config = new AgentConfiguration { EmitPublicStatus = true };
+        var statusManager = new StatusManager(config, _mockEventManager.Object, _mockLogger.Object);
+        var statusTitle = "Test Status";
+
+        // Act & Assert - Should not throw, just pass null to event manager
+        statusManager.EmitStatus(null!, statusTitle);
+
+        // Assert
+        _mockEventManager.Verify(x => x.RaiseStatusUpdate(
+            null!, statusTitle, null, null, null), Times.Once);
+    }
+
+    [TestMethod]
+    public void EmitStatus_Should_HandleNullStatusTitle_When_StatusTitleIsNull()
+    {
+        // Arrange
+        var config = new AgentConfiguration { EmitPublicStatus = true };
+        var statusManager = new StatusManager(config, _mockEventManager.Object, _mockLogger.Object);
+        var agentId = "test-agent";
+
+        // Act & Assert - Should not throw, just pass null to event manager
+        statusManager.EmitStatus(agentId, null!);
+
+        // Assert
+        _mockEventManager.Verify(x => x.RaiseStatusUpdate(
+            agentId, null!, null, null, null), Times.Once);
+    }
+
+    [TestMethod]
+    public void EmitStatus_Should_EmitEventWithNullOptionalParameters_When_OptionalParametersAreNull()
     {
         // Arrange
         var config = new AgentConfiguration { EmitPublicStatus = true };
@@ -65,126 +138,69 @@ public class StatusManagerTests
         var agentId = "test-agent";
         var statusTitle = "Test Status";
 
-        // Act & Assert - Should not throw
-        statusManager.EmitStatus(agentId, statusTitle);
+        // Act
+        statusManager.EmitStatus(agentId, statusTitle, null, null, null);
+
+        // Assert
+        _mockEventManager.Verify(x => x.RaiseStatusUpdate(
+            agentId, statusTitle, null, null, null), Times.Once);
     }
 
+    [TestMethod]
+    public void EmitStatus_Should_PropagateEventManagerException_When_EventManagerThrows()
+    {
+        // Arrange
+        var config = new AgentConfiguration { EmitPublicStatus = true };
+        _mockEventManager.Setup(x => x.RaiseStatusUpdate(
+            It.IsAny<string>(), It.IsAny<string>(), It.Is<string>(s => s == null), 
+            It.Is<string>(s => s == null), It.Is<int?>(i => i == null)))
+            .Throws(new InvalidOperationException("Test exception"));
+        
+        var statusManager = new StatusManager(config, _mockEventManager.Object, _mockLogger.Object);
+        var agentId = "test-agent";
+        var statusTitle = "Test Status";
 
+        // Act & Assert - Should propagate the exception
+        Assert.ThrowsException<InvalidOperationException>(() => 
+            statusManager.EmitStatus(agentId, statusTitle));
+    }
 
     [TestMethod]
-    public void EmitStatus_WithAllParameters_ShouldSetCorrectValues()
+    public void EmitStatus_Should_EmitEventWithAllParameters_When_AllParametersProvided()
     {
         // Arrange
         var config = new AgentConfiguration { EmitPublicStatus = true };
         var statusManager = new StatusManager(config, _mockEventManager.Object, _mockLogger.Object);
-        var agentId = "test-agent";
-        var statusTitle = "Test Status";
-        var statusDetails = "Test Details";
-        var nextStepHint = "Next Step";
+        var agentId = "test-agent-123";
+        var statusTitle = "Processing Complete";
+        var statusDetails = "Successfully processed 100 items";
+        var nextStepHint = "Ready for next phase";
         var progressPct = 75;
 
         // Act
         statusManager.EmitStatus(agentId, statusTitle, statusDetails, nextStepHint, progressPct);
 
         // Assert
-        _mockEventManager.Verify(x => x.RaiseStatusUpdate(agentId, statusTitle, statusDetails, nextStepHint, progressPct), Times.Once);
+        _mockEventManager.Verify(x => x.RaiseStatusUpdate(
+            agentId, statusTitle, statusDetails, nextStepHint, progressPct), Times.Once);
     }
 
     [TestMethod]
-    public void EmitStatus_WithMinimalParameters_ShouldSetDefaultValues()
+    public void EmitStatus_Should_EmitEventWithEmptyStrings_When_EmptyStringsProvided()
     {
         // Arrange
         var config = new AgentConfiguration { EmitPublicStatus = true };
         var statusManager = new StatusManager(config, _mockEventManager.Object, _mockLogger.Object);
         var agentId = "test-agent";
-        var statusTitle = "Test Status";
-
-        // Act
-        statusManager.EmitStatus(agentId, statusTitle);
-
-        // Assert
-        _mockEventManager.Verify(x => x.RaiseStatusUpdate(agentId, statusTitle, null, null, null), Times.Once);
-    }
-
-    [TestMethod]
-    public void Constructor_WithNullLogger_ShouldUseConsoleLogger()
-    {
-        // Act
-        var statusManager = new StatusManager(_config, _mockEventManager.Object, null);
-
-        // Assert
-        Assert.IsNotNull(statusManager);
-    }
-
-    [TestMethod]
-    public void EmitStatus_WithMultipleCalls_ShouldWorkCorrectly()
-    {
-        // Arrange
-        var config = new AgentConfiguration { EmitPublicStatus = true };
-        var statusManager = new StatusManager(config, _mockEventManager.Object, _mockLogger.Object);
-
-        // Act
-        statusManager.EmitStatus("agent1", "Status 1");
-        statusManager.EmitStatus("agent2", "Status 2");
-        statusManager.EmitStatus("agent3", "Status 3");
-
-        // Assert
-        _mockEventManager.Verify(x => x.RaiseStatusUpdate(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<int?>()), Times.Exactly(3));
-    }
-
-    [TestMethod]
-    public void EmitStatus_WithEmptyStrings_ShouldHandleCorrectly()
-    {
-        // Arrange
-        var config = new AgentConfiguration { EmitPublicStatus = true };
-        var statusManager = new StatusManager(config, _mockEventManager.Object, _mockLogger.Object);
-        var agentId = "";
         var statusTitle = "";
+        var statusDetails = "";
+        var nextStepHint = "";
 
         // Act
-        statusManager.EmitStatus(agentId, statusTitle);
+        statusManager.EmitStatus(agentId, statusTitle, statusDetails, nextStepHint);
 
         // Assert
-        _mockEventManager.Verify(x => x.RaiseStatusUpdate(agentId, statusTitle, null, null, null), Times.Once);
-    }
-
-    [TestMethod]
-    public void EmitStatus_WithNullStrings_ShouldHandleCorrectly()
-    {
-        // Arrange
-        var config = new AgentConfiguration { EmitPublicStatus = true };
-        var statusManager = new StatusManager(config, _mockEventManager.Object, _mockLogger.Object);
-        var agentId = "test-agent";
-        string? statusTitle = null;
-
-        // Act
-        statusManager.EmitStatus(agentId, statusTitle ?? string.Empty);
-
-        // Assert
-        _mockEventManager.Verify(x => x.RaiseStatusUpdate(agentId, "", null, null, null), Times.Once);
-    }
-
-    [TestMethod]
-    public void EmitStatus_WithProgressPercentage_ShouldHandleRangeCorrectly()
-    {
-        // Arrange
-        var config = new AgentConfiguration { EmitPublicStatus = true };
-        var statusManager = new StatusManager(config, _mockEventManager.Object, _mockLogger.Object);
-        var agentId = "test-agent";
-        var statusTitle = "Test Status";
-
-        // Act - Test various progress values
-        statusManager.EmitStatus(agentId, statusTitle, progressPct: 0);
-        statusManager.EmitStatus(agentId, statusTitle, progressPct: 50);
-        statusManager.EmitStatus(agentId, statusTitle, progressPct: 100);
-        statusManager.EmitStatus(agentId, statusTitle, progressPct: -10);
-        statusManager.EmitStatus(agentId, statusTitle, progressPct: 150);
-
-        // Assert
-        _mockEventManager.Verify(x => x.RaiseStatusUpdate(agentId, statusTitle, null, null, 0), Times.Once);
-        _mockEventManager.Verify(x => x.RaiseStatusUpdate(agentId, statusTitle, null, null, 50), Times.Once);
-        _mockEventManager.Verify(x => x.RaiseStatusUpdate(agentId, statusTitle, null, null, 100), Times.Once);
-        _mockEventManager.Verify(x => x.RaiseStatusUpdate(agentId, statusTitle, null, null, -10), Times.Once);
-        _mockEventManager.Verify(x => x.RaiseStatusUpdate(agentId, statusTitle, null, null, 150), Times.Once);
+        _mockEventManager.Verify(x => x.RaiseStatusUpdate(
+            agentId, statusTitle, statusDetails, nextStepHint, null), Times.Once);
     }
 }

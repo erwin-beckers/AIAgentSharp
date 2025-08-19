@@ -1,5 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using AIAgentSharp.Utils;
+using AIAgentSharp.Agents.Interfaces;
 
 namespace AIAgentSharp;
 
@@ -31,7 +33,10 @@ public static class JsonUtil
     /// <exception cref="ArgumentException">Thrown when the JSON is invalid or required fields are missing.</exception>
     public static ModelMessage ParseStrict(string json, AgentConfiguration? config = null)
     {
-        using var doc = JsonDocument.Parse(json);
+        // Clean the JSON response to handle malformed responses from LLMs
+        var cleanedJson = JsonResponseCleaner.CleanJsonResponse(json);
+        
+        using var doc = JsonDocument.Parse(cleanedJson);
         var root = doc.RootElement;
 
         if (root.ValueKind != JsonValueKind.Object)
@@ -160,6 +165,70 @@ public static class JsonUtil
             }
         }
 
+        // Parse optional Chain of Thought fields
+        if (root.TryGetProperty("reasoning", out var reasoningProp))
+        {
+            result.Reasoning = reasoningProp.GetString();
+        }
+
+        if (root.TryGetProperty("insights", out var insightsProp))
+        {
+            if (insightsProp.ValueKind == JsonValueKind.Array)
+            {
+                result.Insights = insightsProp.EnumerateArray()
+                    .Select(e => e.GetString() ?? "")
+                    .Where(s => !string.IsNullOrEmpty(s))
+                    .ToList();
+            }
+        }
+
+        if (root.TryGetProperty("conclusion", out var conclusionProp))
+        {
+            result.Conclusion = conclusionProp.GetString();
+        }
+
+        if (root.TryGetProperty("is_valid", out var isValidProp))
+        {
+            if (isValidProp.ValueKind == JsonValueKind.True || isValidProp.ValueKind == JsonValueKind.False)
+            {
+                result.IsValid = isValidProp.GetBoolean();
+            }
+        }
+
+        if (root.TryGetProperty("error", out var errorProp))
+        {
+            result.Error = errorProp.GetString();
+        }
+
+        // Parse optional Tree of Thoughts fields
+        if (root.TryGetProperty("thought", out var thoughtProp))
+        {
+            result.Thought = thoughtProp.GetString();
+        }
+
+        if (root.TryGetProperty("thought_type", out var thoughtTypeProp))
+        {
+            result.ThoughtType = thoughtTypeProp.GetString();
+        }
+
+        if (root.TryGetProperty("score", out var scoreProp))
+        {
+            if (scoreProp.ValueKind == JsonValueKind.Number)
+            {
+                result.Score = scoreProp.GetDouble();
+            }
+        }
+
+        if (root.TryGetProperty("children", out var childrenProp))
+        {
+            if (childrenProp.ValueKind == JsonValueKind.Array)
+            {
+                result.Children = childrenProp.EnumerateArray()
+                    .Select(e => (object)e.Clone())
+                    .ToList();
+            }
+        }
+
         // Enforce action-specific validation
         if (string.IsNullOrWhiteSpace(result.Thoughts))
         {
@@ -195,5 +264,167 @@ public static class JsonUtil
     public static string ToJson(object obj)
     {
         return JsonSerializer.Serialize(obj, JsonOptions);
+    }
+
+    /// <summary>
+    /// Parses a Chain of Thought response from the LLM.
+    /// </summary>
+    /// <param name="json">The JSON string to parse.</param>
+    /// <returns>A parsed ModelMessage with Chain of Thought fields.</returns>
+    public static ModelMessage ParseChainOfThoughtResponse(string json)
+    {
+        // Clean the JSON response to handle malformed responses from LLMs
+        var cleanedJson = JsonResponseCleaner.CleanJsonResponse(json);
+        
+        using var doc = JsonDocument.Parse(cleanedJson);
+        var root = doc.RootElement;
+
+        var result = new ModelMessage();
+
+        // Parse Chain of Thought specific fields
+        if (root.TryGetProperty("reasoning", out var reasoningProp))
+        {
+            result.Reasoning = reasoningProp.GetString();
+        }
+
+        if (root.TryGetProperty("reasoning_confidence", out var reasoningConfidenceProp))
+        {
+            if (reasoningConfidenceProp.ValueKind == JsonValueKind.Number)
+            {
+                result.ReasoningConfidence = reasoningConfidenceProp.GetDouble();
+            }
+        }
+        else if (root.TryGetProperty("confidence", out var confidenceProp))
+        {
+            if (confidenceProp.ValueKind == JsonValueKind.Number)
+            {
+                result.ReasoningConfidence = confidenceProp.GetDouble();
+            }
+        }
+
+        if (root.TryGetProperty("reasoning_type", out var reasoningTypeProp))
+        {
+            var reasoningTypeStr = reasoningTypeProp.GetString();
+            if (!string.IsNullOrEmpty(reasoningTypeStr))
+            {
+                if (Enum.TryParse<ReasoningType>(reasoningTypeStr, true, out var reasoningType))
+                {
+                    result.ReasoningType = reasoningType;
+                }
+            }
+        }
+
+        if (root.TryGetProperty("insights", out var insightsProp))
+        {
+            if (insightsProp.ValueKind == JsonValueKind.Array)
+            {
+                result.Insights = insightsProp.EnumerateArray()
+                    .Select(e => e.GetString() ?? "")
+                    .Where(s => !string.IsNullOrEmpty(s))
+                    .ToList();
+            }
+        }
+
+        if (root.TryGetProperty("conclusion", out var conclusionProp))
+        {
+            result.Conclusion = conclusionProp.GetString();
+        }
+
+        if (root.TryGetProperty("is_valid", out var isValidProp))
+        {
+            if (isValidProp.ValueKind == JsonValueKind.True || isValidProp.ValueKind == JsonValueKind.False)
+            {
+                result.IsValid = isValidProp.GetBoolean();
+            }
+        }
+
+        if (root.TryGetProperty("error", out var errorProp))
+        {
+            result.Error = errorProp.GetString();
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Parses a Tree of Thoughts response from the LLM.
+    /// </summary>
+    /// <param name="json">The JSON string to parse.</param>
+    /// <returns>A parsed ModelMessage with Tree of Thoughts fields.</returns>
+    public static ModelMessage ParseTreeOfThoughtsResponse(string json)
+    {
+        // Clean the JSON response to handle malformed responses from LLMs
+        var cleanedJson = JsonResponseCleaner.CleanJsonResponse(json);
+        
+        using var doc = JsonDocument.Parse(cleanedJson);
+        var root = doc.RootElement;
+
+        var result = new ModelMessage();
+
+        // Parse Tree of Thoughts specific fields
+        if (root.TryGetProperty("thought", out var thoughtProp))
+        {
+            result.Thought = thoughtProp.GetString();
+        }
+
+        if (root.TryGetProperty("thought_type", out var thoughtTypeProp))
+        {
+            result.ThoughtType = thoughtTypeProp.GetString();
+        }
+
+        if (root.TryGetProperty("score", out var scoreProp))
+        {
+            if (scoreProp.ValueKind == JsonValueKind.Number)
+            {
+                result.Score = scoreProp.GetDouble();
+            }
+        }
+
+        if (root.TryGetProperty("children", out var childrenProp))
+        {
+            if (childrenProp.ValueKind == JsonValueKind.Array)
+            {
+                result.Children = childrenProp.EnumerateArray()
+                    .Select(e => (object)e.Clone())
+                    .ToList();
+            }
+        }
+
+        // Also parse any Chain of Thought fields that might be present
+        if (root.TryGetProperty("reasoning", out var reasoningProp))
+        {
+            result.Reasoning = reasoningProp.GetString();
+        }
+
+        if (root.TryGetProperty("insights", out var insightsProp))
+        {
+            if (insightsProp.ValueKind == JsonValueKind.Array)
+            {
+                result.Insights = insightsProp.EnumerateArray()
+                    .Select(e => e.GetString() ?? "")
+                    .Where(s => !string.IsNullOrEmpty(s))
+                    .ToList();
+            }
+        }
+
+        if (root.TryGetProperty("conclusion", out var conclusionProp))
+        {
+            result.Conclusion = conclusionProp.GetString();
+        }
+
+        if (root.TryGetProperty("is_valid", out var isValidProp))
+        {
+            if (isValidProp.ValueKind == JsonValueKind.True || isValidProp.ValueKind == JsonValueKind.False)
+            {
+                result.IsValid = isValidProp.GetBoolean();
+            }
+        }
+
+        if (root.TryGetProperty("error", out var errorProp))
+        {
+            result.Error = errorProp.GetString();
+        }
+
+        return result;
     }
 }
