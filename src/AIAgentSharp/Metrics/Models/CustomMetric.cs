@@ -3,6 +3,7 @@ namespace AIAgentSharp.Metrics;
 /// <summary>
 /// Represents a custom metric with a numeric value and optional tags.
 /// </summary>
+[ExcludeFromCodeCoverage]
 public sealed class CustomMetric
 {
     public string Name { get; set; } = string.Empty;

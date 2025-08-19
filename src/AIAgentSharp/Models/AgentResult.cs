@@ -3,6 +3,7 @@ namespace AIAgentSharp;
 /// <summary>
 ///     Represents the final result of an agent run, including success status and final output.
 /// </summary>
+[ExcludeFromCodeCoverage]
 public sealed class AgentResult
 {
     /// <summary>

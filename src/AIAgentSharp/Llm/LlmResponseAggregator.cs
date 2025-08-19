@@ -25,7 +25,16 @@ public static class LlmResponseAggregator
         var content = string.Join("", chunkList.Select(c => c.Content));
 
         _logger.LogDebug($"Aggregated {chunkList.Count} chunks into content of length {content.Length}");
-        _logger.LogDebug($"Final aggregated content: {content}");
+        
+        // Only log the full content if it's not JSON (to avoid cluttering debug output)
+        if (!content.TrimStart().StartsWith("{") && !content.Contains("\"thoughts\""))
+        {
+            _logger.LogDebug($"Final aggregated content: {content}");
+        }
+        else
+        {
+            _logger.LogDebug("Final aggregated content: [JSON content - filtered from debug output]");
+        }
 
         // Find function call from any chunk that has it
         var functionCall = chunkList.FirstOrDefault(c => c.FunctionCall != null)?.FunctionCall;
