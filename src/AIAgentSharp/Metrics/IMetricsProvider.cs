@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace AIAgentSharp.Metrics;
 
 /// <summary>
@@ -15,7 +17,6 @@ namespace AIAgentSharp.Metrics;
 /// events. All operations are thread-safe and designed for concurrent access.
 /// </para>
 /// </remarks>
-[ExcludeFromCodeCoverage]
 public interface IMetricsProvider
 {
     /// <summary>

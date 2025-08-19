@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using AIAgentSharp.Agents.Interfaces;
 
 namespace AIAgentSharp.Metrics;
