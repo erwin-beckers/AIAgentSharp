@@ -1,0 +1,21 @@
+<Project>
+  <PropertyGroup>
+    <!-- Default to using local project references for development -->
+    <UseLocalPackages Condition="'$(UseLocalPackages)' == ''">true</UseLocalPackages>
+    
+    <!-- Set the AIAgentSharp version - you can override this via command line -->
+    <AIAgentSharpVersion Condition="'$(AIAgentSharpVersion)' == ''">1.0.8</AIAgentSharpVersion>
+  </PropertyGroup>
+
+  <!-- When UseLocalPackages is false, use the NuGet package reference -->
+  <!-- Only apply to projects that are NOT the main AIAgentSharp project -->
+  <ItemGroup Condition="'$(UseLocalPackages)' != 'true' AND '$(MSBuildProjectName)' != 'AIAgentSharp'">
+    <PackageReference Include="AIAgentSharp" Version="$(AIAgentSharpVersion)" />
+  </ItemGroup>
+
+  <!-- When UseLocalPackages is true, use the local project reference -->
+  <!-- Only apply to projects that are NOT the main AIAgentSharp project -->
+  <ItemGroup Condition="'$(UseLocalPackages)' == 'true' AND '$(MSBuildProjectName)' != 'AIAgentSharp'">
+    <ProjectReference Include="$(MSBuildThisFileDirectory)src\AIAgentSharp\AIAgentSharp.csproj" />
+  </ItemGroup>
+</Project>

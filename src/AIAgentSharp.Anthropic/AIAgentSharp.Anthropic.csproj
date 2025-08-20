@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <PackageId>AIAgentSharp.Anthropic</PackageId>
-    <Version>1.0.8</Version>
+    <Version>1.0.9</Version>
     <Authors>AIAgentSharp Contributors</Authors>
     <Description>Anthropic Claude integration for AIAgentSharp - LLM-powered agents with Anthropic Claude models.</Description>
     <PackageTags>ai,agent,llm,anthropic,claude,automation</PackageTags>
@@ -22,10 +22,6 @@
 
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="/" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\AIAgentSharp\AIAgentSharp.csproj" />
   </ItemGroup>
 
 </Project>
