@@ -1,11 +1,13 @@
-using System.Text.Json.Serialization;
 using AIAgentSharp.Agents.Interfaces;
+using System.Diagnostics.CodeAnalysis;
+using System.Text.Json.Serialization;
 
 namespace AIAgentSharp;
 
 /// <summary>
 ///     Represents a message from the LLM, including thoughts, actions, and optional public status fields.
 /// </summary>
+[ExcludeFromCodeCoverage]
 public sealed class ModelMessage
 {
     /// <summary>

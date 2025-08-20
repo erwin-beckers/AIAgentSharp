@@ -1,8 +1,11 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace AIAgentSharp;
 
 /// <summary>
 ///     Represents the result of a tool execution, including success status, output, and metadata.
 /// </summary>
+[ExcludeFromCodeCoverage]
 public sealed class ToolExecutionResult
 {
     /// <summary>

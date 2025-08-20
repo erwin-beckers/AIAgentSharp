@@ -1,10 +1,12 @@
 using AIAgentSharp.Agents.Interfaces;
+using System.Diagnostics.CodeAnalysis;
 
 namespace AIAgentSharp;
 
 /// <summary>
 ///     Represents the complete state of an agent, including its goal, conversation history, and metadata.
 /// </summary>
+[ExcludeFromCodeCoverage]
 public sealed class AgentState
 {
     /// <summary>

@@ -1,8 +1,11 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace AIAgentSharp;
 
 /// <summary>
 ///     Event arguments for when a tool call completes.
 /// </summary>
+[ExcludeFromCodeCoverage]
 public class AgentToolCallCompletedEventArgs : EventArgs
 {
     /// <summary>

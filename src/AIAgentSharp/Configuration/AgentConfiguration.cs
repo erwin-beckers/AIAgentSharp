@@ -1,4 +1,5 @@
 using AIAgentSharp.Agents.Interfaces;
+using System.Diagnostics.CodeAnalysis;
 
 namespace AIAgentSharp;
 
@@ -71,6 +72,7 @@ namespace AIAgentSharp;
 /// };
 /// </code>
 /// </example>
+[ExcludeFromCodeCoverage]
 public sealed class AgentConfiguration
 {
     /// <summary>

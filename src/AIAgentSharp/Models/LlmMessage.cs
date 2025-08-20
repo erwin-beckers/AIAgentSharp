@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json.Serialization;
 
 namespace AIAgentSharp;
@@ -5,6 +6,7 @@ namespace AIAgentSharp;
 /// <summary>
 ///     Represents a message in the conversation with the LLM.
 /// </summary>
+[ExcludeFromCodeCoverage]
 public sealed class LlmMessage
 {
     /// <summary>

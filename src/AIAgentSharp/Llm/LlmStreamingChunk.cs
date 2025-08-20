@@ -1,9 +1,12 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace AIAgentSharp;
 
 /// <summary>
 /// Represents a chunk of streaming content from the LLM.
 /// This is the primary response type for all LLM interactions.
 /// </summary>
+[ExcludeFromCodeCoverage]
 public sealed class LlmStreamingChunk
 {
     /// <summary>

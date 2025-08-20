@@ -1,8 +1,11 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace AIAgentSharp.Metrics;
 
 /// <summary>
 /// Represents a single execution time record for performance tracking.
 /// </summary>
+[ExcludeFromCodeCoverage]
 public sealed class ExecutionTimeRecord
 {
     public string AgentId { get; set; } = string.Empty;

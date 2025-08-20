@@ -1,9 +1,12 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace AIAgentSharp.Metrics;
 
 /// <summary>
 /// Provides a high-level summary of all metrics for quick overview
 /// and dashboard displays.
 /// </summary>
+[ExcludeFromCodeCoverage]
 public sealed class MetricsSummary
 {
     public long TotalAgentRuns { get; set; }

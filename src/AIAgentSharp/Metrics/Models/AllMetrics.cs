@@ -1,8 +1,11 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace AIAgentSharp.Metrics;
 
 /// <summary>
 /// Contains all metrics from all collectors in a unified structure.
 /// </summary>
+[ExcludeFromCodeCoverage]
 public sealed class AllMetrics
 {
     public PerformanceMetrics Performance { get; set; } = new();

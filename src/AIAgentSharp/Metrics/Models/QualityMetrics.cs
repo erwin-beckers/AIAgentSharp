@@ -1,4 +1,5 @@
 using AIAgentSharp.Agents.Interfaces;
+using System.Diagnostics.CodeAnalysis;
 
 namespace AIAgentSharp.Metrics;
 
@@ -6,6 +7,7 @@ namespace AIAgentSharp.Metrics;
 /// Contains quality-related metrics including response quality,
 /// reasoning accuracy, and validation results.
 /// </summary>
+[ExcludeFromCodeCoverage]
 public sealed class QualityMetrics
 {
     public long TotalResponses { get; set; }

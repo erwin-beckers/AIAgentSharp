@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace AIAgentSharp.Metrics;
 
 /// <summary>
@@ -14,6 +16,7 @@ namespace AIAgentSharp.Metrics;
 /// a point-in-time snapshot and should be refreshed periodically for real-time monitoring.
 /// </para>
 /// </remarks>
+[ExcludeFromCodeCoverage]
 public sealed class MetricsData
 {
     /// <summary>

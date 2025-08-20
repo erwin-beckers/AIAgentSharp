@@ -1,8 +1,11 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace AIAgentSharp;
 
 /// <summary>
 ///     Event arguments for the StatusUpdate event containing public status information.
 /// </summary>
+[ExcludeFromCodeCoverage]
 public class AgentStatusEventArgs : EventArgs
 {
     /// <summary>

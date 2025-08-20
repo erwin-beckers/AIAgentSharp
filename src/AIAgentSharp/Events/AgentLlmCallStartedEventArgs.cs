@@ -1,8 +1,11 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace AIAgentSharp;
 
 /// <summary>
 ///     Event arguments for when an LLM call starts.
 /// </summary>
+[ExcludeFromCodeCoverage]
 public class AgentLlmCallStartedEventArgs : EventArgs
 {
     /// <summary>

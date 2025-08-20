@@ -1,9 +1,12 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace AIAgentSharp.Metrics;
 
 /// <summary>
 /// Contains operational metrics including success/failure counts,
 /// error tracking, and operational health indicators.
 /// </summary>
+[ExcludeFromCodeCoverage]
 public sealed class OperationalMetrics
 {
     public long SuccessfulAgentRuns { get; set; }

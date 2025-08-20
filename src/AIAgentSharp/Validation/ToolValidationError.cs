@@ -1,8 +1,11 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace AIAgentSharp;
 
 /// <summary>
 ///     Represents a validation error for a specific field in tool parameters.
 /// </summary>
+[ExcludeFromCodeCoverage]
 public class ToolValidationError
 {
     /// <summary>

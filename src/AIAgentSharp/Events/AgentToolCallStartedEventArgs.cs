@@ -1,8 +1,11 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace AIAgentSharp;
 
 /// <summary>
 ///     Event arguments for when a tool call starts.
 /// </summary>
+[ExcludeFromCodeCoverage]
 public class AgentToolCallStartedEventArgs : EventArgs
 {
     /// <summary>

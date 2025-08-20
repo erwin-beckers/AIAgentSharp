@@ -1,8 +1,11 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace AIAgentSharp;
 
 /// <summary>
 ///     Represents a request to call a specific tool with parameters.
 /// </summary>
+[ExcludeFromCodeCoverage]
 public sealed class ToolCallRequest
 {
     /// <summary>

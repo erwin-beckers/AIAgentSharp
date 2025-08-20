@@ -1,8 +1,11 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace AIAgentSharp;
 
 /// <summary>
 ///     Event arguments for when an agent step starts.
 /// </summary>
+[ExcludeFromCodeCoverage]
 public class AgentStepStartedEventArgs : EventArgs
 {
     /// <summary>

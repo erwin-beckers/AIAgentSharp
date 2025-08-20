@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace AIAgentSharp;
 
 /// <summary>
@@ -5,6 +7,7 @@ namespace AIAgentSharp;
 ///     This attribute provides metadata for tool parameter properties and is used
 ///     by the schema generation system to create comprehensive tool descriptions.
 /// </summary>
+[ExcludeFromCodeCoverage]
 [AttributeUsage(AttributeTargets.Property)]
 public sealed class ToolFieldAttribute : Attribute
 {

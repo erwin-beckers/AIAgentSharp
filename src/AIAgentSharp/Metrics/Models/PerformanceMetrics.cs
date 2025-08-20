@@ -1,9 +1,12 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace AIAgentSharp.Metrics;
 
 /// <summary>
 /// Contains performance-related metrics including execution times,
 /// throughput, and percentile calculations.
 /// </summary>
+[ExcludeFromCodeCoverage]
 public sealed class PerformanceMetrics
 {
     public long TotalAgentRuns { get; set; }

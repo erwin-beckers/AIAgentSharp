@@ -1,9 +1,12 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace AIAgentSharp.Metrics;
 
 /// <summary>
 /// Contains custom metrics, tags, and metadata that can be
 /// defined by users or specific use cases.
 /// </summary>
+[ExcludeFromCodeCoverage]
 public sealed class CustomMetrics
 {
     public Dictionary<string, double> Metrics { get; set; } = new();

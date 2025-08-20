@@ -1,8 +1,11 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace AIAgentSharp;
 
 /// <summary>
 /// Represents a unified response from an LLM that can contain text content, function calls, streaming data, and usage metadata.
 /// </summary>
+[ExcludeFromCodeCoverage]
 public sealed class LlmResponse
 {
     /// <summary>

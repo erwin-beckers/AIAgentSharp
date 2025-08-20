@@ -1,8 +1,11 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace AIAgentSharp;
 
 /// <summary>
 ///     Exception thrown when tool parameter validation fails.
 /// </summary>
+[ExcludeFromCodeCoverage]
 public class ToolValidationException : Exception
 {
     /// <summary>

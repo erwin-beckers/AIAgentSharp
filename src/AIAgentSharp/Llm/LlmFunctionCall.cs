@@ -1,8 +1,11 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace AIAgentSharp;
 
 /// <summary>
 /// Represents a function call made by the LLM.
 /// </summary>
+[ExcludeFromCodeCoverage]
 public sealed class LlmFunctionCall
 {
     /// <summary>

@@ -1,8 +1,11 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace AIAgentSharp;
 
 /// <summary>
 ///     Event arguments for when an LLM chunk is received during streaming.
 /// </summary>
+[ExcludeFromCodeCoverage]
 public class AgentLlmChunkReceivedEventArgs : EventArgs
 {
     /// <summary>

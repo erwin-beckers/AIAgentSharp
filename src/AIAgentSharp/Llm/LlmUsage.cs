@@ -1,8 +1,11 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace AIAgentSharp;
 
 /// <summary>
 /// Represents token usage information returned by an LLM provider for a single call.
 /// </summary>
+[ExcludeFromCodeCoverage]
 public sealed class LlmUsage
 {
     /// <summary>

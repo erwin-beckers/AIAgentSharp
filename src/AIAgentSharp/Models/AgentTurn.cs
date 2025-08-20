@@ -1,8 +1,11 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace AIAgentSharp;
 
 /// <summary>
 ///     Represents a single turn in the agent's conversation, including LLM messages, tool calls, and results.
 /// </summary>
+[ExcludeFromCodeCoverage]
 public sealed class AgentTurn
 {
     /// <summary>

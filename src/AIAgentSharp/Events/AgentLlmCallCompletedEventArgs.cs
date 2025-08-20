@@ -1,8 +1,11 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace AIAgentSharp;
 
 /// <summary>
 ///     Event arguments for when an LLM call completes.
 /// </summary>
+[ExcludeFromCodeCoverage]
 public class AgentLlmCallCompletedEventArgs : EventArgs
 {
     /// <summary>

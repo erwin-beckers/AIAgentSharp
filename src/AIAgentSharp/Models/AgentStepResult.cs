@@ -1,8 +1,11 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace AIAgentSharp;
 
 /// <summary>
 ///     Represents the result of a single agent step, including continuation status and step details.
 /// </summary>
+[ExcludeFromCodeCoverage]
 public sealed class AgentStepResult
 {
     /// <summary>

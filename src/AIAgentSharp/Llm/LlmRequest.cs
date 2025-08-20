@@ -1,8 +1,11 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace AIAgentSharp;
 
 /// <summary>
 /// Represents a unified request to an LLM that can handle text completion, function calling, and streaming.
 /// </summary>
+[ExcludeFromCodeCoverage]
 public sealed class LlmRequest
 {
     /// <summary>

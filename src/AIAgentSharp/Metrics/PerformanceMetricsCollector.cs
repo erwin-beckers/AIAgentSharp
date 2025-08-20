@@ -191,7 +191,7 @@ public sealed class PerformanceMetricsCollector
         while (_executionTimes.TryDequeue(out _)) { }
     }
 
-    protected double CalculateRequestsPerSecond()
+    private double CalculateRequestsPerSecond()
     {
         var totalRequests = _totalAgentRuns + _totalLlmCalls + _totalToolCalls;
         if (totalRequests == 0) return 0;

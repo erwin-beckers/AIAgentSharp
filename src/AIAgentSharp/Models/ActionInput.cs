@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json.Serialization;
 
 namespace AIAgentSharp;
@@ -5,6 +6,7 @@ namespace AIAgentSharp;
 /// <summary>
 ///     Represents the input data for an agent action, including tool calls and final outputs.
 /// </summary>
+[ExcludeFromCodeCoverage]
 public sealed class ActionInput
 {
     /// <summary>
