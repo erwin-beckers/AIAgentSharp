@@ -10,8 +10,9 @@ A comprehensive, production-ready .NET 8.0 framework for building LLM-powered ag
 
 - **🧠 Advanced Reasoning**: Chain of Thought (CoT) and Tree of Thoughts (ToT) reasoning engines
 - **🔄 Re/Act Pattern**: Full implementation of the Reasoning and Acting pattern for LLM agents
-- **🔧 Function Calling**: Support for OpenAI-style function calling when available
+- **🔧 Advanced Tool Calling**: Support for OpenAI-style function calling with multi-tool execution
 - **🛠️ Rich Tool Framework**: Strongly-typed tools with automatic schema generation and validation
+- **⚡ Multi-Tool Calling**: Execute multiple tools simultaneously in a single LLM response
 - **💾 State Persistence**: Multiple state store implementations (in-memory, file-based)
 - **📊 Real-time Monitoring**: Comprehensive event system and metrics collection
 - **🔄 Loop Detection**: Intelligent loop breaker to prevent infinite loops
@@ -204,6 +205,36 @@ public sealed class WeatherTool : BaseTool<WeatherParams, object>
 }
 ```
 
+### Multi-Tool Calling
+
+AIAgentSharp supports advanced multi-tool calling, allowing the LLM to execute multiple tools in a single response for more efficient task completion:
+
+```csharp
+// The agent can automatically call multiple tools in one turn
+var agent = AIAgent.Create(new OpenAiLlmClient(apiKey))
+    .WithTools(
+        new SearchFlightsTool(),
+        new SearchHotelsTool(),
+        new SearchAttractionsTool(),
+        new CalculateTripCostTool()
+    )
+    .WithReasoning(ReasoningType.ChainOfThought)
+    .Build();
+
+// Example: "Plan a trip to Tokyo" - the agent might call:
+// 1. SearchFlightsTool
+// 2. SearchHotelsTool  
+// 3. SearchAttractionsTool
+// All in a single LLM response!
+
+var result = await agent.RunAsync("travel-agent", 
+    "Plan a 5-day business trip to Tokyo for 3 people with a $8000 budget", 
+    agent.Tools);
+
+// Multi-tool execution is automatically handled and reported
+Console.WriteLine($"Total tools executed: {result.State?.CurrentTurn?.ToolExecutionResults?.Count ?? 0}");
+```
+
 ### Different LLM Providers
 
 ```csharp
@@ -245,6 +276,14 @@ agent.StatusUpdate += (sender, e) =>
 
 agent.RunCompleted += (sender, e) => 
     Console.WriteLine($"Agent completed with {e.TotalTurns} turns");
+
+// Real-time streaming of reasoning content (Chain of Thought, Tree of Thoughts)
+agent.LlmChunkReceived += (sender, e) => 
+{
+    // Automatically filtered to show only clean reasoning content
+    // No JSON schemas or technical formatting - just the agent's thoughts
+    Console.Write(e.Chunk.Content);
+};
 ```
 
 ### Metrics

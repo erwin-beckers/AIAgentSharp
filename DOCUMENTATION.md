@@ -25,6 +25,7 @@ Welcome to the comprehensive documentation for AIAgentSharp, a production-ready 
 ### Examples and Tutorials
 - [Basic Agent Example](docs/examples/basic-agent.md) - Simple agent implementation
 - [Tool Creation Guide](docs/examples/tool-creation.md) - How to create custom tools
+- [Multi-Tool Calling Guide](docs/examples/multi-tool-calling.md) - **NEW!** Advanced multi-tool execution
 - [Reasoning Examples](docs/examples/reasoning-examples.md) - Chain of Thought and Tree of Thoughts
 - [Travel Planning Example](docs/examples/travel-planning.md) - Complete real-world example
 - [Event Monitoring Example](docs/examples/event-monitoring.md) - Real-time agent monitoring

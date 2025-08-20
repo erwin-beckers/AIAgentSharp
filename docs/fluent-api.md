@@ -126,6 +126,7 @@ Available event handlers:
 - `OnToolCallCompleted(Action<AgentToolCallCompletedEventArgs>)` - When a tool call completes
 - `OnLlmCallStarted(Action<AgentLlmCallStartedEventArgs>)` - When an LLM call starts
 - `OnLlmCallCompleted(Action<AgentLlmCallCompletedEventArgs>)` - When an LLM call completes
+- `OnLlmChunkReceived(Action<AgentLlmChunkReceivedEventArgs>)` - **NEW!** Real-time streaming of clean reasoning content
 - `OnStatusUpdate(Action<AgentStatusEventArgs>)` - When status updates occur
 
 ### Advanced Configuration
@@ -191,9 +192,34 @@ var agent = AIAgent.Create(new OpenAiLlmClient(apiKey))
         .OnRunStarted(e => Console.WriteLine($"🚀 Run started: {e.AgentId}"))
         .OnStepCompleted(e => Console.WriteLine($"✅ Step {e.TurnIndex + 1} completed"))
         .OnToolCallStarted(e => Console.WriteLine($"🔧 Tool called: {e.ToolName}"))
+        .OnLlmChunkReceived(e => Console.Write(e.Chunk.Content)) // Real-time reasoning display
         .OnRunCompleted(e => Console.WriteLine($"🏁 Run completed: {e.Succeeded}"))
     )
     .Build();
+```
+
+### Real-Time Reasoning Display
+
+The `OnLlmChunkReceived` event provides real-time access to clean reasoning content:
+
+```csharp
+var agent = AIAgent.Create(new OpenAiLlmClient(apiKey))
+    .WithReasoning(ReasoningType.ChainOfThought)
+    .WithEventHandling(events => events
+        .OnLlmChunkReceived(e => 
+        {
+            // Automatically filtered content - no JSON schemas or technical formatting
+            // Just the agent's clean thoughts and reasoning process
+            Console.Write(e.Chunk.Content);
+        })
+        .OnLlmCallCompleted(e => Console.WriteLine()) // Add newline when complete
+    )
+    .Build();
+
+// Output example:
+// "To plan this complex business trip, I need to consider the budget constraints, 
+// dietary restrictions, and different arrival times. Let me start by searching 
+// for flights that accommodate the team's scheduling needs..."
 ```
 
 ### Tree of Thoughts Agent
