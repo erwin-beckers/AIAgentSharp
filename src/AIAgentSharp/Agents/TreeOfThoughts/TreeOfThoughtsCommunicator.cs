@@ -19,18 +19,17 @@ internal sealed class TreeOfThoughtsCommunicator
     /// </summary>
     private async Task<ModelMessage?> CallLlmForTreeOfThoughtsAsync(IEnumerable<LlmMessage> messages, CancellationToken cancellationToken)
     {
-        // Use the underlying LLM client directly for Tree of Thoughts responses
-        var request = new LlmRequest { Messages = messages, ResponseType = LlmResponseType.Text };
-        var response = await LlmResponseAggregator.AggregateChunksAsync(_llmCommunicator.GetLlmClient().StreamAsync(request, cancellationToken));
+        // Use LlmCommunicator for proper streaming and event emission
+        var content = await _llmCommunicator.CallLlmWithStreamingAsync(messages, "tree-of-thoughts", 0, cancellationToken);
         
-        if (string.IsNullOrEmpty(response.Content))
+        if (string.IsNullOrEmpty(content))
         {
             return null;
         }
 
         try
         {
-            return JsonUtil.ParseTreeOfThoughtsResponse(response.Content);
+            return JsonUtil.ParseTreeOfThoughtsResponse(content);
         }
         catch (Exception ex)
         {

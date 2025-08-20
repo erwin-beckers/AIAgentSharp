@@ -84,8 +84,8 @@ public class ChainStepExecutorTests
         _mockPromptBuilder.Setup(x => x.BuildAnalysisPrompt(goal, context, _mockTools))
             .Returns(expectedPrompt);
         
-        _mockLlmClient.Setup(x => x.StreamAsync(It.IsAny<LlmRequest>(), It.IsAny<CancellationToken>()))
-            .Returns(mockChunks.ToAsyncEnumerable());
+        _mockLlmCommunicator.Setup(x => x.CallLlmWithStreamingAsync(It.IsAny<IEnumerable<LlmMessage>>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(mockResponse);
 
         // Act
         var result = await _stepExecutor.PerformAnalysisStepAsync(goal, context, _mockTools, default(CancellationToken));
@@ -120,8 +120,8 @@ public class ChainStepExecutorTests
         _mockPromptBuilder.Setup(x => x.BuildAnalysisPrompt(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<IDictionary<string, ITool>>()))
             .Returns("Test prompt");
         
-        _mockLlmClient.Setup(x => x.StreamAsync(It.IsAny<LlmRequest>(), It.IsAny<CancellationToken>()))
-            .Returns(mockChunks.ToAsyncEnumerable());
+        _mockLlmCommunicator.Setup(x => x.CallLlmWithStreamingAsync(It.IsAny<IEnumerable<LlmMessage>>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(mockResponse);
 
         // Act
         await _stepExecutor.PerformAnalysisStepAsync(goal, context, _mockTools, default(CancellationToken));
@@ -146,8 +146,8 @@ public class ChainStepExecutorTests
         _mockPromptBuilder.Setup(x => x.BuildAnalysisPrompt(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<IDictionary<string, ITool>>()))
             .Returns("Test prompt");
         
-        _mockLlmClient.Setup(x => x.StreamAsync(It.IsAny<LlmRequest>(), It.IsAny<CancellationToken>()))
-            .Returns(new List<LlmStreamingChunk>().ToAsyncEnumerable());
+        _mockLlmCommunicator.Setup(x => x.CallLlmWithStreamingAsync(It.IsAny<IEnumerable<LlmMessage>>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync("");
 
         // Act
         var result = await _stepExecutor.PerformAnalysisStepAsync(goal, context, _mockTools, default(CancellationToken));
@@ -181,8 +181,8 @@ public class ChainStepExecutorTests
         _mockPromptBuilder.Setup(x => x.BuildPlanningPrompt(goal, context, _mockTools, analysisInsights))
             .Returns(expectedPrompt);
         
-        _mockLlmClient.Setup(x => x.StreamAsync(It.IsAny<LlmRequest>(), It.IsAny<CancellationToken>()))
-            .Returns(mockChunks.ToAsyncEnumerable());
+        _mockLlmCommunicator.Setup(x => x.CallLlmWithStreamingAsync(It.IsAny<IEnumerable<LlmMessage>>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(mockResponse);
 
         // Act
         var result = await _stepExecutor.PerformPlanningStepAsync(goal, context, _mockTools, analysisInsights, default(CancellationToken));
@@ -217,8 +217,8 @@ public class ChainStepExecutorTests
         _mockPromptBuilder.Setup(x => x.BuildPlanningPrompt(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<IDictionary<string, ITool>>(), It.IsAny<List<string>>()))
             .Returns("Test prompt");
         
-        _mockLlmClient.Setup(x => x.StreamAsync(It.IsAny<LlmRequest>(), It.IsAny<CancellationToken>()))
-            .Returns(mockChunks.ToAsyncEnumerable());
+        _mockLlmCommunicator.Setup(x => x.CallLlmWithStreamingAsync(It.IsAny<IEnumerable<LlmMessage>>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(mockResponse);
 
         // Act
         await _stepExecutor.PerformPlanningStepAsync(goal, context, _mockTools, analysisInsights, default(CancellationToken));
@@ -255,8 +255,8 @@ public class ChainStepExecutorTests
         _mockPromptBuilder.Setup(x => x.BuildStrategyPrompt(goal, context, _mockTools, planningInsights))
             .Returns("Test strategy prompt");
         
-        _mockLlmClient.Setup(x => x.StreamAsync(It.IsAny<LlmRequest>(), It.IsAny<CancellationToken>()))
-            .Returns(mockChunks.ToAsyncEnumerable());
+        _mockLlmCommunicator.Setup(x => x.CallLlmWithStreamingAsync(It.IsAny<IEnumerable<LlmMessage>>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(mockResponse);
 
         // Act
         var result = await _stepExecutor.PerformStrategyStepAsync(goal, context, _mockTools, planningInsights, default(CancellationToken));
@@ -292,8 +292,8 @@ public class ChainStepExecutorTests
         _mockPromptBuilder.Setup(x => x.BuildEvaluationPrompt(goal, context, _mockTools, allInsights))
             .Returns("Test evaluation prompt");
         
-        _mockLlmClient.Setup(x => x.StreamAsync(It.IsAny<LlmRequest>(), It.IsAny<CancellationToken>()))
-            .Returns(mockChunks.ToAsyncEnumerable());
+        _mockLlmCommunicator.Setup(x => x.CallLlmWithStreamingAsync(It.IsAny<IEnumerable<LlmMessage>>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(mockResponse);
 
         // Act
         var result = await _stepExecutor.PerformEvaluationStepAsync(goal, context, _mockTools, allInsights, default(CancellationToken));
@@ -328,8 +328,8 @@ public class ChainStepExecutorTests
         _mockPromptBuilder.Setup(x => x.BuildValidationPrompt(goal, insights, conclusion, confidence))
             .Returns("Test validation prompt");
         
-        _mockLlmClient.Setup(x => x.StreamAsync(It.IsAny<LlmRequest>(), It.IsAny<CancellationToken>()))
-            .Returns(mockChunks.ToAsyncEnumerable());
+        _mockLlmCommunicator.Setup(x => x.CallLlmWithStreamingAsync(It.IsAny<IEnumerable<LlmMessage>>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(mockResponse);
 
         // Act
         var result = await _stepExecutor.PerformValidationAsync(goal, insights, conclusion, confidence, default(CancellationToken));
@@ -362,8 +362,8 @@ public class ChainStepExecutorTests
         _mockPromptBuilder.Setup(x => x.BuildValidationPrompt(goal, insights, conclusion, confidence))
             .Returns("Test validation prompt");
         
-        _mockLlmClient.Setup(x => x.StreamAsync(It.IsAny<LlmRequest>(), It.IsAny<CancellationToken>()))
-            .Returns(mockChunks.ToAsyncEnumerable());
+        _mockLlmCommunicator.Setup(x => x.CallLlmWithStreamingAsync(It.IsAny<IEnumerable<LlmMessage>>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(mockResponse);
 
         // Act
         var result = await _stepExecutor.PerformValidationAsync(goal, insights, conclusion, confidence, default(CancellationToken));
@@ -394,8 +394,8 @@ public class ChainStepExecutorTests
         _mockPromptBuilder.Setup(x => x.BuildAnalysisPrompt(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<IDictionary<string, ITool>>()))
             .Returns("Test prompt");
         
-        _mockLlmClient.Setup(x => x.StreamAsync(It.IsAny<LlmRequest>(), It.IsAny<CancellationToken>()))
-            .Returns(mockChunks.ToAsyncEnumerable());
+        _mockLlmCommunicator.Setup(x => x.CallLlmWithStreamingAsync(It.IsAny<IEnumerable<LlmMessage>>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(mockResponse);
 
         // Act
         var result = await _stepExecutor.PerformAnalysisStepAsync(goal, context, _mockTools, default(CancellationToken));
@@ -428,8 +428,8 @@ public class ChainStepExecutorTests
         _mockPromptBuilder.Setup(x => x.BuildEvaluationPrompt(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<IDictionary<string, ITool>>(), It.IsAny<List<string>>()))
             .Returns("Test prompt");
         
-        _mockLlmClient.Setup(x => x.StreamAsync(It.IsAny<LlmRequest>(), It.IsAny<CancellationToken>()))
-            .Returns(mockChunks.ToAsyncEnumerable());
+        _mockLlmCommunicator.Setup(x => x.CallLlmWithStreamingAsync(It.IsAny<IEnumerable<LlmMessage>>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(mockResponse);
 
         // Act
         await _stepExecutor.PerformEvaluationStepAsync(goal, context, _mockTools, allInsights, default(CancellationToken));
@@ -465,8 +465,8 @@ public class ChainStepExecutorTests
         _mockPromptBuilder.Setup(x => x.BuildValidationPrompt(It.IsAny<string>(), It.IsAny<List<string>>(), It.IsAny<string>(), It.IsAny<double>()))
             .Returns("Test prompt");
         
-        _mockLlmClient.Setup(x => x.StreamAsync(It.IsAny<LlmRequest>(), It.IsAny<CancellationToken>()))
-            .Returns(mockChunks.ToAsyncEnumerable());
+        _mockLlmCommunicator.Setup(x => x.CallLlmWithStreamingAsync(It.IsAny<IEnumerable<LlmMessage>>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(mockResponse);
 
         // Act
         await _stepExecutor.PerformValidationAsync(goal, insights, conclusion, confidence, default(CancellationToken));

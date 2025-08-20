@@ -26,6 +26,8 @@ public class AIAgentBuilder
     private readonly List<Action<AgentRunCompletedEventArgs>> _runCompletedHandlers = new();
     private readonly List<Action<AgentStepStartedEventArgs>> _stepStartedHandlers = new();
     private readonly List<Action<AgentStatusEventArgs>> _statusUpdateHandlers = new();
+    private readonly List<Action<AgentLlmChunkReceivedEventArgs>> _llmChunkReceivedHandlers = new();
+    private bool _enableStreaming = false;
 
     /// <summary>
     /// Sets the LLM client for the agent.
@@ -158,7 +160,19 @@ public class AIAgentBuilder
         _runCompletedHandlers.AddRange(eventBuilder.RunCompletedHandlers);
         _stepStartedHandlers.AddRange(eventBuilder.StepStartedHandlers);
         _statusUpdateHandlers.AddRange(eventBuilder.StatusUpdateHandlers);
+        _llmChunkReceivedHandlers.AddRange(eventBuilder.LlmChunkReceivedHandlers);
         
+        return this;
+    }
+
+    /// <summary>
+    /// Enables streaming for LLM calls.
+    /// </summary>
+    /// <param name="enable">Whether to enable streaming</param>
+    /// <returns>The builder instance for method chaining</returns>
+    public AIAgentBuilder WithStreaming(bool enable = true)
+    {
+        _enableStreaming = enable;
         return this;
     }
 
@@ -182,7 +196,8 @@ public class AIAgentBuilder
         {
             ReasoningType = _reasoningType,
             TreeExplorationStrategy = _explorationStrategy,
-            MaxTreeDepth = _maxDepth
+            MaxTreeDepth = _maxDepth,
+            UseFunctionCalling = !_enableStreaming
         };
 
         // Create agent
@@ -232,6 +247,11 @@ public class AIAgentBuilder
         foreach (var handler in _statusUpdateHandlers)
         {
             agent.StatusUpdate += (sender, e) => handler(e);
+        }
+
+        foreach (var handler in _llmChunkReceivedHandlers)
+        {
+            agent.LlmChunkReceived += (sender, e) => handler(e);
         }
 
         return agent;
@@ -315,6 +335,7 @@ public class EventHandlingBuilder
     public List<Action<AgentRunCompletedEventArgs>> RunCompletedHandlers { get; } = new();
     public List<Action<AgentStepStartedEventArgs>> StepStartedHandlers { get; } = new();
     public List<Action<AgentStatusEventArgs>> StatusUpdateHandlers { get; } = new();
+    public List<Action<AgentLlmChunkReceivedEventArgs>> LlmChunkReceivedHandlers { get; } = new();
 
     /// <summary>
     /// Adds a handler for step completed events.
@@ -421,6 +442,18 @@ public class EventHandlingBuilder
     {
         if (handler != null)
             StatusUpdateHandlers.Add(handler);
+        return this;
+    }
+
+    /// <summary>
+    /// Adds a handler for LLM chunk received events.
+    /// </summary>
+    /// <param name="handler">The event handler</param>
+    /// <returns>The builder instance for method chaining</returns>
+    public EventHandlingBuilder OnLlmChunkReceived(Action<AgentLlmChunkReceivedEventArgs> handler)
+    {
+        if (handler != null)
+            LlmChunkReceivedHandlers.Add(handler);
         return this;
     }
 }

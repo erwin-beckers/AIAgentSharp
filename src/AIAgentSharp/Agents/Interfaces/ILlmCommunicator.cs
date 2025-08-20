@@ -1,5 +1,3 @@
-
-
 namespace AIAgentSharp.Agents.Interfaces;
 
 /// <summary>
@@ -11,6 +9,11 @@ public interface ILlmCommunicator
     /// Calls the LLM with function calling support using the unified interface.
     /// </summary>
     Task<LlmResponse> CallWithFunctionsAsync(IEnumerable<LlmMessage> messages, List<FunctionSpec> functionSpecs, string agentId, int turnIndex, CancellationToken ct);
+
+    /// <summary>
+    /// Calls the LLM with streaming support and emits streaming events.
+    /// </summary>
+    Task<string> CallLlmWithStreamingAsync(IEnumerable<LlmMessage> messages, string agentId, int turnIndex, CancellationToken ct);
 
     /// <summary>
     /// Calls the LLM and parses the JSON response.

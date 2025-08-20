@@ -5,7 +5,8 @@ using AIAgentSharp.Metrics;
 namespace AIAgentSharp.Agents;
 
 /// <summary>
-/// Handles communication with LLM providers, including function calling and JSON parsing.
+/// Handles communication with LLM providers with consistent event emission and error handling.
+/// This is the single point of responsibility for all LLM calls in the system.
 /// </summary>
 public sealed class LlmCommunicator : ILlmCommunicator
 {
@@ -35,7 +36,7 @@ public sealed class LlmCommunicator : ILlmCommunicator
     }
 
     /// <summary>
-    /// Calls the LLM with function calling capabilities using the unified streaming interface.
+    /// Calls the LLM with function calling support.
     /// </summary>
     /// <param name="messages">The conversation messages to send to the LLM.</param>
     /// <param name="functionSpecs">The available functions that the LLM can call.</param>
@@ -51,46 +52,84 @@ public sealed class LlmCommunicator : ILlmCommunicator
         using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         timeoutCts.CancelAfter(_llmTimeout);
 
-        var request = new LlmRequest
+        try
         {
-            Messages = messages,
-            Functions = functionSpecs,
-            ResponseType = LlmResponseType.FunctionCall
-        };
-
-        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-        
-        // Use the new streaming interface and aggregate chunks
-        var response = await LlmResponseAggregator.ProcessChunksWithCallbackAsync(
-            _llm.StreamAsync(request, timeoutCts.Token),
-            chunk => 
+            var request = new LlmRequest
             {
-                // Filter out JSON content before emitting chunk events for UI
-                var filteredChunk = FilterJsonContentFromChunk(chunk);
-                if (filteredChunk != null)
-                {
-                    _eventManager.RaiseLlmChunkReceived(agentId, turnIndex, filteredChunk);
-                }
-            });
-        
-        stopwatch.Stop();
+                Messages = messages,
+                Functions = functionSpecs,
+                ResponseType = LlmResponseType.FunctionCall
+            };
 
-        // Record metrics
-        _metricsCollector.RecordLlmCallExecutionTime(agentId, turnIndex, stopwatch.ElapsedMilliseconds, "function-calling");
-        _metricsCollector.RecordLlmCallCompletion(agentId, turnIndex, true, "function-calling");
-        _metricsCollector.RecordApiCall(agentId, "LLM", "function-calling");
+            // Use streaming and aggregate the response
+            var response = await LlmResponseAggregator.AggregateChunksAsync(_llm.StreamAsync(request, timeoutCts.Token));
 
-        // If provider reported usage, record token usage
-        if (response.Usage != null)
-        {
-            _metricsCollector.RecordTokenUsage(agentId, turnIndex, (int)response.Usage.InputTokens, (int)response.Usage.OutputTokens, response.Usage.Model);
+            // Record metrics
+            _metricsCollector.RecordTokenUsage(agentId, turnIndex, response.Usage?.InputTokens ?? 0L, response.Usage?.OutputTokens ?? 0, "function-calling");
+
+            // Raise LLM call completed event
+            _eventManager.RaiseLlmCallCompleted(agentId, turnIndex, null);
+
+            return response;
         }
+        catch (Exception ex)
+        {
+            _logger.LogError($"LLM function call failed: {ex.Message}");
+            _eventManager.RaiseLlmCallCompleted(agentId, turnIndex, null, ex.Message);
+            throw;
+        }
+    }
 
-        return response;
+    /// <summary>
+    /// Calls the LLM with streaming support and emits streaming events.
+    /// This is the primary method for all streaming LLM calls in the system.
+    /// </summary>
+    /// <param name="messages">The conversation messages to send to the LLM.</param>
+    /// <param name="agentId">Identifier of the agent making the call.</param>
+    /// <param name="turnIndex">Current turn index for event tracking.</param>
+    /// <param name="ct">Cancellation token for the operation.</param>
+    /// <returns>The complete response content as a string.</returns>
+    public async Task<string> CallLlmWithStreamingAsync(IEnumerable<LlmMessage> messages, string agentId, int turnIndex, CancellationToken ct)
+    {
+        // Raise LLM call started event
+        _eventManager.RaiseLlmCallStarted(agentId, turnIndex);
+
+        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeoutCts.CancelAfter(_llmTimeout);
+
+        try
+        {
+            var request = new LlmRequest
+            {
+                Messages = messages,
+                ResponseType = LlmResponseType.Text
+            };
+
+            var content = "";
+            await foreach (var chunk in _llm.StreamAsync(request, timeoutCts.Token))
+            {
+                content += chunk.Content;
+                
+                // Emit streaming chunk event
+                _eventManager.RaiseLlmChunkReceived(agentId, turnIndex, chunk);
+            }
+
+            // Raise LLM call completed event
+            _eventManager.RaiseLlmCallCompleted(agentId, turnIndex, null);
+
+            return content;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError($"LLM streaming call failed: {ex.Message}");
+            _eventManager.RaiseLlmCallCompleted(agentId, turnIndex, null, ex.Message);
+            throw;
+        }
     }
 
     /// <summary>
     /// Calls the LLM and parses the response into a structured ModelMessage.
+    /// This method is specifically for Re/Act pattern JSON parsing.
     /// </summary>
     /// <param name="messages">The conversation messages to send to the LLM.</param>
     /// <param name="agentId">Identifier of the agent making the call.</param>
@@ -98,92 +137,48 @@ public sealed class LlmCommunicator : ILlmCommunicator
     /// <param name="turnId">Unique identifier for the current turn.</param>
     /// <param name="state">Current agent state for error handling.</param>
     /// <param name="ct">Cancellation token for aborting the operation.</param>
-    /// <returns>
-    /// A parsed <see cref="ModelMessage"/> or null if parsing failed.
-    /// </returns>
-    /// <remarks>
-    /// <para>
-    /// This method handles the complete LLM communication cycle:
-    /// </para>
-    /// <list type="number">
-    /// <item><description>Calls the LLM with timeout handling</description></item>
-    /// <item><description>Parses the JSON response</description></item>
-    /// <item><description>Handles parsing errors gracefully</description></item>
-    /// <item><description>Emits events for monitoring</description></item>
-    /// <item><description>Updates agent state with errors if needed</description></item>
-    /// </list>
-    /// <para>
-    /// If JSON parsing fails, the method creates an error turn in the agent state
-    /// and returns null, allowing the agent to continue with error recovery.
-    /// </para>
-    /// </remarks>
-    /// <exception cref="OperationCanceledException">Thrown when the operation is cancelled or times out.</exception>
+    /// <returns>A parsed <see cref="ModelMessage"/> or null if parsing failed.</returns>
     public async Task<ModelMessage?> CallLlmAndParseAsync(IEnumerable<LlmMessage> messages, string agentId, int turnIndex, string turnId, AgentState state, CancellationToken ct)
     {
         try
         {
-            var response = await CallLlmWithUsage(messages, agentId, turnIndex, ct);
-            // Parse content
-            var model = await ParseJsonResponse(response.Content, turnIndex, turnId, state, ct);
-            return model;
+            // Use streaming for consistent behavior
+            var content = await CallLlmWithStreamingAsync(messages, agentId, turnIndex, ct);
+            
+            // Parse the content
+            return await ParseJsonResponse(content, turnIndex, turnId, state, ct);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
-            // Handle caller cancellation
             var err = "LLM call was cancelled by user";
             _logger.LogError(err);
             throw;
         }
         catch (OperationCanceledException)
         {
-            // Handle deadline exceeded
             var err = $"LLM call deadline exceeded after {_llmTimeout}";
             _logger.LogError(err);
-
-            var errorTurn = new AgentTurn
-            {
-                Index = turnIndex,
-                TurnId = turnId,
-                LlmMessage = null,
-                ToolCall = null,
-                ToolResult = new ToolExecutionResult
-                {
-                    Success = false,
-                    Error = err,
-                    TurnId = turnId,
-                    CreatedUtc = DateTimeOffset.UtcNow
-                }
-            };
-            state.Turns.Add(errorTurn);
-
+            CreateErrorTurn(state, turnIndex, turnId, err);
             return null;
         }
         catch (Exception llmEx)
         {
-            // Handle other LLM errors
             var err = $"LLM call failed: {llmEx.Message}";
             _logger.LogError(err);
-
-            var errorTurn = new AgentTurn
-            {
-                Index = turnIndex,
-                TurnId = turnId,
-                LlmMessage = null,
-                ToolCall = null,
-                ToolResult = new ToolExecutionResult
-                {
-                    Success = false,
-                    Error = err,
-                    TurnId = turnId,
-                    CreatedUtc = DateTimeOffset.UtcNow
-                }
-            };
-            state.Turns.Add(errorTurn);
-
+            CreateErrorTurn(state, turnIndex, turnId, err);
             return null;
         }
     }
 
+    /// <summary>
+    /// Parses a JSON response from the LLM into a ModelMessage.
+    /// </summary>
+    /// <param name="llmRaw">The raw LLM response content.</param>
+    /// <param name="turnIndex">Current turn index for event tracking.</param>
+    /// <param name="turnId">Unique identifier for the current turn.</param>
+    /// <param name="state">Current agent state for error handling.</param>
+    /// <param name="ct">Cancellation token for the operation.</param>
+    /// <returns>A parsed <see cref="ModelMessage"/> or null if parsing failed.</returns>
     public Task<ModelMessage?> ParseJsonResponse(string llmRaw, int turnIndex, string turnId, AgentState state, CancellationToken ct)
     {
         try
@@ -212,22 +207,8 @@ public sealed class LlmCommunicator : ILlmCommunicator
             // Raise LLM call completed event for JSON parsing error
             _eventManager.RaiseLlmCallCompleted(state.AgentId, turnIndex, null, err);
 
-            // Store error as ToolResult instead of fake LLM turn
-            var errorTurn = new AgentTurn
-            {
-                Index = turnIndex,
-                TurnId = turnId,
-                LlmMessage = null,
-                ToolCall = null,
-                ToolResult = new ToolExecutionResult
-                {
-                    Success = false,
-                    Error = err,
-                    TurnId = turnId,
-                    CreatedUtc = DateTimeOffset.UtcNow
-                }
-            };
-            state.Turns.Add(errorTurn);
+            // Store error as ToolResult
+            CreateErrorTurn(state, turnIndex, turnId, err);
             return Task.FromResult<ModelMessage?>(null);
         }
     }
@@ -279,6 +260,7 @@ public sealed class LlmCommunicator : ILlmCommunicator
 
     /// <summary>
     /// Gets the underlying LLM client for direct access when needed.
+    /// This method should be used sparingly and only for testing or special cases.
     /// </summary>
     /// <returns>The underlying LLM client.</returns>
     public ILlmClient GetLlmClient()
@@ -287,143 +269,24 @@ public sealed class LlmCommunicator : ILlmCommunicator
     }
 
     /// <summary>
-    /// Calls the LLM with the unified streaming interface and returns the response with usage metadata.
+    /// Creates an error turn in the agent state.
     /// </summary>
-    /// <param name="messages">The conversation messages to send to the LLM.</param>
-    /// <param name="agentId">Identifier of the agent making the call.</param>
-    /// <param name="turnIndex">Current turn index for event tracking.</param>
-    /// <param name="ct">Cancellation token for the operation.</param>
-    /// <returns>The LLM response with usage metadata.</returns>
-    private async Task<LlmResponse> CallLlmWithUsage(IEnumerable<LlmMessage> messages, string agentId, int turnIndex, CancellationToken ct)
+    private void CreateErrorTurn(AgentState state, int turnIndex, string turnId, string error)
     {
-        // Raise LLM call started event
-        _eventManager.RaiseLlmCallStarted(agentId, turnIndex);
-
-        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        timeoutCts.CancelAfter(_llmTimeout);
-
-        var request = new LlmRequest
+        var errorTurn = new AgentTurn
         {
-            Messages = messages,
-            ResponseType = LlmResponseType.Text
+            Index = turnIndex,
+            TurnId = turnId,
+            LlmMessage = null,
+            ToolCall = null,
+            ToolResult = new ToolExecutionResult
+            {
+                Success = false,
+                Error = error,
+                TurnId = turnId,
+                CreatedUtc = DateTimeOffset.UtcNow
+            }
         };
-
-        _logger.LogDebug($"Calling LLM with timeout {_llmTimeout}");
-        var sw = System.Diagnostics.Stopwatch.StartNew();
-        
-        // Use the new streaming interface and aggregate chunks
-        var response = await LlmResponseAggregator.ProcessChunksWithCallbackAsync(
-            _llm.StreamAsync(request, timeoutCts.Token),
-            chunk => 
-            {
-                // Filter out JSON content before emitting chunk events for UI
-                var filteredChunk = FilterJsonContentFromChunk(chunk);
-                if (filteredChunk != null)
-                {
-                    _eventManager.RaiseLlmChunkReceived(agentId, turnIndex, filteredChunk);
-                }
-            });
-        
-        sw.Stop();
-
-        // Record metrics (only with a concrete model if provided)
-        if (response.Usage != null)
-        {
-            _metricsCollector.RecordLlmCallExecutionTime(agentId, turnIndex, sw.ElapsedMilliseconds, response.Usage.Model);
-            _metricsCollector.RecordLlmCallCompletion(agentId, turnIndex, true, response.Usage.Model);
-            _metricsCollector.RecordApiCall(agentId, "LLM", response.Usage.Model);
-            _metricsCollector.RecordTokenUsage(agentId, turnIndex, (int)response.Usage.InputTokens, (int)response.Usage.OutputTokens, response.Usage.Model);
-        }
-
-        return response;
-    }
-
-    private static object? ConvertJsonElementToNativeType(object? value)
-    {
-        if (value is JsonElement element)
-        {
-            return element.ValueKind switch
-            {
-                JsonValueKind.String => element.GetString(),
-                JsonValueKind.Number => ConvertJsonNumber(element),
-                JsonValueKind.True => true,
-                JsonValueKind.False => false,
-                JsonValueKind.Null => null,
-                JsonValueKind.Array => element.EnumerateArray().Select(e => ConvertJsonElementToNativeType(e)).ToList(),
-                JsonValueKind.Object => element.EnumerateObject().ToDictionary(
-                    prop => prop.Name,
-                    prop => ConvertJsonElementToNativeType(prop.Value)),
-                _ => value
-            };
-        }
-        return value;
-    }
-
-    private static object ConvertJsonNumber(JsonElement element)
-    {
-        // Try to preserve precision by checking for integers first
-        if (element.TryGetInt64(out var longValue))
-        {
-            // If it fits in int32, return int32 for compatibility
-            if (longValue >= int.MinValue && longValue <= int.MaxValue)
-            {
-                return (int)longValue;
-            }
-            return longValue;
-        }
-
-        // For decimal numbers, try to preserve precision
-        if (element.TryGetDecimal(out var decimalValue))
-        {
-            // If it's a whole number, return as long
-            if (decimalValue == Math.Floor(decimalValue))
-            {
-                var longVal = (long)decimalValue;
-
-                if (longVal >= int.MinValue && longVal <= int.MaxValue)
-                {
-                    return (int)longVal;
-                }
-                return longVal;
-            }
-            return decimalValue;
-        }
-
-        // Fallback to double
-        return element.GetDouble();
-    }
-
-    /// <summary>
-    /// Filters out JSON content from streaming chunks to prevent showing internal agent responses to users.
-    /// </summary>
-    /// <param name="chunk">The original streaming chunk.</param>
-    /// <returns>A filtered chunk with JSON content removed, or null if the entire chunk should be filtered.</returns>
-    private LlmStreamingChunk? FilterJsonContentFromChunk(LlmStreamingChunk chunk)
-    {
-        if (string.IsNullOrEmpty(chunk.Content))
-        {
-            return chunk; // Keep empty chunks
-        }
-
-        var content = chunk.Content;
-
-        // Check if this chunk contains JSON content that should be filtered
-        if (content.TrimStart().StartsWith("{") || 
-            content.Contains("\"thoughts\"") ||
-            content.Contains("\"action\"") ||
-            content.Contains("\"action_input\"") ||
-            content.Contains("\"reasoning_confidence\"") ||
-            content.Contains("\"reasoning_type\"") ||
-            content.Contains("\"status_title\"") ||
-            content.Contains("\"status_details\"") ||
-            content.Contains("\"next_step_hint\"") ||
-            content.Contains("\"progress_pct\""))
-        {
-            // Return null to indicate this chunk should be filtered out
-            return null;
-        }
-
-        // Return the original chunk if it doesn't contain JSON content
-        return chunk;
+        state.Turns.Add(errorTurn);
     }
 }

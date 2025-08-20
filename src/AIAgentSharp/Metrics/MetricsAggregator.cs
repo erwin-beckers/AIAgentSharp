@@ -96,7 +96,7 @@ public sealed class MetricsAggregator : IMetricsCollector
 
     #region Resource Metrics
 
-    public void RecordTokenUsage(string agentId, int turnIndex, int inputTokens, int outputTokens, string modelName)
+    public void RecordTokenUsage(string agentId, int turnIndex, long inputTokens, long outputTokens, string modelName)
     {
         _resourceCollector.RecordTokenUsage(agentId, turnIndex, inputTokens, outputTokens, modelName);
     }

@@ -36,19 +36,8 @@ public sealed class ChainStepExecutor
         var prompt = _promptBuilder.BuildAnalysisPrompt(goal, context, tools);
         var messages = new List<LlmMessage> { new LlmMessage { Role = "user", Content = prompt } };
         
-        // Call LLM directly and parse with Chain of Thought specific parser
-        var llmClient = _llmCommunicator.GetLlmClient();
-        var request = new LlmRequest
-        {
-            Messages = messages,
-            ResponseType = LlmResponseType.Text
-        };
-
-        var content = "";
-        await foreach (var chunk in llmClient.StreamAsync(request, cancellationToken))
-        {
-            content += chunk.Content;
-        }
+        // Use LlmCommunicator for proper streaming and event emission
+        var content = await _llmCommunicator.CallLlmWithStreamingAsync(messages, "reasoning", 0, cancellationToken);
 
         if (string.IsNullOrEmpty(content))
         {
@@ -97,19 +86,8 @@ public sealed class ChainStepExecutor
         var prompt = _promptBuilder.BuildPlanningPrompt(goal, context, tools, analysisInsights);
         var messages = new List<LlmMessage> { new LlmMessage { Role = "user", Content = prompt } };
         
-        // Call LLM directly and parse with Chain of Thought specific parser
-        var llmClient = _llmCommunicator.GetLlmClient();
-        var request = new LlmRequest
-        {
-            Messages = messages,
-            ResponseType = LlmResponseType.Text
-        };
-
-        var content = "";
-        await foreach (var chunk in llmClient.StreamAsync(request, cancellationToken))
-        {
-            content += chunk.Content;
-        }
+        // Use LlmCommunicator for proper streaming and event emission
+        var content = await _llmCommunicator.CallLlmWithStreamingAsync(messages, "reasoning", 1, cancellationToken);
 
         if (string.IsNullOrEmpty(content))
         {
@@ -158,19 +136,8 @@ public sealed class ChainStepExecutor
         var prompt = _promptBuilder.BuildStrategyPrompt(goal, context, tools, planningInsights);
         var messages = new List<LlmMessage> { new LlmMessage { Role = "user", Content = prompt } };
         
-        // Call LLM directly and parse with Chain of Thought specific parser
-        var llmClient = _llmCommunicator.GetLlmClient();
-        var request = new LlmRequest
-        {
-            Messages = messages,
-            ResponseType = LlmResponseType.Text
-        };
-
-        var content = "";
-        await foreach (var chunk in llmClient.StreamAsync(request, cancellationToken))
-        {
-            content += chunk.Content;
-        }
+        // Use LlmCommunicator for proper streaming and event emission
+        var content = await _llmCommunicator.CallLlmWithStreamingAsync(messages, "reasoning", 2, cancellationToken);
 
         if (string.IsNullOrEmpty(content))
         {
@@ -219,19 +186,8 @@ public sealed class ChainStepExecutor
         var prompt = _promptBuilder.BuildEvaluationPrompt(goal, context, tools, allInsights);
         var messages = new List<LlmMessage> { new LlmMessage { Role = "user", Content = prompt } };
         
-        // Call LLM directly and parse with Chain of Thought specific parser
-        var llmClient = _llmCommunicator.GetLlmClient();
-        var request = new LlmRequest
-        {
-            Messages = messages,
-            ResponseType = LlmResponseType.Text
-        };
-
-        var content = "";
-        await foreach (var chunk in llmClient.StreamAsync(request, cancellationToken))
-        {
-            content += chunk.Content;
-        }
+        // Use LlmCommunicator for proper streaming and event emission
+        var content = await _llmCommunicator.CallLlmWithStreamingAsync(messages, "reasoning", 3, cancellationToken);
 
         if (string.IsNullOrEmpty(content))
         {
@@ -281,19 +237,8 @@ public sealed class ChainStepExecutor
         var prompt = _promptBuilder.BuildValidationPrompt(goal, insights, conclusion, confidence);
         var messages = new List<LlmMessage> { new LlmMessage { Role = "user", Content = prompt } };
         
-        // Call LLM directly and parse with Chain of Thought specific parser
-        var llmClient = _llmCommunicator.GetLlmClient();
-        var request = new LlmRequest
-        {
-            Messages = messages,
-            ResponseType = LlmResponseType.Text
-        };
-
-        var content = "";
-        await foreach (var chunk in llmClient.StreamAsync(request, cancellationToken))
-        {
-            content += chunk.Content;
-        }
+        // Use LlmCommunicator for proper streaming and event emission
+        var content = await _llmCommunicator.CallLlmWithStreamingAsync(messages, "reasoning", 4, cancellationToken);
 
         if (string.IsNullOrEmpty(content))
         {

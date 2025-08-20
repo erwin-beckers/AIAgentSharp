@@ -4,6 +4,7 @@ using AIAgentSharp.Agents.Interfaces;
 using AIAgentSharp.Examples;
 using AIAgentSharp.Fluent;
 using AIAgentSharp.OpenAI;
+using System.Runtime.Serialization;
 
 namespace Examples;
 
@@ -37,7 +38,7 @@ public class TreeOfThoughsExample
         Console.WriteLine("🌳 Tree of Thoughts (ToT) Reasoning Example");
         Console.WriteLine("This demonstrates branching exploration of multiple solution paths.\n");
 
-        // Configure the agent using the fluent API
+        // Configure the agent using the improved fluent API
         var agent = AIAgent.Create(llm)
             .WithTools(tools)
             .WithStorage(new MemoryAgentStateStore())
@@ -46,12 +47,21 @@ public class TreeOfThoughsExample
                 .SetMaxDepth(3)
             )
             .WithEventHandling(events => events
-                .OnRunStarted(e => Console.WriteLine($"[EVENT] Run started for {e.AgentId} with goal: {e.Goal}"))
-                .OnStepStarted(e => Console.WriteLine($"[EVENT] Step {e.TurnIndex + 1} started for {e.AgentId}"))
-                .OnLlmCallStarted(e => Console.WriteLine($"[EVENT] LLM call started for {e.AgentId} turn {e.TurnIndex + 1}"))
-                .OnToolCallStarted(e => Console.WriteLine($"[EVENT] Tool call started: {e.ToolName} for {e.AgentId} turn {e.TurnIndex + 1}"))
-                .OnStepCompleted(e => Console.WriteLine($"[EVENT] Step {e.TurnIndex + 1} completed for {e.AgentId} - Continue: {e.Continue}, Tool: {e.ExecutedTool}"))
-                .OnRunCompleted(e => Console.WriteLine($"[EVENT] Run completed for {e.AgentId} - Success: {e.Succeeded}, Turns: {e.TotalTurns}"))
+                .OnRunStarted(e => Console.WriteLine($"Starting: {e.Goal} (Agent: {e.AgentId})"))
+                .OnStepStarted(e => Console.WriteLine($"Step {e.TurnIndex + 1} started (Agent: {e.AgentId})"))
+                .OnLlmCallStarted(e => Console.WriteLine($"LLM call started (turn {e.TurnIndex + 1}, Agent: {e.AgentId})"))
+                .OnToolCallStarted(e => Console.WriteLine($"Tool call started: {e.ToolName} (turn {e.TurnIndex + 1}, Agent: {e.AgentId})"))
+                .OnStepCompleted(e => Console.WriteLine($"Step {e.TurnIndex + 1} completed - Continue: {e.Continue}, Tool: {e.ExecutedTool} (Agent: {e.AgentId})"))
+                .OnRunCompleted(e => Console.WriteLine($"Run completed - Success: {e.Succeeded}, Turns: {e.TotalTurns} (Agent: {e.AgentId})"))
+                .OnLlmChunkReceived(e =>
+                {
+                    Console.Write(e.Chunk.Content);
+                })
+                .OnLlmCallCompleted(e =>
+                {
+                    Console.WriteLine(); // Add newline after streaming completes
+                    Console.WriteLine($"LLM call completed (turn {e.TurnIndex + 1}, Agent: {e.AgentId})");
+                })
             )
             .Build();
 

@@ -159,7 +159,7 @@ public interface IMetricsCollector
     /// <param name="inputTokens">The number of input tokens.</param>
     /// <param name="outputTokens">The number of output tokens.</param>
     /// <param name="modelName">The name of the LLM model used.</param>
-    void RecordTokenUsage(string agentId, int turnIndex, int inputTokens, int outputTokens, string modelName);
+    void RecordTokenUsage(string agentId, int turnIndex, long inputTokens, long outputTokens, string modelName);
 
     /// <summary>
     /// Records API call counts.

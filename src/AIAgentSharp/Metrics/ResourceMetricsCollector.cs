@@ -32,7 +32,7 @@ public sealed class ResourceMetricsCollector
     /// <summary>
     /// Records token usage for a specific model.
     /// </summary>
-    public void RecordTokenUsage(string agentId, int turnIndex, int inputTokens, int outputTokens, string modelName)
+    public void RecordTokenUsage(string agentId, int turnIndex, long inputTokens, long outputTokens, string modelName)
     {
         try
         {

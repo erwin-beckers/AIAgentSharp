@@ -114,7 +114,7 @@ public sealed class MetricsCollector : IMetricsCollector, IMetricsProvider
         OnMetricsUpdated("Validation");
     }
 
-    public void RecordTokenUsage(string agentId, int turnIndex, int inputTokens, int outputTokens, string modelName)
+    public void RecordTokenUsage(string agentId, int turnIndex, long inputTokens, long outputTokens, string modelName)
     {
         _aggregator.RecordTokenUsage(agentId, turnIndex, inputTokens, outputTokens, modelName);
         OnMetricsUpdated("TokenUsage");

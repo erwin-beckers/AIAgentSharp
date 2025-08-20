@@ -216,6 +216,7 @@ public sealed class OpenAiLlmClient : ILlmClient
         else
         {
             // Use streaming API for text responses
+            
             var completionUpdates = chatClient.CompleteChatStreamingAsync(chatMessages, options);
             var contentBuilder = new System.Text.StringBuilder();
 

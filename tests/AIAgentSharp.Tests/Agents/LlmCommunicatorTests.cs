@@ -84,9 +84,8 @@ public class LlmCommunicatorTests
         // Assert
         Assert.IsNotNull(result);
         _mockEventManager.Verify(x => x.RaiseLlmCallStarted(agentId, turnIndex), Times.Once);
-        _mockMetricsCollector.Verify(x => x.RecordLlmCallExecutionTime(agentId, turnIndex, It.IsAny<long>(), "function-calling"), Times.Once);
-        _mockMetricsCollector.Verify(x => x.RecordLlmCallCompletion(agentId, turnIndex, true, "function-calling", null), Times.Once);
-        _mockMetricsCollector.Verify(x => x.RecordApiCall(agentId, "LLM", "function-calling"), Times.Once);
+        _mockMetricsCollector.Verify(x => x.RecordTokenUsage(agentId, turnIndex, 0L, 0L, "function-calling"), Times.Once);
+        _mockEventManager.Verify(x => x.RaiseLlmCallCompleted(agentId, turnIndex, null, null), Times.Once);
     }
 
     [TestMethod]
