@@ -39,6 +39,12 @@ public class AgentStepCompletedEventArgs : EventArgs
     public string? Error { get; set; }
 
     /// <summary>
+    ///     Gets or sets the results of multiple tool executions if multiple tools were called.
+    ///     This enables support for multiple tool results in a single step.
+    /// </summary>
+    public List<ToolExecutionResult>? MultiToolResults { get; set; }
+
+    /// <summary>
     ///     Gets or sets the timestamp when the step completed.
     /// </summary>
     public DateTimeOffset Timestamp { get; set; } = DateTimeOffset.UtcNow;

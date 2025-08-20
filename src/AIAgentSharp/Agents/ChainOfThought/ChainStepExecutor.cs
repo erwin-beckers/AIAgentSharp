@@ -214,6 +214,7 @@ public sealed class ChainStepExecutor
         }
         catch (Exception ex)
         {
+            Console.WriteLine($"Error {ex} in PerformEvaluationStepAsync() content={content}");
             return new ChainEvaluationExecutionResult
             {
                 Success = false,

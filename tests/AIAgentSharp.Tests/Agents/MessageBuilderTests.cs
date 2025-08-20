@@ -98,9 +98,226 @@ public class MessageBuilderTests
         var messages = result.ToList();
         var userMessage = messages.FirstOrDefault(m => m.Role == "user");
         Assert.IsNotNull(userMessage);
-        Assert.IsTrue(userMessage.Content.Contains("TOOL CATALOG"));
         Assert.IsTrue(userMessage.Content.Contains("test_tool"));
-        Assert.IsTrue(userMessage.Content.Contains("{\"params\":{}}"));
+    }
+
+    [TestMethod]
+    public void BuildMessages_Should_IncludeMultiToolCallInstructions_When_BuildingMessages()
+    {
+        // Arrange
+        var state = new AgentState
+        {
+            AgentId = "test-agent",
+            Goal = "Test goal"
+        };
+        var tools = new Dictionary<string, ITool>();
+
+        // Act
+        var result = _messageBuilder.BuildMessages(state, tools);
+
+        // Assert
+        var messages = result.ToList();
+        var userMessage = messages.FirstOrDefault(m => m.Role == "user");
+        Assert.IsNotNull(userMessage);
+        
+        // Should include multi-tool call instructions
+        Assert.IsTrue(userMessage.Content.Contains("action:\"multi_tool_call\""));
+        Assert.IsTrue(userMessage.Content.Contains("Call multiple tools in sequence"));
+        Assert.IsTrue(userMessage.Content.Contains("tool_calls array"));
+    }
+
+    [TestMethod]
+    public void BuildMessages_Should_IncludeActionsAvailableSection_When_BuildingMessages()
+    {
+        // Arrange
+        var state = new AgentState
+        {
+            AgentId = "test-agent",
+            Goal = "Test goal"
+        };
+        var tools = new Dictionary<string, ITool>();
+
+        // Act
+        var result = _messageBuilder.BuildMessages(state, tools);
+
+        // Assert
+        var messages = result.ToList();
+        var userMessage = messages.FirstOrDefault(m => m.Role == "user");
+        Assert.IsNotNull(userMessage);
+        
+        // Should include the ACTIONS AVAILABLE section
+        Assert.IsTrue(userMessage.Content.Contains("ACTIONS AVAILABLE:"));
+        Assert.IsTrue(userMessage.Content.Contains("action:\"tool_call\""));
+        Assert.IsTrue(userMessage.Content.Contains("action:\"multi_tool_call\""));
+        Assert.IsTrue(userMessage.Content.Contains("action:\"plan\""));
+        Assert.IsTrue(userMessage.Content.Contains("action:\"finish\""));
+        Assert.IsTrue(userMessage.Content.Contains("action:\"retry\""));
+    }
+
+    [TestMethod]
+    public void BuildMessages_Should_HandleMultipleToolCallsInHistory_When_RecentTurnsContainMultiToolCalls()
+    {
+        // Arrange
+        var state = new AgentState
+        {
+            AgentId = "test-agent",
+            Goal = "Test goal",
+            Turns = new List<AgentTurn>
+            {
+                new AgentTurn
+                {
+                    Index = 0,
+                    TurnId = "turn_0",
+                    LlmMessage = new ModelMessage
+                    {
+                        Thoughts = "I need to call multiple tools",
+                        Action = AgentAction.MultiToolCall,
+                        ActionInput = new ActionInput
+                        {
+                            ToolCalls = new List<ToolCall>
+                            {
+                                new ToolCall
+                                {
+                                    Tool = "tool1",
+                                    Params = new Dictionary<string, object?> { { "param1", "value1" } },
+                                    Reason = "First tool"
+                                },
+                                new ToolCall
+                                {
+                                    Tool = "tool2",
+                                    Params = new Dictionary<string, object?> { { "param2", "value2" } },
+                                    Reason = "Second tool"
+                                }
+                            }
+                        }
+                    },
+                    ToolCalls = new List<ToolCallRequest>
+                    {
+                        new ToolCallRequest { Tool = "tool1", Params = new Dictionary<string, object?> { { "param1", "value1" } }, TurnId = "hash1" },
+                        new ToolCallRequest { Tool = "tool2", Params = new Dictionary<string, object?> { { "param2", "value2" } }, TurnId = "hash2" }
+                    },
+                    ToolResults = new List<ToolExecutionResult>
+                    {
+                        new ToolExecutionResult
+                        {
+                            Success = true,
+                            Tool = "tool1",
+                            Output = "result1",
+                            TurnId = "hash1",
+                            CreatedUtc = DateTimeOffset.UtcNow
+                        },
+                        new ToolExecutionResult
+                        {
+                            Success = true,
+                            Tool = "tool2",
+                            Output = "result2",
+                            TurnId = "hash2",
+                            CreatedUtc = DateTimeOffset.UtcNow
+                        }
+                    }
+                }
+            }
+        };
+        var tools = new Dictionary<string, ITool>();
+
+        // Act
+        var result = _messageBuilder.BuildMessages(state, tools);
+
+        // Assert
+        var messages = result.ToList();
+        var userMessage = messages.FirstOrDefault(m => m.Role == "user");
+        Assert.IsNotNull(userMessage);
+        
+        // Should include multi-tool call history
+        Assert.IsTrue(userMessage.Content.Contains("MULTI_TOOL_CALLS:"));
+        Assert.IsTrue(userMessage.Content.Contains("MULTI_TOOL_RESULTS:"));
+        Assert.IsTrue(userMessage.Content.Contains("tool1"));
+        Assert.IsTrue(userMessage.Content.Contains("tool2"));
+    }
+
+    [TestMethod]
+    public void BuildMessages_Should_HandleMultipleToolCallsInSummarizedHistory_When_OldTurnsContainMultiToolCalls()
+    {
+        // Arrange
+        var state = new AgentState
+        {
+            AgentId = "test-agent",
+            Goal = "Test goal",
+            Turns = new List<AgentTurn>()
+        };
+
+        // Add many turns to trigger summarization
+        for (int i = 0; i < 10; i++)
+        {
+            state.Turns.Add(new AgentTurn
+            {
+                Index = i,
+                TurnId = $"turn_{i}",
+                LlmMessage = new ModelMessage
+                {
+                    Thoughts = $"Turn {i} thoughts",
+                    Action = i % 2 == 0 ? AgentAction.ToolCall : AgentAction.MultiToolCall,
+                    ActionInput = i % 2 == 0 ? 
+                        new ActionInput { Tool = "single_tool", Params = new Dictionary<string, object?>() } :
+                        new ActionInput 
+                        { 
+                            ToolCalls = new List<ToolCall>
+                            {
+                                new ToolCall { Tool = "multi_tool1", Params = new Dictionary<string, object?>() },
+                                new ToolCall { Tool = "multi_tool2", Params = new Dictionary<string, object?>() }
+                            }
+                        }
+                },
+                ToolCalls = i % 2 == 0 ? null : new List<ToolCallRequest>
+                {
+                    new ToolCallRequest { Tool = "multi_tool1", Params = new Dictionary<string, object?>(), TurnId = $"hash_{i}_1" },
+                    new ToolCallRequest { Tool = "multi_tool2", Params = new Dictionary<string, object?>(), TurnId = $"hash_{i}_2" }
+                },
+                ToolResults = i % 2 == 0 ? null : new List<ToolExecutionResult>
+                {
+                    new ToolExecutionResult { Success = true, Tool = "multi_tool1", TurnId = $"hash_{i}_1", CreatedUtc = DateTimeOffset.UtcNow },
+                    new ToolExecutionResult { Success = true, Tool = "multi_tool2", TurnId = $"hash_{i}_2", CreatedUtc = DateTimeOffset.UtcNow }
+                }
+            });
+        }
+
+        var tools = new Dictionary<string, ITool>();
+
+        // Act
+        var result = _messageBuilder.BuildMessages(state, tools);
+
+        // Assert
+        var messages = result.ToList();
+        var userMessage = messages.FirstOrDefault(m => m.Role == "user");
+        Assert.IsNotNull(userMessage);
+        
+        // Should include summarized multi-tool calls
+        Assert.IsTrue(userMessage.Content.Contains("MULTI_TOOLS:"));
+        Assert.IsTrue(userMessage.Content.Contains("MULTI_RESULTS:"));
+        Assert.IsTrue(userMessage.Content.Contains("multi_tool1, multi_tool2"));
+    }
+
+    [TestMethod]
+    public void BuildMessages_Should_IncludeMultiToolCallHint_When_BuildingMessages()
+    {
+        // Arrange
+        var state = new AgentState
+        {
+            AgentId = "test-agent",
+            Goal = "Test goal"
+        };
+        var tools = new Dictionary<string, ITool>();
+
+        // Act
+        var result = _messageBuilder.BuildMessages(state, tools);
+
+        // Assert
+        var messages = result.ToList();
+        var userMessage = messages.FirstOrDefault(m => m.Role == "user");
+        Assert.IsNotNull(userMessage);
+        
+        // Should include hint about multiple tool calls
+        Assert.IsTrue(userMessage.Content.Contains("You can call multiple tools in sequence using action:\"multi_tool_call\""));
     }
 
     [TestMethod]

@@ -26,7 +26,8 @@ public sealed class TreeOfThoughtsEngine : ITreeOfThoughtsEngine
         ILogger logger,
         IEventManager eventManager,
         IStatusManager statusManager,
-        IMetricsCollector metricsCollector)
+        IMetricsCollector metricsCollector,
+        ILlmCommunicator? llmCommunicator = null)
     {
         _config = config ?? throw new ArgumentNullException(nameof(config));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -34,9 +35,9 @@ public sealed class TreeOfThoughtsEngine : ITreeOfThoughtsEngine
         _statusManager = statusManager ?? throw new ArgumentNullException(nameof(statusManager));
         _metricsCollector = metricsCollector ?? throw new ArgumentNullException(nameof(metricsCollector));
 
-        // Initialize components using unified LLM communication
-        var llmCommunicator = new LlmCommunicator(llm, config, logger, eventManager, statusManager, metricsCollector);
-        var totCommunicator = new TreeOfThoughtsCommunicator(llmCommunicator);
+        // Initialize components using shared LLM communication
+        var communicator = llmCommunicator ?? new LlmCommunicator(llm, config, logger, eventManager, statusManager, metricsCollector);
+        var totCommunicator = new TreeOfThoughtsCommunicator(communicator);
         _thoughtGenerator = new TreeThoughtGenerator(totCommunicator);
         _nodeEvaluator = new TreeNodeEvaluator(totCommunicator);
         _conclusionGenerator = new TreeConclusionGenerator(totCommunicator);

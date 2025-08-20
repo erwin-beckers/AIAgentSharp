@@ -394,6 +394,114 @@ public class EventManagerTests
     }
 
     [TestMethod]
+    public void RaiseStepCompleted_Should_HandleMultiToolResults_When_StepResultContainsMultiToolResults()
+    {
+        // Arrange
+        var agentId = "test-agent";
+        var turnIndex = 3;
+        var multiToolResults = new List<ToolExecutionResult>
+        {
+            new ToolExecutionResult
+            {
+                Success = true,
+                Tool = "tool1",
+                Output = "result1",
+                TurnId = "turn1",
+                CreatedUtc = DateTimeOffset.UtcNow
+            },
+            new ToolExecutionResult
+            {
+                Success = false,
+                Tool = "tool2",
+                Error = "Tool failed",
+                TurnId = "turn2",
+                CreatedUtc = DateTimeOffset.UtcNow
+            }
+        };
+
+        var stepResult = new AgentStepResult
+        {
+            Continue = true,
+            ExecutedTool = true,
+            MultiToolResults = multiToolResults
+        };
+
+        AgentStepCompletedEventArgs? capturedArgs = null;
+        _eventManager.StepCompleted += (sender, args) => capturedArgs = args;
+
+        // Act
+        _eventManager.RaiseStepCompleted(agentId, turnIndex, stepResult);
+
+        // Assert
+        Assert.IsNotNull(capturedArgs);
+        Assert.AreEqual(agentId, capturedArgs.AgentId);
+        Assert.AreEqual(turnIndex, capturedArgs.TurnIndex);
+        Assert.AreEqual(stepResult.Continue, capturedArgs.Continue);
+        Assert.AreEqual(stepResult.ExecutedTool, capturedArgs.ExecutedTool);
+        Assert.IsNotNull(capturedArgs.MultiToolResults);
+        Assert.AreEqual(2, capturedArgs.MultiToolResults.Count);
+        Assert.AreEqual(multiToolResults[0], capturedArgs.MultiToolResults[0]);
+        Assert.AreEqual(multiToolResults[1], capturedArgs.MultiToolResults[1]);
+    }
+
+    [TestMethod]
+    public void RaiseStepCompleted_Should_HandleNullMultiToolResults_When_StepResultHasNullMultiToolResults()
+    {
+        // Arrange
+        var agentId = "test-agent";
+        var turnIndex = 3;
+        var stepResult = new AgentStepResult
+        {
+            Continue = true,
+            ExecutedTool = true,
+            MultiToolResults = null
+        };
+
+        AgentStepCompletedEventArgs? capturedArgs = null;
+        _eventManager.StepCompleted += (sender, args) => capturedArgs = args;
+
+        // Act
+        _eventManager.RaiseStepCompleted(agentId, turnIndex, stepResult);
+
+        // Assert
+        Assert.IsNotNull(capturedArgs);
+        Assert.AreEqual(agentId, capturedArgs.AgentId);
+        Assert.AreEqual(turnIndex, capturedArgs.TurnIndex);
+        Assert.AreEqual(stepResult.Continue, capturedArgs.Continue);
+        Assert.AreEqual(stepResult.ExecutedTool, capturedArgs.ExecutedTool);
+        Assert.IsNull(capturedArgs.MultiToolResults);
+    }
+
+    [TestMethod]
+    public void RaiseStepCompleted_Should_HandleEmptyMultiToolResults_When_StepResultHasEmptyMultiToolResults()
+    {
+        // Arrange
+        var agentId = "test-agent";
+        var turnIndex = 3;
+        var stepResult = new AgentStepResult
+        {
+            Continue = true,
+            ExecutedTool = true,
+            MultiToolResults = new List<ToolExecutionResult>()
+        };
+
+        AgentStepCompletedEventArgs? capturedArgs = null;
+        _eventManager.StepCompleted += (sender, args) => capturedArgs = args;
+
+        // Act
+        _eventManager.RaiseStepCompleted(agentId, turnIndex, stepResult);
+
+        // Assert
+        Assert.IsNotNull(capturedArgs);
+        Assert.AreEqual(agentId, capturedArgs.AgentId);
+        Assert.AreEqual(turnIndex, capturedArgs.TurnIndex);
+        Assert.AreEqual(stepResult.Continue, capturedArgs.Continue);
+        Assert.AreEqual(stepResult.ExecutedTool, capturedArgs.ExecutedTool);
+        Assert.IsNotNull(capturedArgs.MultiToolResults);
+        Assert.AreEqual(0, capturedArgs.MultiToolResults.Count);
+    }
+
+    [TestMethod]
     public void RaiseRunCompleted_Should_RaiseEventSuccessfully_When_ValidParametersProvided()
     {
         // Arrange

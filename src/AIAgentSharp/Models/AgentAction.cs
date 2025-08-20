@@ -16,6 +16,11 @@ public enum AgentAction
     ToolCall,
 
     /// <summary>
+    ///     The agent is calling multiple tools in sequence.
+    /// </summary>
+    MultiToolCall,
+
+    /// <summary>
     ///     The agent is finishing its task.
     /// </summary>
     Finish,

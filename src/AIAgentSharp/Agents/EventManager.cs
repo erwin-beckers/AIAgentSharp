@@ -159,7 +159,8 @@ public sealed class EventManager : IEventManager
                 Continue = stepResult.Continue,
                 ExecutedTool = stepResult.ExecutedTool,
                 FinalOutput = stepResult.FinalOutput,
-                Error = stepResult.Error
+                Error = stepResult.Error,
+                MultiToolResults = stepResult.MultiToolResults
             });
         }
         catch (Exception ex)

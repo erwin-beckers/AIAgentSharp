@@ -1,6 +1,7 @@
 using System.Text.Json;
 using AIAgentSharp.Agents.Interfaces;
 using AIAgentSharp.Metrics;
+using AIAgentSharp.Utils;
 
 namespace AIAgentSharp.Agents;
 
@@ -106,12 +107,38 @@ public sealed class LlmCommunicator : ILlmCommunicator
             };
 
             var content = "";
+            var cleaner = new StreamingContentCleaner(); // New instance per streaming session
             await foreach (var chunk in _llm.StreamAsync(request, timeoutCts.Token))
             {
                 content += chunk.Content;
                 
-                // Emit streaming chunk event
-                _eventManager.RaiseLlmChunkReceived(agentId, turnIndex, chunk);
+                // Process chunk with stateful cleaner
+                var cleanedContent = cleaner.ProcessChunk(chunk.Content);
+                if (!string.IsNullOrEmpty(cleanedContent))
+                {
+                    // Create a cleaned chunk for the event
+                    var cleanedChunk = new LlmStreamingChunk
+                    {
+                        Content = cleanedContent,
+                        IsFinal = chunk.IsFinal,
+                        FinishReason = chunk.FinishReason,
+                        FunctionCall = chunk.FunctionCall,
+                        Usage = chunk.Usage,
+                        ActualResponseType = chunk.ActualResponseType,
+                        AdditionalMetadata = chunk.AdditionalMetadata
+                    };
+                    
+                    // Emit streaming chunk event with cleaned content
+                    _eventManager.RaiseLlmChunkReceived(agentId, turnIndex, cleanedChunk);
+                }
+            }
+            
+            // Flush any remaining content
+            var remainingContent = cleaner.Flush();
+            if (!string.IsNullOrEmpty(remainingContent))
+            {
+                var finalChunk = new LlmStreamingChunk { Content = remainingContent, IsFinal = true };
+                _eventManager.RaiseLlmChunkReceived(agentId, turnIndex, finalChunk);
             }
 
             // Raise LLM call completed event
@@ -145,8 +172,8 @@ public sealed class LlmCommunicator : ILlmCommunicator
             // Use streaming for consistent behavior
             var content = await CallLlmWithStreamingAsync(messages, agentId, turnIndex, ct);
             
-            // Parse the content
-            return await ParseJsonResponse(content, turnIndex, turnId, state, ct);
+            // Parse the content (without raising duplicate events)
+            return await ParseJsonResponseInternal(content, turnIndex, turnId, state, ct);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -183,7 +210,10 @@ public sealed class LlmCommunicator : ILlmCommunicator
     {
         try
         {
+            _logger.LogDebug($"Parsing LLM response: {llmRaw}");
             var modelMsg = JsonUtil.ParseStrict(llmRaw, _config);
+
+            _logger.LogDebug($"Parsed action: {modelMsg.Action}, Tool: {modelMsg.ActionInput.Tool}, ToolCalls count: {modelMsg.ActionInput.ToolCalls?.Count ?? 0}");
 
             // Emit status if LLM provided public fields
             if (!string.IsNullOrEmpty(modelMsg.StatusTitle))
@@ -193,6 +223,42 @@ public sealed class LlmCommunicator : ILlmCommunicator
 
             // Raise LLM call completed event for JSON parsing
             _eventManager.RaiseLlmCallCompleted(state.AgentId, turnIndex, modelMsg);
+
+            return Task.FromResult<ModelMessage?>(modelMsg);
+        }
+        catch (Exception ex)
+        {
+            var err = $"Invalid LLM JSON: {llmRaw} {ex.Message}";
+            _logger.LogError(err);
+
+            // Emit status for JSON parse failure
+            _statusManager.EmitStatus(state.AgentId, "Invalid model output", "JSON parsing failed", "Will retry with corrected format");
+
+            // Raise LLM call completed event for JSON parsing error
+            _eventManager.RaiseLlmCallCompleted(state.AgentId, turnIndex, null, err);
+
+            // Store error as ToolResult
+            CreateErrorTurn(state, turnIndex, turnId, err);
+            return Task.FromResult<ModelMessage?>(null);
+        }
+    }
+
+    /// <summary>
+    /// Internal method to parse JSON response without raising duplicate events.
+    /// </summary>
+    private Task<ModelMessage?> ParseJsonResponseInternal(string llmRaw, int turnIndex, string turnId, AgentState state, CancellationToken ct)
+    {
+        try
+        {
+            var modelMsg = JsonUtil.ParseStrict(llmRaw, _config);
+
+            _logger.LogDebug($"Parsed action: {modelMsg.Action}, Tool: {modelMsg.ActionInput.Tool}, ToolCalls count: {modelMsg.ActionInput.ToolCalls?.Count ?? 0}");
+
+            // Emit status if LLM provided public fields
+            if (!string.IsNullOrEmpty(modelMsg.StatusTitle))
+            {
+                _statusManager.EmitStatus(state.AgentId, modelMsg.StatusTitle, modelMsg.StatusDetails, modelMsg.NextStepHint, modelMsg.ProgressPct);
+            }
 
             return Task.FromResult<ModelMessage?>(modelMsg);
         }
@@ -241,17 +307,24 @@ public sealed class LlmCommunicator : ILlmCommunicator
             parameters = new Dictionary<string, object?>();
         }
 
+        // Strip the "functions." prefix if present (some LLMs add this prefix)
+        var toolName = functionResult.FunctionCall.Name;
+        if (toolName.StartsWith("functions."))
+        {
+            toolName = toolName.Substring("functions.".Length);
+        }
+
         // Create action input
         var actionInput = new ActionInput
         {
-            Tool = functionResult.FunctionCall.Name,
+            Tool = toolName,
             Params = parameters
         };
 
         // Create normalized message
         return new ModelMessage
         {
-            Thoughts = $"Calling function {functionResult.FunctionCall.Name} with parameters: {JsonSerializer.Serialize(parameters, JsonUtil.JsonOptions)}",
+            Thoughts = $"Calling function {toolName} with parameters: {JsonSerializer.Serialize(parameters, JsonUtil.JsonOptions)}",
             Action = AgentAction.ToolCall,
             ActionRaw = "tool_call",
             ActionInput = actionInput

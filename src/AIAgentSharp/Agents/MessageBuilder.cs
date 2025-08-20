@@ -25,7 +25,7 @@ public sealed class MessageBuilder : IMessageBuilder
         sb.AppendLine("GOAL:");
         sb.AppendLine(state.Goal);
         sb.AppendLine();
-        sb.AppendLine("TOOL CATALOG (name and params you may call via action:\"tool_call\"):");
+        sb.AppendLine("TOOL CATALOG (name and params you may call via action:\"tool_call\" or action:\"multi_tool_call\"):");
 
         foreach (var t in tools.Values)
         {
@@ -39,6 +39,22 @@ public sealed class MessageBuilder : IMessageBuilder
             }
         }
         sb.AppendLine("Use the JSON schemas exactly; do not invent fields.");
+        sb.AppendLine();
+        sb.AppendLine("ACTIONS AVAILABLE:");
+        sb.AppendLine("- action:\"tool_call\" - Call a single tool");
+        sb.AppendLine("- action:\"multi_tool_call\" - Call multiple tools in sequence (use tool_calls array)");
+        sb.AppendLine("- action:\"plan\" - Create an execution plan");
+        sb.AppendLine("- action:\"finish\" - Complete the task with final output");
+        sb.AppendLine("- action:\"retry\" - Retry a previous action");
+        sb.AppendLine();
+        sb.AppendLine("MULTI-TOOL CALL FORMAT:");
+        sb.AppendLine("When using action:\"multi_tool_call\", the action_input must contain a tool_calls array:");
+        sb.AppendLine("{\"tool_calls\": [{\"tool\": \"tool_name\", \"params\": {\"param1\": \"value1\"}}]}");
+        sb.AppendLine("Each tool call must have \"tool\" (string) and \"params\" (object) fields.");
+        sb.AppendLine("IMPORTANT: Use the tool name WITHOUT the \"functions.\" prefix.");
+        sb.AppendLine("CORRECT: {\"tool\": \"search_flights\", \"params\": {...}}");
+        sb.AppendLine("WRONG: {\"tool\": \"functions.search_flights\", \"params\": {...}}");
+        sb.AppendLine("Do NOT use \"recipient_name\" or \"parameters\" fields.");
         sb.AppendLine();
 
         // Add status update instructions if enabled
@@ -72,6 +88,7 @@ public sealed class MessageBuilder : IMessageBuilder
                     sb.AppendLine(JsonUtil.ToJson(t.LlmMessage));
                 }
 
+                // Handle single tool call (backward compatibility)
                 if (t.ToolCall != null)
                 {
                     sb.AppendLine("TOOL_CALL:");
@@ -84,6 +101,26 @@ public sealed class MessageBuilder : IMessageBuilder
                     // Truncate large outputs to prevent prompt bloat
                     var truncatedResult = TruncateToolResultOutput(t.ToolResult, _config.MaxToolOutputSize);
                     sb.AppendLine(JsonUtil.ToJson(truncatedResult));
+                }
+
+                // Handle multiple tool calls
+                if (t.ToolCalls != null && t.ToolCalls.Count > 0)
+                {
+                    sb.AppendLine("MULTI_TOOL_CALLS:");
+                    foreach (var toolCall in t.ToolCalls)
+                    {
+                        sb.AppendLine(JsonUtil.ToJson(toolCall));
+                    }
+                }
+
+                if (t.ToolResults != null && t.ToolResults.Count > 0)
+                {
+                    sb.AppendLine("MULTI_TOOL_RESULTS:");
+                    foreach (var toolResult in t.ToolResults)
+                    {
+                        var truncatedResult = TruncateToolResultOutput(toolResult, _config.MaxToolOutputSize);
+                        sb.AppendLine(JsonUtil.ToJson(truncatedResult));
+                    }
                 }
                 sb.AppendLine("---");
             }
@@ -99,6 +136,7 @@ public sealed class MessageBuilder : IMessageBuilder
                     summary.Append($"LLM: {action} - {thoughts}");
                 }
 
+                // Handle single tool call (backward compatibility)
                 if (t.ToolCall != null)
                 {
                     if (summary.Length > 0)
@@ -123,14 +161,43 @@ public sealed class MessageBuilder : IMessageBuilder
                     }
                 }
 
+                // Handle multiple tool calls
+                if (t.ToolCalls != null && t.ToolCalls.Count > 0)
+                {
+                    if (summary.Length > 0)
+                    {
+                        summary.Append(" | ");
+                    }
+                    var toolNames = string.Join(", ", t.ToolCalls.Select(tc => tc.Tool));
+                    summary.Append($"MULTI_TOOLS: {toolNames}");
+                }
+
+                if (t.ToolResults != null && t.ToolResults.Count > 0)
+                {
+                    if (summary.Length > 0)
+                    {
+                        summary.Append(" | ");
+                    }
+                    var successCount = t.ToolResults.Count(r => r.Success);
+                    var totalCount = t.ToolResults.Count;
+                    summary.Append($"MULTI_RESULTS: {successCount}/{totalCount} success");
+                }
+
                 sb.AppendLine($"SUMMARY: {summary}");
                 sb.AppendLine("---");
             }
         }
 
         sb.AppendLine();
+        sb.AppendLine("JSON FORMAT RULES:");
+        sb.AppendLine("- Use only valid JSON syntax");
+        sb.AppendLine("- No comments (// or /* */)");
+        sb.AppendLine("- No trailing commas");
+        sb.AppendLine("- All strings must be quoted");
+        sb.AppendLine("- No explanatory text in parameter values");
+        sb.AppendLine();
         sb.AppendLine(
-            "IMPORTANT: Reply with JSON only. No prose or markdown. When a tool call fails, read the validation_error details in HISTORY and immediately retry with corrected parameters. Avoid repeating identical failing calls.");
+            "IMPORTANT: Reply with JSON only. No prose or markdown. When a tool call fails, read the validation_error details in HISTORY and immediately retry with corrected parameters. Avoid repeating identical failing calls. You can call multiple tools in sequence using action:\"multi_tool_call\" with a tool_calls array. Use the exact format: {\"tool_calls\": [{\"tool\": \"tool_name\", \"params\": {...}}]}. REMEMBER: Use tool names WITHOUT the \"functions.\" prefix. DO NOT include comments (// or /* */) in the JSON - it must be valid JSON.");
 
         var user = new LlmMessage { Role = "user", Content = sb.ToString() };
         return new[] { sys, user };

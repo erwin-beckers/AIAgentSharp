@@ -52,7 +52,7 @@ public sealed class AgentOrchestrator : IAgentOrchestrator
         _toolExecutor = toolExecutor ?? new ToolExecutor(_config, _logger, _eventManager, _statusManager, _metricsCollector);
         _loopDetector = loopDetector ?? new LoopDetector(_config, _logger);
         _messageBuilder = messageBuilder ?? new MessageBuilder(_config);
-        _reasoningManager = reasoningManager ?? new ReasoningManager(_llm, _config, _logger, _eventManager, _statusManager, _metricsCollector);
+        _reasoningManager = reasoningManager ?? new ReasoningManager(_llm, _config, _logger, _eventManager, _statusManager, _metricsCollector, _llmCommunicator);
     }
 
     /// <summary>
@@ -160,7 +160,7 @@ public sealed class AgentOrchestrator : IAgentOrchestrator
                         }
                     }
                     // Function calling failed, fall back to JSON parsing
-                    _logger.LogDebug("Function calling returned no function call, falling back to JSON parsing");
+                    _logger.LogDebug("Function calling returned no function call, falling back to JSON parsing (this is expected for multi-tool calls)");
                     var llmRaw = functionResult.Content ?? "";
                     modelMsg = await _llmCommunicator.ParseJsonResponse(llmRaw, turnIndex, turnId, state, ct);
 
@@ -299,6 +299,137 @@ public sealed class AgentOrchestrator : IAgentOrchestrator
         };
     }
 
+    public async Task<AgentStepResult> ProcessMultiToolCall(ModelMessage modelMsg, AgentState state, IDictionary<string, ITool> tools, int turnIndex, string turnId, CancellationToken ct)
+    {
+        var toolCalls = modelMsg.ActionInput.ToolCalls ?? new List<ToolCall>();
+        var results = new List<ToolExecutionResult>();
+        var toolCallRequests = new List<ToolCallRequest>();
+
+        _logger.LogInformation($"Processing multi-tool call with {toolCalls.Count} tools: {string.Join(", ", toolCalls.Select(tc => tc.Tool))}");
+        
+        if (toolCalls.Count == 0)
+        {
+            _logger.LogWarning("No tool calls found in multi-tool call action. ActionInput.ToolCalls is null or empty.");
+            _logger.LogDebug($"ActionInput.Tool: {modelMsg.ActionInput.Tool}");
+            _logger.LogDebug($"ActionInput.Params: {JsonSerializer.Serialize(modelMsg.ActionInput.Params)}");
+        }
+        else
+        {
+            _logger.LogInformation($"Found {toolCalls.Count} tool calls:");
+            foreach (var tc in toolCalls)
+            {
+                _logger.LogInformation($"  - {tc.Tool} with {tc.Params?.Count ?? 0} parameters");
+            }
+        }
+
+        foreach (var toolCall in toolCalls)
+        {
+            var toolName = toolCall.Tool.Trim();
+            var prms = toolCall.Params ?? new Dictionary<string, object?>();
+
+            var dedupeId = HashToolCall(toolName, prms);
+
+            // Check deduplication
+            var allowDedupe = true;
+            var stalenessThreshold = _config.DedupeStalenessThreshold;
+
+            if (tools.TryGetValue(toolName, out var toolForDedupe))
+            {
+                var dedupeControl = toolForDedupe as IDedupeControl;
+                allowDedupe = dedupeControl?.AllowDedupe ?? true;
+                var customTtl = dedupeControl?.CustomTtl;
+                stalenessThreshold = customTtl ?? _config.DedupeStalenessThreshold;
+            }
+
+            // Check for existing successful result
+            if (allowDedupe)
+            {
+                // Check for single tool result first
+                var priorSingle = state.Turns.LastOrDefault(t =>
+                    t.ToolResult?.TurnId == dedupeId &&
+                    t.ToolResult.Success &&
+                    DateTimeOffset.UtcNow - t.ToolResult.CreatedUtc <= stalenessThreshold);
+
+                if (priorSingle?.ToolResult != null)
+                {
+                    _logger.LogInformation($"Reusing existing successful single tool result for id {dedupeId} (age: {DateTimeOffset.UtcNow - priorSingle.ToolResult.CreatedUtc})");
+                    
+                    // Record deduplication cache hit
+                    _metricsCollector.RecordDeduplicationEvent(state.AgentId, toolName, true);
+                    
+                    results.Add(priorSingle.ToolResult);
+                    toolCallRequests.Add(new ToolCallRequest { Tool = toolName, Params = prms, TurnId = dedupeId });
+                    continue;
+                }
+
+                // Check for multi-tool results
+                var priorMulti = state.Turns.LastOrDefault(t =>
+                    t.ToolResults != null &&
+                    t.ToolResults.Any(tr => tr.TurnId == dedupeId && tr.Success && DateTimeOffset.UtcNow - tr.CreatedUtc <= stalenessThreshold));
+
+                if (priorMulti?.ToolResults != null)
+                {
+                    var matchingResult = priorMulti.ToolResults.First(tr => tr.TurnId == dedupeId && tr.Success && DateTimeOffset.UtcNow - tr.CreatedUtc <= stalenessThreshold);
+                    _logger.LogInformation($"Reusing existing successful multi-tool result for id {dedupeId} (age: {DateTimeOffset.UtcNow - matchingResult.CreatedUtc})");
+                    
+                    // Record deduplication cache hit
+                    _metricsCollector.RecordDeduplicationEvent(state.AgentId, toolName, true);
+                    
+                    results.Add(matchingResult);
+                    toolCallRequests.Add(new ToolCallRequest { Tool = toolName, Params = prms, TurnId = dedupeId });
+                    continue;
+                }
+            }
+
+            // Record deduplication cache miss (tool is being executed, not reused)
+            _metricsCollector.RecordDeduplicationEvent(state.AgentId, toolName, false);
+            
+            // Execute the tool
+            _logger.LogDebug($"Executing tool: {toolName}");
+            var execResult = await _toolExecutor.ExecuteToolAsync(toolName, prms, tools, state.AgentId, turnIndex, ct);
+
+            // Record the tool call for loop detection
+            _loopDetector.RecordToolCall(state.AgentId, toolName, prms, execResult.Success);
+
+            // Add retry hints and loop breaker logic
+            await AddRetryHintsAndLoopBreaker(state, execResult, toolName, prms, turnIndex);
+
+            results.Add(execResult);
+            toolCallRequests.Add(new ToolCallRequest { Tool = toolName, Params = prms, TurnId = dedupeId });
+            
+            _logger.LogDebug($"Tool {toolName} execution completed: {(execResult.Success ? "SUCCESS" : "FAILED")}");
+        }
+
+        // Create a single turn with multiple tool calls and results
+        var turn = new AgentTurn 
+        { 
+            Index = turnIndex, 
+            TurnId = turnId, 
+            LlmMessage = modelMsg,
+            ToolCalls = toolCallRequests,
+            ToolResults = results
+        };
+        state.Turns.Add(turn);
+
+        // Check if any tool failed and we should stop
+        var anyFailed = results.Any(r => !r.Success);
+        var shouldStopNow = anyFailed && _config.MaxTurns <= 1;
+
+        var successCount = results.Count(r => r.Success);
+        var totalCount = results.Count;
+        _logger.LogInformation($"Multi-tool call completed: {successCount}/{totalCount} tools succeeded");
+
+        return new AgentStepResult
+        {
+            Continue = !shouldStopNow,
+            ExecutedTool = true,
+            LlmMessage = modelMsg,
+            MultiToolResults = results,
+            State = state,
+            Error = shouldStopNow ? "One or more tools failed in multi-tool call" : null
+        };
+    }
+
     public async Task<AgentStepResult> ProcessAction(ModelMessage modelMsg, AgentState state, IDictionary<string, ITool> tools, int turnIndex, string turnId, CancellationToken ct)
     {
         var turn = new AgentTurn { Index = turnIndex, TurnId = turnId, LlmMessage = modelMsg };
@@ -321,6 +452,10 @@ public sealed class AgentOrchestrator : IAgentOrchestrator
             case AgentAction.ToolCall:
             {
                 return await ProcessToolCall(modelMsg, state, tools, turnIndex, turnId, ct);
+            }
+            case AgentAction.MultiToolCall:
+            {
+                return await ProcessMultiToolCall(modelMsg, state, tools, turnIndex, turnId, ct);
             }
             case AgentAction.Finish:
             {

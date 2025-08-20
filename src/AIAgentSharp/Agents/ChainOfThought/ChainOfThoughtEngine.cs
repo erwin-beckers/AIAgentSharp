@@ -25,7 +25,8 @@ public sealed class ChainOfThoughtEngine : IChainOfThoughtEngine
         ILogger logger,
         IEventManager eventManager,
         IStatusManager statusManager,
-        IMetricsCollector metricsCollector)
+        IMetricsCollector metricsCollector,
+        ILlmCommunicator? llmCommunicator = null)
     {
         _llm = llm ?? throw new ArgumentNullException(nameof(llm));
         _config = config ?? throw new ArgumentNullException(nameof(config));
@@ -36,8 +37,8 @@ public sealed class ChainOfThoughtEngine : IChainOfThoughtEngine
 
         // Initialize components
         _promptBuilder = new ChainPromptBuilder();
-        var llmCommunicator = new LlmCommunicator(llm, config, logger, eventManager, statusManager, metricsCollector);
-        _stepExecutor = new ChainStepExecutor(_promptBuilder, llmCommunicator, statusManager);
+        var communicator = llmCommunicator ?? new LlmCommunicator(llm, config, logger, eventManager, statusManager, metricsCollector);
+        _stepExecutor = new ChainStepExecutor(_promptBuilder, communicator, statusManager);
         _chainOperations = new ChainOperations(logger);
     }
 

@@ -87,6 +87,14 @@ public static class JsonUtil
             result.ActionInput.Params = JsonSerializer.Deserialize<Dictionary<string, object?>>(paramsProp.GetRawText(), JsonOptions);
         }
 
+        if (actionInput.TryGetProperty("tool_calls", out var toolCallsProp))
+        {
+            if (toolCallsProp.ValueKind == JsonValueKind.Array)
+            {
+                result.ActionInput.ToolCalls = JsonSerializer.Deserialize<List<ToolCall>>(toolCallsProp.GetRawText(), JsonOptions);
+            }
+        }
+
         if (actionInput.TryGetProperty("summary", out var summaryProp))
         {
             var summary = summaryProp.GetString();

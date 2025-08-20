@@ -24,7 +24,8 @@ public sealed class ReasoningManager : IReasoningManager
         ILogger logger,
         IEventManager eventManager,
         IStatusManager statusManager,
-        IMetricsCollector metricsCollector)
+        IMetricsCollector metricsCollector,
+        ILlmCommunicator? llmCommunicator = null)
     {
         _llm = llm ?? throw new ArgumentNullException(nameof(llm));
         _config = config ?? throw new ArgumentNullException(nameof(config));
@@ -33,11 +34,11 @@ public sealed class ReasoningManager : IReasoningManager
         _statusManager = statusManager ?? throw new ArgumentNullException(nameof(statusManager));
         _metricsCollector = metricsCollector ?? throw new ArgumentNullException(nameof(metricsCollector));
 
-        // Initialize reasoning engines
+        // Initialize reasoning engines with shared LlmCommunicator
         _reasoningEngines = new Dictionary<ReasoningType, IReasoningEngine>
         {
-            [ReasoningType.ChainOfThought] = new ChainOfThoughtEngine(_llm, _config, _logger, _eventManager, _statusManager, _metricsCollector),
-            [ReasoningType.TreeOfThoughts] = new TreeOfThoughtsEngine(_llm, _config, _logger, _eventManager, _statusManager, _metricsCollector)
+            [ReasoningType.ChainOfThought] = new ChainOfThoughtEngine(_llm, _config, _logger, _eventManager, _statusManager, _metricsCollector, llmCommunicator),
+            [ReasoningType.TreeOfThoughts] = new TreeOfThoughtsEngine(_llm, _config, _logger, _eventManager, _statusManager, _metricsCollector, llmCommunicator)
         };
     }
 

@@ -67,6 +67,39 @@ public class ChainOfThoughExample
                 .OnToolCallStarted(e => Console.WriteLine($"Tool call started: {e.ToolName} (turn {e.TurnIndex + 1}, Agent: {e.AgentId})"))
                 .OnStepCompleted(e => Console.WriteLine($"Step {e.TurnIndex + 1} completed - Continue: {e.Continue}, Tool: {e.ExecutedTool} (Agent: {e.AgentId})"))
                 .OnRunCompleted(e => Console.WriteLine($"Run completed - Success: {e.Succeeded}, Turns: {e.TotalTurns} (Agent: {e.AgentId})"))
+                .OnStatusUpdate(e =>
+                {
+                    Console.WriteLine();
+                    Console.WriteLine($"Status Update (Turn {e.TurnIndex + 1}, Agent: {e.AgentId}): {e.StatusTitle}");
+
+                    if (!string.IsNullOrEmpty(e.StatusDetails))
+                    {
+                        Console.WriteLine($"   Details: {e.StatusDetails}");
+                    }
+
+                    if (!string.IsNullOrEmpty(e.NextStepHint))
+                    {
+                        Console.WriteLine($"   Next: {e.NextStepHint}");
+                    }
+
+                    if (e.ProgressPct.HasValue)
+                    {
+                        Console.WriteLine($"   Progress: {e.ProgressPct}%");
+                    }
+
+                    Console.WriteLine();
+                })
+                .OnLlmCallCompleted(e =>
+                {
+                    if (e.Error != null)
+                    {
+                        Console.WriteLine($"LLM call failed (turn {e.TurnIndex + 1}, Agent: {e.AgentId}): {e.Error}");
+                    }
+                    else
+                    {
+                        Console.WriteLine($"LLM call completed (turn {e.TurnIndex + 1}, Agent: {e.AgentId}) - Action: {e.LlmMessage?.Action}");
+                    }
+                })
             )
             .Build();
 

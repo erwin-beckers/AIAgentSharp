@@ -30,8 +30,15 @@ public sealed class AgentStepResult
 
     /// <summary>
     ///     Gets or sets the result of tool execution if a tool was called.
+    ///     This is maintained for backward compatibility with single tool calls.
     /// </summary>
     public ToolExecutionResult? ToolResult { get; set; }
+
+    /// <summary>
+    ///     Gets or sets the results of multiple tool executions if multiple tools were called.
+    ///     This enables support for multiple tool results in a single step.
+    /// </summary>
+    public List<ToolExecutionResult>? MultiToolResults { get; set; }
 
     /// <summary>
     ///     Gets or sets the current state of the agent after this step.
