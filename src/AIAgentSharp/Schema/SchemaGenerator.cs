@@ -41,7 +41,7 @@ public static class SchemaGenerator
         return GenerateSchema(type, visited);
     }
 
-    private static Dictionary<string, object> GenerateSchema(Type type, HashSet<Type> visited)
+    public static Dictionary<string, object> GenerateSchema(Type type, HashSet<Type> visited)
     {
         // Handle circular references
         if (visited.Contains(type))
@@ -100,7 +100,7 @@ public static class SchemaGenerator
         return new Dictionary<string, object> { ["type"] = "object" };
     }
 
-    private static Dictionary<string, object> GenerateNullableValueTypeSchema(Type underlyingType, HashSet<Type> visited)
+    public static Dictionary<string, object> GenerateNullableValueTypeSchema(Type underlyingType, HashSet<Type> visited)
     {
         var baseSchema = GenerateSchema(underlyingType, visited);
 
@@ -134,7 +134,7 @@ public static class SchemaGenerator
         }
     }
 
-    private static Dictionary<string, object> GeneratePrimitiveTypeSchema(Type type)
+    public static Dictionary<string, object> GeneratePrimitiveTypeSchema(Type type)
     {
         if (type == typeof(string))
         {
@@ -174,13 +174,13 @@ public static class SchemaGenerator
         return new Dictionary<string, object> { ["type"] = "object" };
     }
 
-    private static Dictionary<string, object> GenerateEnumSchema(Type type)
+    public static Dictionary<string, object> GenerateEnumSchema(Type type)
     {
         var enumValues = Enum.GetValues(type).Cast<object>().Select(v => v.ToString()).ToArray();
         return new Dictionary<string, object> { ["type"] = "string", ["enum"] = enumValues };
     }
 
-    private static Dictionary<string, object> GenerateCollectionSchema(Type type, HashSet<Type> visited)
+    public static Dictionary<string, object> GenerateCollectionSchema(Type type, HashSet<Type> visited)
     {
         Type elementType;
 
@@ -196,7 +196,7 @@ public static class SchemaGenerator
         return new Dictionary<string, object> { ["type"] = "array", ["items"] = GenerateSchema(elementType, visited) };
     }
 
-    private static Dictionary<string, object> GenerateDictionarySchema(Type type, HashSet<Type> visited)
+    public static Dictionary<string, object> GenerateDictionarySchema(Type type, HashSet<Type> visited)
     {
         var keyType = type.GetGenericArguments()[0];
         var valueType = type.GetGenericArguments()[1];
@@ -209,7 +209,7 @@ public static class SchemaGenerator
         return new Dictionary<string, object> { ["type"] = "object" };
     }
 
-    private static Dictionary<string, object> GenerateObjectSchema(Type type, HashSet<Type> visited)
+    public static Dictionary<string, object> GenerateObjectSchema(Type type, HashSet<Type> visited)
     {
         // Add to visited set before processing to prevent circular references
         visited.Add(type);
@@ -259,7 +259,7 @@ public static class SchemaGenerator
         return RequiredFieldHelper.IsPropertyRequired(property);
     }
 
-    private static bool IsPrimitiveType(Type type)
+    public static bool IsPrimitiveType(Type type)
     {
         return type == typeof(string) || type == typeof(int) || type == typeof(long) ||
                type == typeof(double) || type == typeof(float) || type == typeof(decimal) ||
@@ -267,7 +267,7 @@ public static class SchemaGenerator
                type == typeof(Guid) || type == typeof(Uri);
     }
 
-    private static bool IsCollectionType(Type type)
+    public static bool IsCollectionType(Type type)
     {
         return type.IsArray || 
                (type.IsGenericType && (type.GetGenericTypeDefinition() == typeof(List<>) || 
@@ -275,12 +275,12 @@ public static class SchemaGenerator
                                       type.GetGenericTypeDefinition() == typeof(IEnumerable<>)));
     }
 
-    private static bool IsDictionaryType(Type type)
+    public static bool IsDictionaryType(Type type)
     {
         return type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Dictionary<,>);
     }
 
-    private static string GetBaseTypeFromSchema(object schema)
+    public static string GetBaseTypeFromSchema(object schema)
     {
         if (schema is IDictionary<string, object> dict && dict.ContainsKey("type"))
         {

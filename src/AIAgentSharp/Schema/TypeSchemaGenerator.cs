@@ -5,7 +5,7 @@ namespace AIAgentSharp.Schema;
 /// <summary>
 /// Handles core type-to-schema conversion logic for different C# types.
 /// </summary>
-internal sealed class TypeSchemaGenerator
+public sealed class TypeSchemaGenerator
 {
     /// <summary>
     /// Generates a JSON schema for the specified type.
@@ -69,7 +69,7 @@ internal sealed class TypeSchemaGenerator
         return new Dictionary<string, object> { ["type"] = "object" };
     }
 
-    private Dictionary<string, object> GenerateNullableValueTypeSchema(Type underlyingType, HashSet<Type> visited)
+    public Dictionary<string, object> GenerateNullableValueTypeSchema(Type underlyingType, HashSet<Type> visited)
     {
         var baseSchema = GenerateSchema(underlyingType, visited);
 
@@ -103,7 +103,7 @@ internal sealed class TypeSchemaGenerator
         }
     }
 
-    private Dictionary<string, object> GeneratePrimitiveTypeSchema(Type type)
+    public Dictionary<string, object> GeneratePrimitiveTypeSchema(Type type)
     {
         if (type == typeof(string))
         {
@@ -143,13 +143,13 @@ internal sealed class TypeSchemaGenerator
         return new Dictionary<string, object> { ["type"] = "object" };
     }
 
-    private Dictionary<string, object> GenerateEnumSchema(Type type)
+    public Dictionary<string, object> GenerateEnumSchema(Type type)
     {
         var enumValues = Enum.GetValues(type).Cast<object>().Select(v => v.ToString()).ToArray();
         return new Dictionary<string, object> { ["type"] = "string", ["enum"] = enumValues };
     }
 
-    private Dictionary<string, object> GenerateCollectionSchema(Type type, HashSet<Type> visited)
+    public Dictionary<string, object> GenerateCollectionSchema(Type type, HashSet<Type> visited)
     {
         Type elementType;
 
@@ -165,7 +165,7 @@ internal sealed class TypeSchemaGenerator
         return new Dictionary<string, object> { ["type"] = "array", ["items"] = GenerateSchema(elementType, visited) };
     }
 
-    private Dictionary<string, object> GenerateDictionarySchema(Type type, HashSet<Type> visited)
+    public Dictionary<string, object> GenerateDictionarySchema(Type type, HashSet<Type> visited)
     {
         var keyType = type.GetGenericArguments()[0];
         var valueType = type.GetGenericArguments()[1];
@@ -178,7 +178,7 @@ internal sealed class TypeSchemaGenerator
         return new Dictionary<string, object> { ["type"] = "object" };
     }
 
-    private Dictionary<string, object> GenerateObjectSchema(Type type, HashSet<Type> visited)
+    public Dictionary<string, object> GenerateObjectSchema(Type type, HashSet<Type> visited)
     {
         // Add to visited set before processing to prevent circular references
         visited.Add(type);
@@ -223,19 +223,19 @@ internal sealed class TypeSchemaGenerator
         return result;
     }
 
-    private object? GeneratePropertySchema(PropertyInfo property, HashSet<Type> visited)
+    public object? GeneratePropertySchema(PropertyInfo property, HashSet<Type> visited)
     {
         // This will be handled by PropertySchemaGenerator
         // For now, return null to indicate this should be processed elsewhere
         return null;
     }
 
-    private bool IsPropertyRequired(PropertyInfo property)
+    public bool IsPropertyRequired(PropertyInfo property)
     {
         return RequiredFieldHelper.IsPropertyRequired(property);
     }
 
-    private bool IsPrimitiveType(Type type)
+    public bool IsPrimitiveType(Type type)
     {
         return type == typeof(string) || type == typeof(int) || type == typeof(long) ||
                type == typeof(double) || type == typeof(float) || type == typeof(decimal) ||
@@ -243,7 +243,7 @@ internal sealed class TypeSchemaGenerator
                type == typeof(Guid) || type == typeof(Uri);
     }
 
-    private bool IsCollectionType(Type type)
+    public bool IsCollectionType(Type type)
     {
         return type.IsArray || 
                (type.IsGenericType && (type.GetGenericTypeDefinition() == typeof(List<>) || 
@@ -251,12 +251,12 @@ internal sealed class TypeSchemaGenerator
                                       type.GetGenericTypeDefinition() == typeof(IEnumerable<>)));
     }
 
-    private bool IsDictionaryType(Type type)
+    public bool IsDictionaryType(Type type)
     {
         return type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Dictionary<,>);
     }
 
-    private string GetBaseTypeFromSchema(object schema)
+    public string GetBaseTypeFromSchema(object schema)
     {
         if (schema is IDictionary<string, object> dict && dict.ContainsKey("type"))
         {

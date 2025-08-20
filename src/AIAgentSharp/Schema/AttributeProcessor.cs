@@ -6,7 +6,7 @@ namespace AIAgentSharp.Schema;
 /// <summary>
 /// Handles processing of DataAnnotations and custom attributes for schema generation.
 /// </summary>
-internal sealed class AttributeProcessor
+public sealed class AttributeProcessor
 {
     /// <summary>
     /// Processes ToolField attributes and applies them to the schema.

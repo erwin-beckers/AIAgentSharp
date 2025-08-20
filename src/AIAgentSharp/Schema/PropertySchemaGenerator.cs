@@ -6,7 +6,7 @@ namespace AIAgentSharp.Schema;
 /// <summary>
 /// Handles property-specific schema generation with attribute processing.
 /// </summary>
-internal sealed class PropertySchemaGenerator
+public sealed class PropertySchemaGenerator
 {
     private readonly TypeSchemaGenerator _typeSchemaGenerator;
     private readonly AttributeProcessor _attributeProcessor;
@@ -35,7 +35,7 @@ internal sealed class PropertySchemaGenerator
         return schemaDict;
     }
 
-    private Dictionary<string, object> ConvertToDictionary(object baseSchema)
+    public Dictionary<string, object> ConvertToDictionary(object baseSchema)
     {
         var schemaDict = new Dictionary<string, object>();
 
@@ -67,7 +67,7 @@ internal sealed class PropertySchemaGenerator
         return schemaDict;
     }
 
-    private void ProcessNullability(PropertyInfo property, Dictionary<string, object> schemaDict)
+    public void ProcessNullability(PropertyInfo property, Dictionary<string, object> schemaDict)
     {
         var isRequired = IsPropertyRequired(property);
         var hasDefaultValue = HasDefaultValue(property);
@@ -100,12 +100,12 @@ internal sealed class PropertySchemaGenerator
         }
     }
 
-    private bool IsPropertyRequired(PropertyInfo property)
+    public bool IsPropertyRequired(PropertyInfo property)
     {
         return RequiredFieldHelper.IsPropertyRequired(property);
     }
 
-    private bool HasDefaultValue(PropertyInfo property)
+    public bool HasDefaultValue(PropertyInfo property)
     {
         try
         {
@@ -142,7 +142,7 @@ internal sealed class PropertySchemaGenerator
         }
     }
 
-    private bool IsNullableReferenceType(PropertyInfo property)
+    public bool IsNullableReferenceType(PropertyInfo property)
     {
         var propertyType = property.PropertyType;
         

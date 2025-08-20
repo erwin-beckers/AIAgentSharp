@@ -222,7 +222,7 @@ public sealed class AgentOrchestrator : IAgentOrchestrator
         return new AgentStepResult { Continue = true, ExecutedTool = false, State = state };
     }
 
-    private async Task<AgentStepResult> ProcessToolCall(ModelMessage modelMsg, AgentState state, IDictionary<string, ITool> tools, int turnIndex, string turnId, CancellationToken ct)
+    public async Task<AgentStepResult> ProcessToolCall(ModelMessage modelMsg, AgentState state, IDictionary<string, ITool> tools, int turnIndex, string turnId, CancellationToken ct)
     {
         var toolName = modelMsg.ActionInput.Tool!.Trim();
         var prms = modelMsg.ActionInput.Params ?? new Dictionary<string, object?>();
@@ -299,7 +299,7 @@ public sealed class AgentOrchestrator : IAgentOrchestrator
         };
     }
 
-    private async Task<AgentStepResult> ProcessAction(ModelMessage modelMsg, AgentState state, IDictionary<string, ITool> tools, int turnIndex, string turnId, CancellationToken ct)
+    public async Task<AgentStepResult> ProcessAction(ModelMessage modelMsg, AgentState state, IDictionary<string, ITool> tools, int turnIndex, string turnId, CancellationToken ct)
     {
         var turn = new AgentTurn { Index = turnIndex, TurnId = turnId, LlmMessage = modelMsg };
 
@@ -353,7 +353,7 @@ public sealed class AgentOrchestrator : IAgentOrchestrator
         }
     }
 
-    private Task<AgentStepResult> HandleFunctionArgumentError(AgentState state, LlmResponse functionResult, int turnIndex, string turnId, string errorMessage)
+    public Task<AgentStepResult> HandleFunctionArgumentError(AgentState state, LlmResponse functionResult, int turnIndex, string turnId, string errorMessage)
     {
         _logger.LogWarning($"Function argument parsing failed: {errorMessage}");
         _statusManager.EmitStatus(state.AgentId, "Function call error", "Invalid function arguments", "Will retry with corrected parameters");
@@ -390,7 +390,7 @@ public sealed class AgentOrchestrator : IAgentOrchestrator
         });
     }
 
-    private Task<AgentStepResult> HandleUnknownToolError(AgentState state, LlmResponse functionResult, int turnIndex, string turnId, string errorMessage)
+    public Task<AgentStepResult> HandleUnknownToolError(AgentState state, LlmResponse functionResult, int turnIndex, string turnId, string errorMessage)
     {
         _logger.LogWarning($"Unknown tool in function call: {errorMessage}");
         _statusManager.EmitStatus(state.AgentId, "Tool not found", errorMessage, "Will try different approach");
@@ -427,7 +427,7 @@ public sealed class AgentOrchestrator : IAgentOrchestrator
         });
     }
 
-    private Task AddRetryHintsAndLoopBreaker(AgentState state, ToolExecutionResult execResult, string toolName, Dictionary<string, object?> prms, int turnIndex)
+    public Task AddRetryHintsAndLoopBreaker(AgentState state, ToolExecutionResult execResult, string toolName, Dictionary<string, object?> prms, int turnIndex)
     {
         // Add a controller retry hint after any tool failure
         if (execResult.Success == false)
@@ -474,7 +474,7 @@ public sealed class AgentOrchestrator : IAgentOrchestrator
         return Task.CompletedTask;
     }
 
-    private static string GenerateTurnId(int turnIndex)
+    public static string GenerateTurnId(int turnIndex)
     {
         return $"turn_{turnIndex}_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}";
     }
@@ -487,7 +487,7 @@ public sealed class AgentOrchestrator : IAgentOrchestrator
         return Convert.ToHexString(bytes); // stable per (tool,params)
     }
 
-    private static string CanonicalizeJson(object? obj)
+    public static string CanonicalizeJson(object? obj)
     {
         if (obj == null)
         {
@@ -505,7 +505,7 @@ public sealed class AgentOrchestrator : IAgentOrchestrator
         return CanonicalizeJsonElement(doc.RootElement);
     }
 
-    private static string CanonicalizeJsonElement(JsonElement element)
+    public static string CanonicalizeJsonElement(JsonElement element)
     {
         switch (element.ValueKind)
         {
@@ -541,7 +541,7 @@ public sealed class AgentOrchestrator : IAgentOrchestrator
         }
     }
 
-    private bool ShouldPerformReasoning(AgentState state, int turnIndex)
+    public bool ShouldPerformReasoning(AgentState state, int turnIndex)
     {
         // Don't perform reasoning if it's disabled
         if (_config.ReasoningType == ReasoningType.None)
@@ -556,7 +556,7 @@ public sealed class AgentOrchestrator : IAgentOrchestrator
                 turnIndex % 3 == 0); // Every 3rd turn after failures
     }
 
-    private async Task<ReasoningResult> PerformReasoningAsync(AgentState state, IDictionary<string, ITool> tools, CancellationToken ct)
+    public async Task<ReasoningResult> PerformReasoningAsync(AgentState state, IDictionary<string, ITool> tools, CancellationToken ct)
     {
         try
         {
@@ -575,7 +575,7 @@ public sealed class AgentOrchestrator : IAgentOrchestrator
         }
     }
 
-    private void UpdateStateWithReasoning(AgentState state, ReasoningResult reasoningResult)
+    public void UpdateStateWithReasoning(AgentState state, ReasoningResult reasoningResult)
     {
         state.ReasoningType = reasoningResult.Chain != null ? ReasoningType.ChainOfThought : 
                              reasoningResult.Tree != null ? ReasoningType.TreeOfThoughts : 
@@ -593,7 +593,7 @@ public sealed class AgentOrchestrator : IAgentOrchestrator
         }
     }
 
-    private string EnhanceGoalWithReasoning(string originalGoal, ReasoningResult reasoningResult)
+    public string EnhanceGoalWithReasoning(string originalGoal, ReasoningResult reasoningResult)
     {
         if (string.IsNullOrEmpty(reasoningResult.Conclusion))
             return originalGoal;
@@ -601,7 +601,7 @@ public sealed class AgentOrchestrator : IAgentOrchestrator
         return $"{originalGoal}\n\nReasoning Insights: {reasoningResult.Conclusion}";
     }
 
-    private string BuildReasoningContext(AgentState state)
+    public string BuildReasoningContext(AgentState state)
     {
         var context = new List<string>();
         
