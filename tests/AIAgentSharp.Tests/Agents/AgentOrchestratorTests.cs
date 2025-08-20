@@ -8,14 +8,14 @@ namespace AIAgentSharp.Tests.Agents;
 [TestClass]
 public class AgentOrchestratorTests
 {
-    private Mock<ILlmClient> _mockLlmClient;
-    private Mock<IAgentStateStore> _mockStateStore;
-    private Mock<ILogger> _mockLogger;
-    private Mock<IEventManager> _mockEventManager;
-    private Mock<IStatusManager> _mockStatusManager;
-    private Mock<IMetricsCollector> _mockMetricsCollector;
-    private AgentConfiguration _config;
-    private AgentOrchestrator _orchestrator;
+    private Mock<ILlmClient> _mockLlmClient = null!;
+    private Mock<IAgentStateStore> _mockStateStore = null!;
+    private Mock<ILogger> _mockLogger = null!;
+    private Mock<IEventManager> _mockEventManager = null!;
+    private Mock<IStatusManager> _mockStatusManager = null!;
+    private Mock<IMetricsCollector> _mockMetricsCollector = null!;
+    private AgentConfiguration _config = null!;
+    private AgentOrchestrator _orchestrator = null!;
 
     [TestInitialize]
     public void Setup()
@@ -127,7 +127,7 @@ public class AgentOrchestratorTests
     }
 
     [TestMethod]
-    public async Task ExecuteStepAsync_Should_ReturnFinishResult_When_FinishActionReceived()
+    public void ExecuteStepAsync_Should_ReturnFinishResult_When_FinishActionReceived()
     {
         // Arrange
         var state = new AgentState { AgentId = "test-agent", Goal = "test goal", Turns = new List<AgentTurn>() };

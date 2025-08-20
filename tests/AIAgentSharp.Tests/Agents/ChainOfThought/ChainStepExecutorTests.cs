@@ -493,9 +493,9 @@ public class ChainStepExecutorTests
             Description = description;
         }
 
-        public Task<object> InvokeAsync(Dictionary<string, object?> parameters, CancellationToken cancellationToken)
+        public Task<object?> InvokeAsync(Dictionary<string, object?> parameters, CancellationToken cancellationToken)
         {
-            return Task.FromResult<object>("Test result");
+            return Task.FromResult<object?>("Test result");
         }
     }
 }

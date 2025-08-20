@@ -8,13 +8,13 @@ namespace AIAgentSharp.Tests.Agents;
 [TestClass]
 public class ReasoningManagerTests
 {
-    private Mock<ILlmClient> _mockLlmClient;
-    private Mock<ILogger> _mockLogger;
-    private Mock<IEventManager> _mockEventManager;
-    private Mock<IStatusManager> _mockStatusManager;
-    private Mock<IMetricsCollector> _mockMetricsCollector;
-    private AgentConfiguration _config;
-    private ReasoningManager _reasoningManager;
+    private Mock<ILlmClient> _mockLlmClient = null!;
+    private Mock<ILogger> _mockLogger = null!;
+    private Mock<IEventManager> _mockEventManager = null!;
+    private Mock<IStatusManager> _mockStatusManager = null!;
+    private Mock<IMetricsCollector> _mockMetricsCollector = null!;
+    private AgentConfiguration _config = null!;
+    private ReasoningManager _reasoningManager = null!;
 
     [TestInitialize]
     public void Setup()
@@ -136,12 +136,12 @@ public class ReasoningManagerTests
     }
 
     [TestMethod]
-    public async Task ReasonAsync_Should_UseConfiguredReasoningType_When_DefaultOverloadUsed()
+    public void ReasonAsync_Should_UseConfiguredReasoningType_When_DefaultOverloadUsed()
     {
         // Arrange
-        var goal = "Test goal";
-        var context = "Test context";
-        var tools = new Dictionary<string, ITool>();
+        _ = "Test goal";
+        _ = "Test context";
+        _ = new Dictionary<string, ITool>();
 
         // Note: This test would require mocking the internal reasoning engines
         // which are created in the constructor. For a more comprehensive test,
@@ -183,13 +183,13 @@ public class ReasoningManagerTests
     }
 
     [TestMethod]
-    public async Task ReasonAsync_Should_UseSpecifiedReasoningType_When_ExplicitTypeProvided()
+    public void ReasonAsync_Should_UseSpecifiedReasoningType_When_ExplicitTypeProvided()
     {
         // Arrange
-        var goal = "Test goal";
-        var context = "Test context";
-        var tools = new Dictionary<string, ITool>();
-        var reasoningType = ReasoningType.TreeOfThoughts;
+        _ = "Test goal";
+        _ = "Test context";
+        _ = new Dictionary<string, ITool>();
+        _ = ReasoningType.TreeOfThoughts;
 
         // Note: Similar to the above test, this would require mocking internal engines
         // for comprehensive testing
@@ -217,12 +217,12 @@ public class ReasoningManagerTests
     }
 
     [TestMethod]
-    public async Task ReasonAsync_Should_LogReasoningType_When_ReasoningStarts()
+    public void ReasonAsync_Should_LogReasoningType_When_ReasoningStarts()
     {
         // Arrange
-        var goal = "Test goal";
-        var context = "Test context";
-        var tools = new Dictionary<string, ITool>();
+        _ = "Test goal";
+        _ = "Test context";
+        _ = new Dictionary<string, ITool>();
 
         // Note: To fully test logging, we would need to capture log messages
         // This test verifies that the method can be called without throwing
@@ -233,12 +233,12 @@ public class ReasoningManagerTests
     }
 
     [TestMethod]
-    public async Task ReasonAsync_Should_HandleNullGoal_When_GoalIsNull()
+    public void ReasonAsync_Should_HandleNullGoal_When_GoalIsNull()
     {
         // Arrange
-        string? goal = null;
-        var context = "Test context";
-        var tools = new Dictionary<string, ITool>();
+        _ = (string?)null;
+        _ = "Test context";
+        _ = new Dictionary<string, ITool>();
 
         // Act & Assert
         // The method should handle null goal gracefully or throw appropriate exception
@@ -246,12 +246,12 @@ public class ReasoningManagerTests
     }
 
     [TestMethod]
-    public async Task ReasonAsync_Should_HandleNullContext_When_ContextIsNull()
+    public void ReasonAsync_Should_HandleNullContext_When_ContextIsNull()
     {
         // Arrange
-        var goal = "Test goal";
-        string? context = null;
-        var tools = new Dictionary<string, ITool>();
+        _ = "Test goal";
+        _ = (string?)null;
+        _ = new Dictionary<string, ITool>();
 
         // Act & Assert
         // The method should handle null context gracefully or throw appropriate exception
@@ -259,12 +259,12 @@ public class ReasoningManagerTests
     }
 
     [TestMethod]
-    public async Task ReasonAsync_Should_HandleNullTools_When_ToolsIsNull()
+    public void ReasonAsync_Should_HandleNullTools_When_ToolsIsNull()
     {
         // Arrange
-        var goal = "Test goal";
-        var context = "Test context";
-        IDictionary<string, ITool>? tools = null;
+        _ = "Test goal";
+        _ = "Test context";
+        _ = (IDictionary<string, ITool>?)null;
 
         // Act & Assert
         // The method should handle null tools gracefully or throw appropriate exception
@@ -272,11 +272,11 @@ public class ReasoningManagerTests
     }
 
     [TestMethod]
-    public async Task ReasonAsync_Should_HandleEmptyTools_When_ToolsIsEmpty()
+    public void ReasonAsync_Should_HandleEmptyTools_When_ToolsIsEmpty()
     {
         // Arrange
-        var goal = "Test goal";
-        var context = "Test context";
+        _ = "Test goal";
+        _ = "Test context";
         var tools = new Dictionary<string, ITool>();
 
         // Act & Assert

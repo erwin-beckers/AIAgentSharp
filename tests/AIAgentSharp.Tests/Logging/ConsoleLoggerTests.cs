@@ -3,8 +3,8 @@ namespace AIAgentSharp.Tests.Logging;
 [TestClass]
 public class ConsoleLoggerTests
 {
-    private StringWriter _stringWriter;
-    private TextWriter _originalOut;
+    private StringWriter _stringWriter = null!;
+    private TextWriter _originalOut = null!;
 
     [TestInitialize]
     public void Setup()

@@ -323,39 +323,3 @@ public sealed class ChainStepExecutor
         }
     }
 }
-
-/// <summary>
-/// Result of executing a Chain of Thought reasoning step.
-/// </summary>
-public sealed class ChainStepExecutionResult
-{
-    public bool Success { get; set; }
-    public string Reasoning { get; set; } = "";
-    public double Confidence { get; set; }
-    public List<string> Insights { get; set; } = new();
-    public ReasoningStepType StepType { get; set; }
-    public string? Error { get; set; }
-}
-
-/// <summary>
-/// Result of executing the evaluation step.
-/// </summary>
-public sealed class ChainEvaluationExecutionResult
-{
-    public bool Success { get; set; }
-    public string Reasoning { get; set; } = "";
-    public double Confidence { get; set; }
-    public List<string> Insights { get; set; } = new();
-    public string Conclusion { get; set; } = "";
-    public ReasoningStepType StepType { get; set; }
-    public string? Error { get; set; }
-}
-
-/// <summary>
-/// Result of Chain of Thought validation.
-/// </summary>
-public sealed class ChainValidationResult
-{
-    public bool IsValid { get; set; }
-    public string? Error { get; set; }
-}

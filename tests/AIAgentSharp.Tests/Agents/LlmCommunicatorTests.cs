@@ -8,20 +8,17 @@ namespace AIAgentSharp.Tests.Agents;
 [TestClass]
 public class LlmCommunicatorTests
 {
-    private Mock<ILlmClient> _mockLlmClient;
-    private Mock<ILogger> _mockLogger;
-    private Mock<IEventManager> _mockEventManager;
-    private Mock<IStatusManager> _mockStatusManager;
-    private Mock<IMetricsCollector> _mockMetricsCollector;
-    private AgentConfiguration _config;
-    private LlmCommunicator _llmCommunicator;
+    private Mock<ILlmClient> _mockLlmClient = null!;
+    private Mock<ILogger> _mockLogger = null!;
+    private Mock<IEventManager> _mockEventManager = null!;
+    private Mock<IStatusManager> _mockStatusManager = null!;
+    private Mock<IMetricsCollector> _mockMetricsCollector = null!;
+    private AgentConfiguration _config = null!;
+    private LlmCommunicator _llmCommunicator = null!;
 
-    private static async IAsyncEnumerable<T> ToAsyncEnumerable<T>(IEnumerable<T> items)
+    private static IAsyncEnumerable<T> ToAsyncEnumerable<T>(IEnumerable<T> items)
     {
-        foreach (var item in items)
-        {
-            yield return item;
-        }
+        return items.ToAsyncEnumerable();
     }
 
     [TestInitialize]
@@ -310,9 +307,11 @@ public class LlmCommunicatorTests
         Assert.AreEqual(AgentAction.ToolCall, result.Action);
         Assert.AreEqual("tool_call", result.ActionRaw);
         Assert.IsNotNull(result.ActionInput);
-        Assert.AreEqual("test_function", result.ActionInput.Tool);
+        var actionInput = result.ActionInput!;
+        Assert.AreEqual("test_function", actionInput.Tool);
         // The parameter value is a JsonElement, not a string
-        Assert.IsTrue(result.ActionInput.Params.ContainsKey("param1"));
+        Assert.IsNotNull(actionInput.Params);
+        Assert.IsTrue(actionInput.Params!.ContainsKey("param1"));
     }
 
     [TestMethod]
@@ -347,8 +346,10 @@ public class LlmCommunicatorTests
 
         // Assert
         Assert.IsNotNull(result);
-        Assert.AreEqual("test_function", result.ActionInput.Tool);
-        Assert.AreEqual(0, result.ActionInput.Params.Count); // Empty params due to parsing failure
+        var actionInput = result.ActionInput!;
+        Assert.AreEqual("test_function", actionInput.Tool);
+        Assert.IsNotNull(actionInput.Params);
+        Assert.AreEqual(0, actionInput.Params!.Count); // Empty params due to parsing failure
     }
 
     [TestMethod]
@@ -371,7 +372,9 @@ public class LlmCommunicatorTests
 
         // Assert
         Assert.IsNotNull(result);
-        Assert.AreEqual("test_function", result.ActionInput.Tool);
-        Assert.AreEqual(0, result.ActionInput.Params.Count);
+        var actionInput = result.ActionInput!;
+        Assert.AreEqual("test_function", actionInput.Tool);
+        Assert.IsNotNull(actionInput.Params);
+        Assert.AreEqual(0, actionInput.Params!.Count);
     }
 }

@@ -6,8 +6,8 @@ namespace AIAgentSharp.Tests.Agents;
 [TestClass]
 public class EventManagerTests
 {
-    private Mock<ILogger> _mockLogger;
-    private EventManager _eventManager;
+    private Mock<ILogger> _mockLogger = null!;
+    private EventManager _eventManager = null!;
 
     [TestInitialize]
     public void Setup()

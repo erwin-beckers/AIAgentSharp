@@ -6,9 +6,9 @@ namespace AIAgentSharp.Tests.Agents;
 [TestClass]
 public class LoopDetectorTests
 {
-    private Mock<ILogger> _mockLogger;
-    private AgentConfiguration _config;
-    private LoopDetector _loopDetector;
+    private Mock<ILogger> _mockLogger = null!;
+    private AgentConfiguration _config = null!;
+    private LoopDetector _loopDetector = null!;
 
     [TestInitialize]
     public void Setup()

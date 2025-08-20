@@ -8,12 +8,12 @@ namespace AIAgentSharp.Tests.Agents;
 [TestClass]
 public class ToolExecutorTests
 {
-    private Mock<ILogger> _mockLogger;
-    private Mock<IEventManager> _mockEventManager;
-    private Mock<IStatusManager> _mockStatusManager;
-    private Mock<IMetricsCollector> _mockMetricsCollector;
-    private AgentConfiguration _config;
-    private ToolExecutor _toolExecutor;
+    private Mock<ILogger> _mockLogger = null!;
+    private Mock<IEventManager> _mockEventManager = null!;
+    private Mock<IStatusManager> _mockStatusManager = null!;
+    private Mock<IMetricsCollector> _mockMetricsCollector = null!;
+    private AgentConfiguration _config = null!;
+    private ToolExecutor _toolExecutor = null!;
 
     [TestInitialize]
     public void Setup()

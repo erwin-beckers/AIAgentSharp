@@ -5,9 +5,9 @@ namespace AIAgentSharp.Tests.Utils;
 [TestClass]
 public class ToolExtensionsTests
 {
-    private Mock<ITool> _mockTool1;
-    private Mock<ITool> _mockTool2;
-    private Mock<ITool> _mockTool3;
+    private Mock<ITool> _mockTool1 = null!;
+    private Mock<ITool> _mockTool2 = null!;
+    private Mock<ITool> _mockTool3 = null!;
 
     [TestInitialize]
     public void Setup()
@@ -244,7 +244,7 @@ public class ToolExtensionsTests
     {
         // Arrange
         var mockToolWithNullName = new Mock<ITool>();
-        mockToolWithNullName.Setup(t => t.Name).Returns((string?)null);
+        mockToolWithNullName.Setup(t => t.Name).Returns((string?)null!);
 
         var tools = new List<ITool> { mockToolWithNullName.Object };
 

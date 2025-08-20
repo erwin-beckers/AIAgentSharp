@@ -7,9 +7,9 @@ namespace AIAgentSharp.Tests.Agents;
 [TestClass]
 public class StatusManagerTests
 {
-    private Mock<IEventManager> _mockEventManager;
-    private Mock<ILogger> _mockLogger;
-    private AgentConfiguration _config;
+    private Mock<IEventManager> _mockEventManager = null!;
+    private Mock<ILogger> _mockLogger = null!;
+    private AgentConfiguration _config = null!;
 
     [TestInitialize]
     public void Setup()

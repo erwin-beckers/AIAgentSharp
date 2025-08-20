@@ -6,8 +6,8 @@ namespace AIAgentSharp.Tests.Agents;
 [TestClass]
 public class MessageBuilderTests
 {
-    private AgentConfiguration _config;
-    private MessageBuilder _messageBuilder;
+    private AgentConfiguration _config = null!;
+    private MessageBuilder _messageBuilder = null!;
 
     [TestInitialize]
     public void Setup()

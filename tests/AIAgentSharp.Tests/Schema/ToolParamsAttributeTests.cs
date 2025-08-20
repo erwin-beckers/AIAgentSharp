@@ -136,7 +136,7 @@ public class ToolParamsAttributeTests
     public void ToolParamsAttribute_Should_BeUsableAsAttribute_When_AppliedToStruct()
     {
         // Arrange & Act
-        var testStruct = new TestStructWithToolParams();
+        _ = new TestStructWithToolParams();
 
         // Assert
         var attribute = typeof(TestStructWithToolParams).GetCustomAttributes(typeof(ToolParamsAttribute), false).FirstOrDefault() as ToolParamsAttribute;

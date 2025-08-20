@@ -365,12 +365,7 @@ public sealed class Agent : IAgent
         add => _eventManager.StatusUpdate += value;
         remove => _eventManager.StatusUpdate -= value;
     }
-
-    /// <summary>
-    /// Gets the metrics provider for accessing collected metrics data.
-    /// </summary>
-    public IMetricsProvider Metrics => _metricsCollector as IMetricsProvider ?? throw new InvalidOperationException("Metrics collector does not implement IMetricsProvider");
-
+    
     private async Task<AgentState> EnsureState(string agentId, string goal, CancellationToken ct)
     {
         var loadStopwatch = System.Diagnostics.Stopwatch.StartNew();
