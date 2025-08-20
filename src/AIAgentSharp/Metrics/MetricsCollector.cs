@@ -202,7 +202,7 @@ public sealed class MetricsCollector : IMetricsCollector, IMetricsProvider
     /// Raises the MetricsUpdated event with the specified metric name.
     /// </summary>
     /// <param name="metricName">The name of the metric that was updated.</param>
-    private void OnMetricsUpdated(string metricName)
+    public void OnMetricsUpdated(string metricName)
     {
         try
         {

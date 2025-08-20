@@ -1,3 +1,7 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using AIAgentSharp.Agents.Interfaces;
+
 namespace AIAgentSharp.Tests.Utils;
 
 [TestClass]
@@ -624,5 +628,371 @@ public class JsonUtilTests
 
         // Act & Assert
         Assert.ThrowsException<ArgumentException>(() => JsonUtil.ParseStrict(json));
+    }
+
+    [TestMethod]
+    public void ToJson_Should_SerializeObject_When_ValidObjectProvided()
+    {
+        // Arrange
+        var obj = new { name = "test", value = 42, active = true };
+
+        // Act
+        var result = JsonUtil.ToJson(obj);
+
+        // Assert
+        Assert.IsNotNull(result);
+        Assert.IsTrue(result.Contains("test"));
+        Assert.IsTrue(result.Contains("42"));
+        Assert.IsTrue(result.Contains("true"));
+    }
+
+    [TestMethod]
+    public void ToJson_Should_UseCamelCase_When_SerializingObject()
+    {
+        // Arrange
+        var obj = new { TestProperty = "value", AnotherProperty = 123 };
+
+        // Act
+        var result = JsonUtil.ToJson(obj);
+
+        // Assert
+        Assert.IsTrue(result.Contains("testProperty"));
+        Assert.IsTrue(result.Contains("anotherProperty"));
+        Assert.IsFalse(result.Contains("TestProperty"));
+        Assert.IsFalse(result.Contains("AnotherProperty"));
+    }
+
+    [TestMethod]
+    public void ToJson_Should_HandleNullObject_When_ObjectIsNull()
+    {
+        // Act
+        var result = JsonUtil.ToJson(null!);
+
+        // Assert
+        Assert.AreEqual("null", result);
+    }
+
+    [TestMethod]
+    public void ParseChainOfThoughtResponse_Should_ParseValidResponse_When_AllFieldsPresent()
+    {
+        // Arrange
+        var json = @"{
+            ""reasoning"": ""Step by step analysis"",
+            ""reasoning_confidence"": 0.85,
+            ""reasoning_type"": ""ChainOfThought"",
+            ""insights"": [""insight1"", ""insight2""],
+            ""conclusion"": ""Final conclusion"",
+            ""is_valid"": true,
+            ""error"": null
+        }";
+
+        // Act
+        var result = JsonUtil.ParseChainOfThoughtResponse(json);
+
+        // Assert
+        Assert.AreEqual("Step by step analysis", result.Reasoning);
+        Assert.AreEqual(0.85, result.ReasoningConfidence);
+        Assert.AreEqual(ReasoningType.ChainOfThought, result.ReasoningType);
+        Assert.AreEqual(2, result.Insights?.Count);
+        Assert.AreEqual("insight1", result.Insights?[0]);
+        Assert.AreEqual("insight2", result.Insights?[1]);
+        Assert.AreEqual("Final conclusion", result.Conclusion);
+        Assert.IsTrue(result.IsValid);
+        Assert.IsNull(result.Error);
+    }
+
+    [TestMethod]
+    public void ParseChainOfThoughtResponse_Should_UseConfidenceField_When_ReasoningConfidenceMissing()
+    {
+        // Arrange
+        var json = @"{
+            ""reasoning"": ""Test reasoning"",
+            ""confidence"": 0.75,
+            ""insights"": [""test insight""]
+        }";
+
+        // Act
+        var result = JsonUtil.ParseChainOfThoughtResponse(json);
+
+        // Assert
+        Assert.AreEqual("Test reasoning", result.Reasoning);
+        Assert.AreEqual(0.75, result.ReasoningConfidence);
+        Assert.AreEqual(1, result.Insights?.Count);
+        Assert.AreEqual("test insight", result.Insights?[0]);
+    }
+
+    [TestMethod]
+    public void ParseChainOfThoughtResponse_Should_HandleMissingFields_When_OptionalFieldsNotPresent()
+    {
+        // Arrange
+        var json = @"{
+            ""reasoning"": ""Test reasoning""
+        }";
+
+        // Act
+        var result = JsonUtil.ParseChainOfThoughtResponse(json);
+
+        // Assert
+        Assert.AreEqual("Test reasoning", result.Reasoning);
+        Assert.IsNull(result.ReasoningConfidence);
+        Assert.IsNull(result.ReasoningType);
+        Assert.IsNull(result.Insights);
+        Assert.IsNull(result.Conclusion);
+        Assert.IsNull(result.IsValid);
+        Assert.IsNull(result.Error);
+    }
+
+    [TestMethod]
+    public void ParseChainOfThoughtResponse_Should_HandleInvalidReasoningType_When_ReasoningTypeIsInvalid()
+    {
+        // Arrange
+        var json = @"{
+            ""reasoning"": ""Test reasoning"",
+            ""reasoning_type"": ""invalid_type""
+        }";
+
+        // Act
+        var result = JsonUtil.ParseChainOfThoughtResponse(json);
+
+        // Assert
+        Assert.AreEqual("Test reasoning", result.Reasoning);
+        Assert.IsNull(result.ReasoningType); // Should be null when invalid
+    }
+
+    [TestMethod]
+    public void ParseChainOfThoughtResponse_Should_HandleEmptyInsights_When_InsightsIsEmpty()
+    {
+        // Arrange
+        var json = @"{
+            ""reasoning"": ""Test reasoning"",
+            ""insights"": []
+        }";
+
+        // Act
+        var result = JsonUtil.ParseChainOfThoughtResponse(json);
+
+        // Assert
+        Assert.AreEqual("Test reasoning", result.Reasoning);
+        Assert.IsNotNull(result.Insights);
+        Assert.AreEqual(0, result.Insights.Count);
+    }
+
+    [TestMethod]
+    public void ParseChainOfThoughtResponse_Should_FilterNullInsights_When_InsightsContainsNullValues()
+    {
+        // Arrange
+        var json = @"{
+            ""reasoning"": ""Test reasoning"",
+            ""insights"": [""valid"", null, """", ""also valid""]
+        }";
+
+        // Act
+        var result = JsonUtil.ParseChainOfThoughtResponse(json);
+
+        // Assert
+        Assert.AreEqual("Test reasoning", result.Reasoning);
+        Assert.IsNotNull(result.Insights);
+        Assert.AreEqual(2, result.Insights.Count);
+        Assert.AreEqual("valid", result.Insights[0]);
+        Assert.AreEqual("also valid", result.Insights[1]);
+    }
+
+    [TestMethod]
+    public void ParseTreeOfThoughtsResponse_Should_ParseValidResponse_When_AllFieldsPresent()
+    {
+        // Arrange
+        var json = @"{
+            ""thought"": ""Test thought"",
+            ""thought_type"": ""evaluation"",
+            ""score"": 0.9,
+            ""children"": [""child1"", ""child2""],
+            ""reasoning"": ""Tree reasoning"",
+            ""insights"": [""tree insight""],
+            ""conclusion"": ""Tree conclusion"",
+            ""is_valid"": true,
+            ""error"": null
+        }";
+
+        // Act
+        var result = JsonUtil.ParseTreeOfThoughtsResponse(json);
+
+        // Assert
+        Assert.AreEqual("Test thought", result.Thought);
+        Assert.AreEqual("evaluation", result.ThoughtType);
+        Assert.AreEqual(0.9, result.Score);
+        Assert.IsNotNull(result.Children);
+        Assert.AreEqual(2, result.Children.Count);
+        Assert.AreEqual("Tree reasoning", result.Reasoning);
+        Assert.AreEqual(1, result.Insights?.Count);
+        Assert.AreEqual("tree insight", result.Insights?[0]);
+        Assert.AreEqual("Tree conclusion", result.Conclusion);
+        Assert.IsTrue(result.IsValid);
+        Assert.IsNull(result.Error);
+    }
+
+    [TestMethod]
+    public void ParseTreeOfThoughtsResponse_Should_HandleMissingFields_When_OptionalFieldsNotPresent()
+    {
+        // Arrange
+        var json = @"{
+            ""thought"": ""Test thought""
+        }";
+
+        // Act
+        var result = JsonUtil.ParseTreeOfThoughtsResponse(json);
+
+        // Assert
+        Assert.AreEqual("Test thought", result.Thought);
+        Assert.IsNull(result.ThoughtType);
+        Assert.IsNull(result.Score);
+        Assert.IsNull(result.Children);
+        Assert.IsNull(result.Reasoning);
+        Assert.IsNull(result.Insights);
+        Assert.IsNull(result.Conclusion);
+        Assert.IsNull(result.IsValid);
+        Assert.IsNull(result.Error);
+    }
+
+    [TestMethod]
+    public void ParseTreeOfThoughtsResponse_Should_HandleEmptyChildren_When_ChildrenIsEmpty()
+    {
+        // Arrange
+        var json = @"{
+            ""thought"": ""Test thought"",
+            ""children"": []
+        }";
+
+        // Act
+        var result = JsonUtil.ParseTreeOfThoughtsResponse(json);
+
+        // Assert
+        Assert.AreEqual("Test thought", result.Thought);
+        Assert.IsNotNull(result.Children);
+        Assert.AreEqual(0, result.Children.Count);
+    }
+
+    [TestMethod]
+    public void ParseTreeOfThoughtsResponse_Should_FilterNullInsights_When_InsightsContainsNullValues()
+    {
+        // Arrange
+        var json = @"{
+            ""thought"": ""Test thought"",
+            ""insights"": [""valid"", null, """", ""also valid""]
+        }";
+
+        // Act
+        var result = JsonUtil.ParseTreeOfThoughtsResponse(json);
+
+        // Assert
+        Assert.AreEqual("Test thought", result.Thought);
+        Assert.IsNotNull(result.Insights);
+        Assert.AreEqual(2, result.Insights.Count);
+        Assert.AreEqual("valid", result.Insights[0]);
+        Assert.AreEqual("also valid", result.Insights[1]);
+    }
+
+    [TestMethod]
+    public void ParseTreeOfThoughtsResponse_Should_HandleNonNumericScore_When_ScoreIsNotNumber()
+    {
+        // Arrange
+        var json = @"{
+            ""thought"": ""Test thought"",
+            ""score"": ""not a number""
+        }";
+
+        // Act
+        var result = JsonUtil.ParseTreeOfThoughtsResponse(json);
+
+        // Assert
+        Assert.AreEqual("Test thought", result.Thought);
+        Assert.IsNull(result.Score);
+    }
+
+    [TestMethod]
+    public void ParseTreeOfThoughtsResponse_Should_HandleNonArrayChildren_When_ChildrenIsNotArray()
+    {
+        // Arrange
+        var json = @"{
+            ""thought"": ""Test thought"",
+            ""children"": ""not an array""
+        }";
+
+        // Act
+        var result = JsonUtil.ParseTreeOfThoughtsResponse(json);
+
+        // Assert
+        Assert.AreEqual("Test thought", result.Thought);
+        Assert.IsNull(result.Children);
+    }
+
+    [TestMethod]
+    public void ParseTreeOfThoughtsResponse_Should_HandleNonArrayInsights_When_InsightsIsNotArray()
+    {
+        // Arrange
+        var json = @"{
+            ""thought"": ""Test thought"",
+            ""insights"": ""not an array""
+        }";
+
+        // Act
+        var result = JsonUtil.ParseTreeOfThoughtsResponse(json);
+
+        // Assert
+        Assert.AreEqual("Test thought", result.Thought);
+        Assert.IsNull(result.Insights);
+    }
+
+    [TestMethod]
+    public void ParseChainOfThoughtResponse_Should_HandleMalformedJson_When_JsonNeedsCleaning()
+    {
+        // Arrange
+        var json = @"```json
+        {
+            ""reasoning"": ""Test reasoning"",
+            ""confidence"": 0.8
+        }
+        ```";
+
+        // Act
+        var result = JsonUtil.ParseChainOfThoughtResponse(json);
+
+        // Assert
+        Assert.AreEqual("Test reasoning", result.Reasoning);
+        Assert.AreEqual(0.8, result.ReasoningConfidence);
+    }
+
+    [TestMethod]
+    public void ParseTreeOfThoughtsResponse_Should_HandleMalformedJson_When_JsonNeedsCleaning()
+    {
+        // Arrange
+        var json = @"```json
+        {
+            ""thought"": ""Test thought"",
+            ""score"": 0.9
+        }
+        ```";
+
+        // Act
+        var result = JsonUtil.ParseTreeOfThoughtsResponse(json);
+
+        // Assert
+        Assert.AreEqual("Test thought", result.Thought);
+        Assert.AreEqual(0.9, result.Score);
+    }
+
+    [TestMethod]
+    public void JsonOptions_Should_BeConfiguredCorrectly_When_Accessed()
+    {
+        // Act
+        var options = JsonUtil.JsonOptions;
+
+        // Assert
+        Assert.IsNotNull(options);
+        Assert.IsNotNull(options.PropertyNamingPolicy);
+        Assert.AreEqual(JsonCommentHandling.Skip, options.ReadCommentHandling);
+        Assert.IsFalse(options.AllowTrailingCommas);
+        Assert.IsFalse(options.WriteIndented);
+        Assert.AreEqual(JsonIgnoreCondition.Never, options.DefaultIgnoreCondition);
+        Assert.IsTrue(options.Converters.Count > 0);
     }
 }
