@@ -11,15 +11,15 @@ internal class Program
     private static async Task Main(string[] args)
     {
         // Get OpenAI API key from environment variable
-        var apiKey = Environment.GetEnvironmentVariable("LLM_API_KEY") ?? throw new InvalidOperationException("Set OPENAI_API_KEY env var.");
+        var apiKey = Environment.GetEnvironmentVariable("LLM_API_KEY") ?? throw new InvalidOperationException("Set LLM_API_KEY env var.");
 
         Console.WriteLine("---------------------------- RE/ACT EXAMPLE --------------------------");
         await ReactExample.RunAsync(apiKey);
 
-        //  Console.WriteLine("---------------------------- CHAIN OF THOUGHTS EXAMPLE --------------------------");
+        Console.WriteLine("---------------------------- CHAIN OF THOUGHTS EXAMPLE --------------------------");
         await ChainOfThoughExample.RunAsync(apiKey);
 
-        // Console.WriteLine("---------------------------- TREE OF THOUGHTS EXAMPLE --------------------------");
+        Console.WriteLine("---------------------------- TREE OF THOUGHTS EXAMPLE --------------------------");
         await TreeOfThoughsExample.RunAsync(apiKey);
 
         Console.WriteLine("---------------------------- SIMPLE STREAMING TEST --------------------------");

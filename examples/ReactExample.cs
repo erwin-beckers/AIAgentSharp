@@ -2,6 +2,7 @@
 using AIAgentSharp.Agents;
 using AIAgentSharp.Anthropic;
 using AIAgentSharp.Examples;
+using AIAgentSharp.Fluent;
 using AIAgentSharp.Gemini;
 using AIAgentSharp.Mistral;
 using AIAgentSharp.OpenAI;
@@ -12,11 +13,8 @@ internal class ReactExample
 {
     public static async Task RunAsync(string apiKey)
     {
-        // Create the appropriate state store
-        IAgentStateStore store = new MemoryAgentStateStore();
-
         // Create LLM client and travel planning tools
-        // var llm = new AnthropicLlmClient(apiKey); // For Anthrophic
+        // var llm = new AnthropicLlmClient(apiKey); // For Anthropic
         // var llm = new GeminiLlmClient(apiKey); // For Google Gemini
         // var llm = new MistralLlmClient(apiKey); // for Mistral
         var llm = new OpenAiLlmClient(apiKey);
@@ -28,22 +26,19 @@ internal class ReactExample
             new CalculateTripCostTool()
         };
 
-        // Configure the agent
-        var config = new AgentConfiguration
-        {
-            MaxTurns = 40,
-            UseFunctionCalling = false,
-            EmitPublicStatus = true // Enable public status updates
-        };
-        var agent = new Agent(llm, store, config: config);
-
-        // Subscribe to events for real-time monitoring
-        agent.RunStarted += (sender, e) => Console.WriteLine($"[EVENT] Run started for {e.AgentId} with goal: {e.Goal}");
-        agent.StepStarted += (sender, e) => Console.WriteLine($"[EVENT] Step {e.TurnIndex + 1} started for {e.AgentId}");
-        agent.LlmCallStarted += (sender, e) => Console.WriteLine($"[EVENT] LLM call started for {e.AgentId} turn {e.TurnIndex + 1}");
-        agent.ToolCallStarted += (sender, e) => Console.WriteLine($"[EVENT] Tool call started: {e.ToolName} for {e.AgentId} turn {e.TurnIndex + 1}");
-        agent.StepCompleted += (sender, e) => Console.WriteLine($"[EVENT] Step {e.TurnIndex + 1} completed for {e.AgentId} - Continue: {e.Continue}, Tool: {e.ExecutedTool}");
-        agent.RunCompleted += (sender, e) => Console.WriteLine($"[EVENT] Run completed for {e.AgentId} - Success: {e.Succeeded}, Turns: {e.TotalTurns}");
+        // Configure the agent using the fluent API
+        var agent = AIAgent.Create(llm)
+            .WithTools(tools)
+            .WithStorage(new MemoryAgentStateStore())
+            .WithEventHandling(events => events
+                .OnRunStarted(e => Console.WriteLine($"[EVENT] Run started for {e.AgentId} with goal: {e.Goal}"))
+                .OnStepStarted(e => Console.WriteLine($"[EVENT] Step {e.TurnIndex + 1} started for {e.AgentId}"))
+                .OnLlmCallStarted(e => Console.WriteLine($"[EVENT] LLM call started for {e.AgentId} turn {e.TurnIndex + 1}"))
+                .OnToolCallStarted(e => Console.WriteLine($"[EVENT] Tool call started: {e.ToolName} for {e.AgentId} turn {e.TurnIndex + 1}"))
+                .OnStepCompleted(e => Console.WriteLine($"[EVENT] Step {e.TurnIndex + 1} completed for {e.AgentId} - Continue: {e.Continue}, Tool: {e.ExecutedTool}"))
+                .OnRunCompleted(e => Console.WriteLine($"[EVENT] Run completed for {e.AgentId} - Success: {e.Succeeded}, Turns: {e.TotalTurns}"))
+            )
+            .Build();
 
         // Subscribe to public status updates
         agent.StatusUpdate += (sender, e) =>

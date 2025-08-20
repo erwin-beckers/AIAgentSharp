@@ -7,6 +7,7 @@ Welcome to the comprehensive documentation for AIAgentSharp, a production-ready 
 ### Getting Started
 - [Installation Guide](docs/installation.md) - How to install and set up AIAgentSharp
 - [Quick Start Guide](docs/quick-start.md) - Get up and running in minutes
+- [Fluent API Guide](docs/fluent-api.md) - **NEW!** Intuitive, chainable agent configuration
 - [Basic Concepts](docs/concepts.md) - Core concepts and terminology
 
 ### Core Components
@@ -57,16 +58,41 @@ Welcome to the comprehensive documentation for AIAgentSharp, a production-ready 
 ## Quick Navigation
 
 ### For New Users
-Start with [Installation Guide](docs/installation.md) → [Quick Start Guide](docs/quick-start.md) → [Basic Concepts](docs/concepts.md)
+Start with [Installation Guide](docs/installation.md) → [Quick Start Guide](docs/quick-start.md) → [Fluent API Guide](docs/fluent-api.md)
 
 ### For Developers
-Jump to [Agent Framework](docs/agent-framework.md) → [Tool Framework](docs/tool-framework.md) → [Examples](docs/examples/)
+Jump to [Fluent API Guide](docs/fluent-api.md) → [Agent Framework](docs/agent-framework.md) → [Tool Framework](docs/tool-framework.md)
 
 ### For Advanced Users
 Explore [Reasoning Engines](docs/reasoning-engines.md) → [Event System](docs/event-system.md) → [Best Practices](docs/best-practices/)
 
 ### For Contributors
 See [Development Setup](docs/contributing/development-setup.md) → [Code Style Guide](docs/contributing/code-style.md) → [Testing Guidelines](docs/contributing/testing-guidelines.md)
+
+---
+
+## 🎯 **NEW: Fluent API**
+
+AIAgentSharp now features a **fluent API** for intuitive, chainable agent configuration:
+
+```csharp
+using AIAgentSharp.Fluent;
+using AIAgentSharp.OpenAI;
+
+var agent = AIAgent.Create(new OpenAiLlmClient(apiKey))
+    .WithTools(new CalculatorTool(), new WeatherTool())
+    .WithReasoning(ReasoningType.ChainOfThought)
+    .WithStorage(new MemoryAgentStateStore())
+    .Build();
+```
+
+**Benefits:**
+- ✅ **More readable and intuitive** - Clear method chaining
+- ✅ **Better discoverability** - See available options in IntelliSense
+- ✅ **Type-safe configuration** - Compile-time checking
+- ✅ **Follows modern .NET patterns** - Like `IHostBuilder`, `IServiceCollection`
+
+📖 **[Read the Fluent API Guide](docs/fluent-api.md)** for complete documentation and examples.
 
 ---
 

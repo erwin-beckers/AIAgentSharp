@@ -2,6 +2,7 @@ using AIAgentSharp;
 using AIAgentSharp.Agents;
 using AIAgentSharp.Agents.Interfaces;
 using AIAgentSharp.Examples;
+using AIAgentSharp.Fluent;
 using AIAgentSharp.OpenAI;
 
 namespace example;
@@ -19,9 +20,6 @@ public class ChainOfThoughExample
         // Create LLM client
         var llm = new OpenAiLlmClient(apiKey);
 
-        // Create state store
-        var store = new MemoryAgentStateStore();
-
         // Create tools
         var tools = new List<ITool>
         {
@@ -32,35 +30,30 @@ public class ChainOfThoughExample
         };
 
         // Example 1: Chain of Thought Reasoning
-        await DemonstrateChainOfThoughtReasoning(llm, store, tools);
+        await DemonstrateChainOfThoughtReasoning(llm, tools);
     }
 
-    private static async Task DemonstrateChainOfThoughtReasoning(ILlmClient llm, IAgentStateStore store, List<ITool> tools)
+    private static async Task DemonstrateChainOfThoughtReasoning(ILlmClient llm, List<ITool> tools)
     {
         Console.WriteLine("🔗 Chain of Thought (CoT) Reasoning Example");
         Console.WriteLine("This demonstrates step-by-step reasoning for complex problem solving.\n");
 
-        var config = new AgentConfiguration
-        {
-            ReasoningType = ReasoningType.ChainOfThought,
-            MaxReasoningSteps = 8,
-            EnableReasoningValidation = true,
-            MinReasoningConfidence = 0.7,
-            MaxTurns = 20,
-            UseFunctionCalling = true,
-            EmitPublicStatus = true
-        };
-
-        var agent = new Agent(llm, store, config: config);
-
-        // Subscribe to events for monitoring
-        agent.StatusUpdate += (sender, e) =>
-        {
-            if (e.StatusTitle?.Contains("reasoning", StringComparison.OrdinalIgnoreCase) == true)
-            {
-                Console.WriteLine($"🤔 {e.StatusTitle}: {e.StatusDetails}");
-            }
-        };
+        // Configure the agent using the fluent API
+        var agent = AIAgent.Create(llm)
+            .WithTools(tools)
+            .WithStorage(new MemoryAgentStateStore())
+            .WithReasoning(ReasoningType.ChainOfThought, options => options
+                .SetMaxDepth(8)
+            )
+            .WithEventHandling(events => events
+                .OnRunStarted(e => Console.WriteLine($"[EVENT] Run started for {e.AgentId} with goal: {e.Goal}"))
+                .OnStepStarted(e => Console.WriteLine($"[EVENT] Step {e.TurnIndex + 1} started for {e.AgentId}"))
+                .OnLlmCallStarted(e => Console.WriteLine($"[EVENT] LLM call started for {e.AgentId} turn {e.TurnIndex + 1}"))
+                .OnToolCallStarted(e => Console.WriteLine($"[EVENT] Tool call started: {e.ToolName} for {e.AgentId} turn {e.TurnIndex + 1}"))
+                .OnStepCompleted(e => Console.WriteLine($"[EVENT] Step {e.TurnIndex + 1} completed for {e.AgentId} - Continue: {e.Continue}, Tool: {e.ExecutedTool}"))
+                .OnRunCompleted(e => Console.WriteLine($"[EVENT] Run completed for {e.AgentId} - Success: {e.Succeeded}, Turns: {e.TotalTurns}"))
+            )
+            .Build();
 
         var goal = @"Plan a complex 5-day business trip to Tokyo for a team of 3 people with the following requirements:
 - Budget: $8000 total

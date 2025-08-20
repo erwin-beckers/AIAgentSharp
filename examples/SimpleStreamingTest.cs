@@ -1,5 +1,6 @@
 using AIAgentSharp;
 using AIAgentSharp.Agents;
+using AIAgentSharp.Fluent;
 using AIAgentSharp.OpenAI;
 
 namespace example;
@@ -13,20 +14,19 @@ internal class SimpleStreamingTest
         Console.WriteLine("Streaming example");
         Console.WriteLine("----------------------------------------------");
         
-        var store = new MemoryAgentStateStore();
-        var config = new AgentConfiguration
-        {
-            MaxTurns = 2,
-            UseFunctionCalling = false, // This should enable streaming
-            EmitPublicStatus = true
-        };
-        
-        var agent = new Agent(llm, store, config: config);
+        // Configure the agent using the fluent API
+        var agent = AIAgent.Create(llm)
+            .WithStorage(new MemoryAgentStateStore())
+            .WithEventHandling(events => events
+                .OnRunStarted(e => Console.WriteLine($"[EVENT] Run started for {e.AgentId} with goal: {e.Goal}"))
+                .OnStepStarted(e => Console.WriteLine($"[EVENT] Step {e.TurnIndex + 1} started for {e.AgentId}"))
+                .OnLlmCallStarted(e => Console.WriteLine($"[EVENT] LLM call started for {e.AgentId} turn {e.TurnIndex + 1}"))
+                .OnToolCallStarted(e => Console.WriteLine($"[EVENT] Tool call started: {e.ToolName} for {e.AgentId} turn {e.TurnIndex + 1}"))
+                .OnStepCompleted(e => Console.WriteLine($"[EVENT] Step {e.TurnIndex + 1} completed for {e.AgentId} - Continue: {e.Continue}, Tool: {e.ExecutedTool}"))
+                .OnRunCompleted(e => Console.WriteLine($"[EVENT] Run completed for {e.AgentId} - Success: {e.Succeeded}, Turns: {e.TotalTurns}"))
+            )
+            .Build();
 
-        // Subscribe to events to see streaming
-        agent.LlmCallStarted += (sender, e) => Console.WriteLine($"[EVENT] LLM call started for turn {e.TurnIndex + 1}");
-        agent.LlmCallCompleted += (sender, e) => Console.WriteLine($"[EVENT] LLM call completed for turn {e.TurnIndex + 1}");
-        
         // Subscribe to streaming chunks for real-time display
         agent.LlmChunkReceived += (sender, e) =>
         {

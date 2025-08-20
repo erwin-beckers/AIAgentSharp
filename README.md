@@ -19,6 +19,7 @@ A comprehensive, production-ready .NET 8.0 framework for building LLM-powered ag
 - **⚡ Performance Optimized**: Efficient token management and prompt optimization
 - **🔒 Production Ready**: Thread-safe implementations with comprehensive error handling
 - **🧪 Well Tested**: Comprehensive test suite with 600+ tests
+- **🎯 Fluent API**: Intuitive, chainable configuration for easy agent setup
 
 ## 📦 Installation
 
@@ -48,21 +49,20 @@ A comprehensive, production-ready .NET 8.0 framework for building LLM-powered ag
 2. **Set your API key**:
    ```bash
    # Windows
-   set OPENAI_API_KEY=your-api-key-here
+   set LLM_API_KEY=your-api-key-here
    
    # Linux/macOS
-   export OPENAI_API_KEY=your-api-key-here
+   export LLM_API_KEY=your-api-key-here
    ```
 
-3. **Create a basic agent**:
+3. **Create a basic agent with the fluent API**:
    ```csharp
-   using AIAgentSharp.Agents;
-   using AIAgentSharp.StateStores;
+   using AIAgentSharp.Fluent;
    using AIAgentSharp.OpenAI;
 
-   var llm = new OpenAiLlmClient(Environment.GetEnvironmentVariable("OPENAI_API_KEY")!);
-   var store = new MemoryAgentStateStore();
-   var agent = new Agent(llm, store);
+   var agent = AIAgent.Create(new OpenAiLlmClient(Environment.GetEnvironmentVariable("LLM_API_KEY")!))
+       .WithStorage(new MemoryAgentStateStore())
+       .Build();
    
    var result = await agent.RunAsync("my-agent", "Hello, how are you?", new List<ITool>());
    Console.WriteLine(result.FinalOutput);
@@ -70,7 +70,56 @@ A comprehensive, production-ready .NET 8.0 framework for building LLM-powered ag
 
 ## 🚀 Usage
 
-### Basic Agent
+### Fluent API (Recommended)
+
+The fluent API provides an intuitive, chainable way to configure agents:
+
+```csharp
+using AIAgentSharp.Fluent;
+using AIAgentSharp.OpenAI;
+
+// Simple agent
+var simpleAgent = AIAgent.Create(new OpenAiLlmClient(apiKey))
+    .WithTools(new CalculatorTool(), new WeatherTool())
+    .WithReasoning(ReasoningType.ChainOfThought)
+    .WithStorage(new MemoryAgentStateStore())
+    .Build();
+
+// Advanced agent with detailed configuration
+var advancedAgent = AIAgent.Create(new OpenAiLlmClient(apiKey))
+    .WithTools(tools => tools
+        .Add(new CalculatorTool())
+        .Add(new WeatherTool())
+        .Add(new DatabaseTool())
+    )
+    .WithReasoning(ReasoningType.TreeOfThoughts, options => options
+        .SetExplorationStrategy(ExplorationStrategy.BestFirst)
+        .SetMaxDepth(5)
+    )
+    .WithStorage(new FileAgentStateStore("agent-state.json"))
+    .WithMetrics(new CustomMetricsCollector())
+    .Build();
+
+// Create an agent with fluent API
+var agent = AIAgent.Create(new OpenAiLlmClient(apiKey))
+    .WithTools(new CalculatorTool(), new WeatherTool())
+    .WithReasoning(ReasoningType.ChainOfThought)
+    .WithStorage(new MemoryAgentStateStore())
+    .WithEventHandling(events => events
+        .OnRunStarted(e => Console.WriteLine($"🚀 Started: {e.AgentId}"))
+        .OnStepCompleted(e => Console.WriteLine($"✅ Step {e.TurnIndex + 1} done"))
+        .OnToolCallStarted(e => Console.WriteLine($"🔧 Tool: {e.ToolName}"))
+        .OnRunCompleted(e => Console.WriteLine($"🏁 Completed: {e.Succeeded}"))
+    )
+    .Build();
+
+// Run the agent
+var result = await agent.RunAsync("my-agent", "Calculate 15 * 23", agent.Tools);
+Console.WriteLine($"Success: {result.Succeeded}");
+Console.WriteLine($"Output: {result.FinalOutput}");
+```
+
+### Traditional API
 
 ```csharp
 using AIAgentSharp.Agents;

@@ -1,0 +1,426 @@
+using AIAgentSharp.Agents;
+using AIAgentSharp.Agents.Interfaces;
+using AIAgentSharp;
+using AIAgentSharp.Metrics;
+
+namespace AIAgentSharp.Fluent;
+
+/// <summary>
+/// Fluent API builder for creating AIAgent instances with a more intuitive configuration approach.
+/// </summary>
+public class AIAgentBuilder
+{
+    private ILlmClient? _llmClient;
+    private readonly List<ITool> _tools = new();
+    private ReasoningType _reasoningType = ReasoningType.None;
+    private ExplorationStrategy _explorationStrategy = ExplorationStrategy.DepthFirst;
+    private int _maxDepth = 3;
+    private IAgentStateStore? _stateStore;
+    private IMetricsCollector? _metricsCollector;
+    private readonly List<Action<AgentStepCompletedEventArgs>> _stepCompletedHandlers = new();
+    private readonly List<Action<AgentToolCallStartedEventArgs>> _toolCallStartedHandlers = new();
+    private readonly List<Action<AgentToolCallCompletedEventArgs>> _toolCallCompletedHandlers = new();
+    private readonly List<Action<AgentLlmCallStartedEventArgs>> _llmCallStartedHandlers = new();
+    private readonly List<Action<AgentLlmCallCompletedEventArgs>> _llmCallCompletedHandlers = new();
+    private readonly List<Action<AgentRunStartedEventArgs>> _runStartedHandlers = new();
+    private readonly List<Action<AgentRunCompletedEventArgs>> _runCompletedHandlers = new();
+    private readonly List<Action<AgentStepStartedEventArgs>> _stepStartedHandlers = new();
+    private readonly List<Action<AgentStatusEventArgs>> _statusUpdateHandlers = new();
+
+    /// <summary>
+    /// Sets the LLM client for the agent.
+    /// </summary>
+    /// <param name="llmClient">The LLM client to use</param>
+    /// <returns>The builder instance for method chaining</returns>
+    public AIAgentBuilder WithLlm(ILlmClient llmClient)
+    {
+        _llmClient = llmClient ?? throw new ArgumentNullException(nameof(llmClient));
+        return this;
+    }
+
+    /// <summary>
+    /// Adds a single tool to the agent.
+    /// </summary>
+    /// <param name="tool">The tool to add</param>
+    /// <returns>The builder instance for method chaining</returns>
+    public AIAgentBuilder WithTool(ITool tool)
+    {
+        if (tool != null)
+            _tools.Add(tool);
+        return this;
+    }
+
+    /// <summary>
+    /// Adds multiple tools to the agent.
+    /// </summary>
+    /// <param name="tools">The tools to add</param>
+    /// <returns>The builder instance for method chaining</returns>
+    public AIAgentBuilder WithTools(params ITool[] tools)
+    {
+        if (tools != null)
+            _tools.AddRange(tools.Where(t => t != null));
+        return this;
+    }
+
+    /// <summary>
+    /// Adds multiple tools to the agent.
+    /// </summary>
+    /// <param name="tools">The tools to add</param>
+    /// <returns>The builder instance for method chaining</returns>
+    public AIAgentBuilder WithTools(IEnumerable<ITool> tools)
+    {
+        if (tools != null)
+            _tools.AddRange(tools.Where(t => t != null));
+        return this;
+    }
+
+    /// <summary>
+    /// Configures tools using a fluent action.
+    /// </summary>
+    /// <param name="configureTools">Action to configure tools</param>
+    /// <returns>The builder instance for method chaining</returns>
+    public AIAgentBuilder WithTools(Action<ToolCollectionBuilder> configureTools)
+    {
+        var toolBuilder = new ToolCollectionBuilder();
+        configureTools(toolBuilder);
+        _tools.AddRange(toolBuilder.Tools);
+        return this;
+    }
+
+    /// <summary>
+    /// Sets the reasoning type for the agent.
+    /// </summary>
+    /// <param name="reasoningType">The reasoning type to use</param>
+    /// <returns>The builder instance for method chaining</returns>
+    public AIAgentBuilder WithReasoning(ReasoningType reasoningType)
+    {
+        _reasoningType = reasoningType;
+        return this;
+    }
+
+    /// <summary>
+    /// Sets the reasoning type with advanced configuration options.
+    /// </summary>
+    /// <param name="reasoningType">The reasoning type to use</param>
+    /// <param name="configureOptions">Action to configure reasoning options</param>
+    /// <returns>The builder instance for method chaining</returns>
+    public AIAgentBuilder WithReasoning(ReasoningType reasoningType, Action<ReasoningOptionsBuilder> configureOptions)
+    {
+        _reasoningType = reasoningType;
+        
+        var optionsBuilder = new ReasoningOptionsBuilder();
+        configureOptions(optionsBuilder);
+        
+        _explorationStrategy = optionsBuilder.ExplorationStrategy;
+        _maxDepth = optionsBuilder.MaxDepth;
+        
+        return this;
+    }
+
+    /// <summary>
+    /// Sets the state store for the agent.
+    /// </summary>
+    /// <param name="stateStore">The state store to use</param>
+    /// <returns>The builder instance for method chaining</returns>
+    public AIAgentBuilder WithStorage(IAgentStateStore stateStore)
+    {
+        _stateStore = stateStore ?? throw new ArgumentNullException(nameof(stateStore));
+        return this;
+    }
+
+    /// <summary>
+    /// Sets the metrics collector for the agent.
+    /// </summary>
+    /// <param name="metricsCollector">The metrics collector to use</param>
+    /// <returns>The builder instance for method chaining</returns>
+    public AIAgentBuilder WithMetrics(IMetricsCollector metricsCollector)
+    {
+        _metricsCollector = metricsCollector ?? throw new ArgumentNullException(nameof(metricsCollector));
+        return this;
+    }
+
+    /// <summary>
+    /// Configures event handling for the agent.
+    /// </summary>
+    /// <param name="configureEvents">Action to configure event handlers</param>
+    /// <returns>The builder instance for method chaining</returns>
+    public AIAgentBuilder WithEventHandling(Action<EventHandlingBuilder> configureEvents)
+    {
+        var eventBuilder = new EventHandlingBuilder();
+        configureEvents(eventBuilder);
+        
+        _stepCompletedHandlers.AddRange(eventBuilder.StepCompletedHandlers);
+        _toolCallStartedHandlers.AddRange(eventBuilder.ToolCallStartedHandlers);
+        _toolCallCompletedHandlers.AddRange(eventBuilder.ToolCallCompletedHandlers);
+        _llmCallStartedHandlers.AddRange(eventBuilder.LlmCallStartedHandlers);
+        _llmCallCompletedHandlers.AddRange(eventBuilder.LlmCallCompletedHandlers);
+        _runStartedHandlers.AddRange(eventBuilder.RunStartedHandlers);
+        _runCompletedHandlers.AddRange(eventBuilder.RunCompletedHandlers);
+        _stepStartedHandlers.AddRange(eventBuilder.StepStartedHandlers);
+        _statusUpdateHandlers.AddRange(eventBuilder.StatusUpdateHandlers);
+        
+        return this;
+    }
+
+    /// <summary>
+    /// Gets the tools configured for this agent.
+    /// </summary>
+    public IEnumerable<ITool> Tools => _tools.AsReadOnly();
+
+    /// <summary>
+    /// Builds and returns the configured Agent instance.
+    /// </summary>
+    /// <returns>The configured Agent instance</returns>
+    /// <exception cref="InvalidOperationException">Thrown when required components are not configured</exception>
+    public Agents.Agent Build()
+    {
+        if (_llmClient == null)
+            throw new InvalidOperationException("LLM client must be configured using WithLlm()");
+
+        // Create configuration
+        var configuration = new AgentConfiguration
+        {
+            ReasoningType = _reasoningType,
+            TreeExplorationStrategy = _explorationStrategy,
+            MaxTreeDepth = _maxDepth
+        };
+
+        // Create agent
+        var agent = new Agents.Agent(_llmClient, _stateStore ?? new MemoryAgentStateStore(), null, configuration, _metricsCollector);
+
+        // Wire up event handlers
+        foreach (var handler in _stepCompletedHandlers)
+        {
+            agent.StepCompleted += (sender, e) => handler(e);
+        }
+        
+        foreach (var handler in _toolCallStartedHandlers)
+        {
+            agent.ToolCallStarted += (sender, e) => handler(e);
+        }
+        
+        foreach (var handler in _toolCallCompletedHandlers)
+        {
+            agent.ToolCallCompleted += (sender, e) => handler(e);
+        }
+        
+        foreach (var handler in _llmCallStartedHandlers)
+        {
+            agent.LlmCallStarted += (sender, e) => handler(e);
+        }
+        
+        foreach (var handler in _llmCallCompletedHandlers)
+        {
+            agent.LlmCallCompleted += (sender, e) => handler(e);
+        }
+        
+        foreach (var handler in _runStartedHandlers)
+        {
+            agent.RunStarted += (sender, e) => handler(e);
+        }
+        
+        foreach (var handler in _runCompletedHandlers)
+        {
+            agent.RunCompleted += (sender, e) => handler(e);
+        }
+        
+        foreach (var handler in _stepStartedHandlers)
+        {
+            agent.StepStarted += (sender, e) => handler(e);
+        }
+        
+        foreach (var handler in _statusUpdateHandlers)
+        {
+            agent.StatusUpdate += (sender, e) => handler(e);
+        }
+
+        return agent;
+    }
+}
+
+/// <summary>
+/// Builder for configuring tool collections.
+/// </summary>
+public class ToolCollectionBuilder
+{
+    public List<ITool> Tools { get; } = new();
+
+    /// <summary>
+    /// Adds a tool to the collection.
+    /// </summary>
+    /// <param name="tool">The tool to add</param>
+    /// <returns>The builder instance for method chaining</returns>
+    public ToolCollectionBuilder Add(ITool tool)
+    {
+        if (tool != null)
+            Tools.Add(tool);
+        return this;
+    }
+
+    /// <summary>
+    /// Adds multiple tools to the collection.
+    /// </summary>
+    /// <param name="tools">The tools to add</param>
+    /// <returns>The builder instance for method chaining</returns>
+    public ToolCollectionBuilder Add(params ITool[] tools)
+    {
+        if (tools != null)
+            Tools.AddRange(tools.Where(t => t != null));
+        return this;
+    }
+}
+
+/// <summary>
+/// Builder for configuring reasoning options.
+/// </summary>
+public class ReasoningOptionsBuilder
+{
+    public ExplorationStrategy ExplorationStrategy { get; set; } = ExplorationStrategy.DepthFirst;
+    public int MaxDepth { get; set; } = 3;
+
+    /// <summary>
+    /// Sets the exploration strategy.
+    /// </summary>
+    /// <param name="strategy">The exploration strategy to use</param>
+    /// <returns>The builder instance for method chaining</returns>
+    public ReasoningOptionsBuilder SetExplorationStrategy(ExplorationStrategy strategy)
+    {
+        ExplorationStrategy = strategy;
+        return this;
+    }
+
+    /// <summary>
+    /// Sets the maximum depth for reasoning.
+    /// </summary>
+    /// <param name="maxDepth">The maximum depth</param>
+    /// <returns>The builder instance for method chaining</returns>
+    public ReasoningOptionsBuilder SetMaxDepth(int maxDepth)
+    {
+        MaxDepth = maxDepth;
+        return this;
+    }
+}
+
+/// <summary>
+/// Builder for configuring event handling.
+/// </summary>
+public class EventHandlingBuilder
+{
+    public List<Action<AgentStepCompletedEventArgs>> StepCompletedHandlers { get; } = new();
+    public List<Action<AgentToolCallStartedEventArgs>> ToolCallStartedHandlers { get; } = new();
+    public List<Action<AgentToolCallCompletedEventArgs>> ToolCallCompletedHandlers { get; } = new();
+    public List<Action<AgentLlmCallStartedEventArgs>> LlmCallStartedHandlers { get; } = new();
+    public List<Action<AgentLlmCallCompletedEventArgs>> LlmCallCompletedHandlers { get; } = new();
+    public List<Action<AgentRunStartedEventArgs>> RunStartedHandlers { get; } = new();
+    public List<Action<AgentRunCompletedEventArgs>> RunCompletedHandlers { get; } = new();
+    public List<Action<AgentStepStartedEventArgs>> StepStartedHandlers { get; } = new();
+    public List<Action<AgentStatusEventArgs>> StatusUpdateHandlers { get; } = new();
+
+    /// <summary>
+    /// Adds a handler for step completed events.
+    /// </summary>
+    /// <param name="handler">The event handler</param>
+    /// <returns>The builder instance for method chaining</returns>
+    public EventHandlingBuilder OnStepCompleted(Action<AgentStepCompletedEventArgs> handler)
+    {
+        if (handler != null)
+            StepCompletedHandlers.Add(handler);
+        return this;
+    }
+
+    /// <summary>
+    /// Adds a handler for tool call started events.
+    /// </summary>
+    /// <param name="handler">The event handler</param>
+    /// <returns>The builder instance for method chaining</returns>
+    public EventHandlingBuilder OnToolCallStarted(Action<AgentToolCallStartedEventArgs> handler)
+    {
+        if (handler != null)
+            ToolCallStartedHandlers.Add(handler);
+        return this;
+    }
+
+    /// <summary>
+    /// Adds a handler for tool call completed events.
+    /// </summary>
+    /// <param name="handler">The event handler</param>
+    /// <returns>The builder instance for method chaining</returns>
+    public EventHandlingBuilder OnToolCallCompleted(Action<AgentToolCallCompletedEventArgs> handler)
+    {
+        if (handler != null)
+            ToolCallCompletedHandlers.Add(handler);
+        return this;
+    }
+
+    /// <summary>
+    /// Adds a handler for LLM call started events.
+    /// </summary>
+    /// <param name="handler">The event handler</param>
+    /// <returns>The builder instance for method chaining</returns>
+    public EventHandlingBuilder OnLlmCallStarted(Action<AgentLlmCallStartedEventArgs> handler)
+    {
+        if (handler != null)
+            LlmCallStartedHandlers.Add(handler);
+        return this;
+    }
+
+    /// <summary>
+    /// Adds a handler for LLM call completed events.
+    /// </summary>
+    /// <param name="handler">The event handler</param>
+    /// <returns>The builder instance for method chaining</returns>
+    public EventHandlingBuilder OnLlmCallCompleted(Action<AgentLlmCallCompletedEventArgs> handler)
+    {
+        if (handler != null)
+            LlmCallCompletedHandlers.Add(handler);
+        return this;
+    }
+
+    /// <summary>
+    /// Adds a handler for run started events.
+    /// </summary>
+    /// <param name="handler">The event handler</param>
+    /// <returns>The builder instance for method chaining</returns>
+    public EventHandlingBuilder OnRunStarted(Action<AgentRunStartedEventArgs> handler)
+    {
+        if (handler != null)
+            RunStartedHandlers.Add(handler);
+        return this;
+    }
+
+    /// <summary>
+    /// Adds a handler for run completed events.
+    /// </summary>
+    /// <param name="handler">The event handler</param>
+    /// <returns>The builder instance for method chaining</returns>
+    public EventHandlingBuilder OnRunCompleted(Action<AgentRunCompletedEventArgs> handler)
+    {
+        if (handler != null)
+            RunCompletedHandlers.Add(handler);
+        return this;
+    }
+
+    /// <summary>
+    /// Adds a handler for step started events.
+    /// </summary>
+    /// <param name="handler">The event handler</param>
+    /// <returns>The builder instance for method chaining</returns>
+    public EventHandlingBuilder OnStepStarted(Action<AgentStepStartedEventArgs> handler)
+    {
+        if (handler != null)
+            StepStartedHandlers.Add(handler);
+        return this;
+    }
+
+    /// <summary>
+    /// Adds a handler for status update events.
+    /// </summary>
+    /// <param name="handler">The event handler</param>
+    /// <returns>The builder instance for method chaining</returns>
+    public EventHandlingBuilder OnStatusUpdate(Action<AgentStatusEventArgs> handler)
+    {
+        if (handler != null)
+            StatusUpdateHandlers.Add(handler);
+        return this;
+    }
+}
