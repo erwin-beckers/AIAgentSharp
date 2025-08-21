@@ -13,6 +13,20 @@ internal class Program
         // Get OpenAI API key from environment variable
         var apiKey = Environment.GetEnvironmentVariable("LLM_API_KEY") ?? throw new InvalidOperationException("Set LLM_API_KEY env var.");
 
+        Console.WriteLine("---------------------------- SIMPLE STREAMING TEST --------------------------");
+        await SimpleStreamingTest.RunAsync(apiKey);
+
+        Console.WriteLine("---------------------------- RE/ACT EXAMPLE --------------------------");
+        await ReactExample.RunAsync(apiKey);
+
+        Console.WriteLine("---------------------------- CHAIN OF THOUGHTS EXAMPLE --------------------------");
+        await ChainOfThoughExample.RunAsync(apiKey);
+
+        Console.WriteLine("---------------------------- TREE OF THOUGHTS EXAMPLE --------------------------");
+        await TreeOfThoughsExample.RunAsync(apiKey);
+
+        Console.WriteLine("---------------------------- CUSTOM SCHEMA EXAMPLE --------------------------");
+        await CustomSchemaExample.RunAsync(apiKey);
 
         Console.WriteLine("---------------------------- HYBRID REASONING EXAMPLE --------------------------");
         await HybridReasoningExample.RunAsync(apiKey);
