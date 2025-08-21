@@ -46,6 +46,12 @@ public class TreeOfThoughsExample
                 .SetExplorationStrategy(ExplorationStrategy.BestFirst)
                 .SetMaxDepth(3)
             )
+            .WithSystemMessage("You are a strategic marketing expert with expertise in digital marketing, consumer behavior, and brand positioning. Use creative exploration to discover innovative marketing approaches.")
+            .WithUserMessage("When exploring marketing strategies, consider multiple creative angles, evaluate market positioning, and assess competitive advantages. Think outside the box while staying practical.")
+            .WithMessages(messages => messages
+                .AddSystemMessage("Explore diverse marketing channels and approaches. Consider both traditional and emerging marketing tactics.")
+                .AddAssistantMessage("I will explore multiple marketing strategy paths to find the most innovative and effective approach.")
+            )
             .WithEventHandling(events => events
                 .OnRunStarted(e => Console.WriteLine($"Starting: {e.Goal} (Agent: {e.AgentId})"))
                 .OnStepStarted(e => Console.WriteLine($"Step {e.TurnIndex + 1} started (Agent: {e.AgentId})"))

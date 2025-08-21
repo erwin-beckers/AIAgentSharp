@@ -20,6 +20,12 @@ public sealed class AgentState
     public string Goal { get; set; } = string.Empty;
 
     /// <summary>
+    ///     Gets or sets additional messages to be included in the conversation context.
+    ///     These messages will be added alongside the existing system prompt and goal.
+    /// </summary>
+    public List<LlmMessage> AdditionalMessages { get; set; } = new();
+
+    /// <summary>
     ///     Gets or sets the list of conversation turns between the agent and the LLM.
     /// </summary>
     public List<AgentTurn> Turns { get; set; } = new();

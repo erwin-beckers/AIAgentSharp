@@ -28,6 +28,7 @@ public class AIAgentBuilder
     private readonly List<Action<AgentStatusEventArgs>> _statusUpdateHandlers = new();
     private readonly List<Action<AgentLlmChunkReceivedEventArgs>> _llmChunkReceivedHandlers = new();
     private bool _enableStreaming = false;
+    private readonly List<LlmMessage> _additionalMessages = new();
 
     /// <summary>
     /// Sets the LLM client for the agent.
@@ -37,6 +38,89 @@ public class AIAgentBuilder
     public AIAgentBuilder WithLlm(ILlmClient llmClient)
     {
         _llmClient = llmClient ?? throw new ArgumentNullException(nameof(llmClient));
+        return this;
+    }
+
+    /// <summary>
+    /// Adds a custom system message to be included alongside the existing AIAgentSharp system prompt.
+    /// </summary>
+    /// <param name="content">The content of the system message</param>
+    /// <returns>The builder instance for method chaining</returns>
+    public AIAgentBuilder WithSystemMessage(string content)
+    {
+        if (!string.IsNullOrWhiteSpace(content))
+        {
+            _additionalMessages.Add(new LlmMessage { Role = "system", Content = content });
+        }
+        return this;
+    }
+
+    /// <summary>
+    /// Adds a custom user message to be included in the conversation context.
+    /// </summary>
+    /// <param name="content">The content of the user message</param>
+    /// <returns>The builder instance for method chaining</returns>
+    public AIAgentBuilder WithUserMessage(string content)
+    {
+        if (!string.IsNullOrWhiteSpace(content))
+        {
+            _additionalMessages.Add(new LlmMessage { Role = "user", Content = content });
+        }
+        return this;
+    }
+
+    /// <summary>
+    /// Adds a custom assistant message to be included in the conversation context.
+    /// </summary>
+    /// <param name="content">The content of the assistant message</param>
+    /// <returns>The builder instance for method chaining</returns>
+    public AIAgentBuilder WithAssistantMessage(string content)
+    {
+        if (!string.IsNullOrWhiteSpace(content))
+        {
+            _additionalMessages.Add(new LlmMessage { Role = "assistant", Content = content });
+        }
+        return this;
+    }
+
+    /// <summary>
+    /// Adds multiple custom messages to be included in the conversation context.
+    /// </summary>
+    /// <param name="messages">The messages to add</param>
+    /// <returns>The builder instance for method chaining</returns>
+    public AIAgentBuilder WithMessages(params LlmMessage[] messages)
+    {
+        if (messages != null)
+        {
+            _additionalMessages.AddRange(messages.Where(m => m != null && !string.IsNullOrWhiteSpace(m.Content)));
+        }
+        return this;
+    }
+
+    /// <summary>
+    /// Adds multiple custom messages to be included in the conversation context.
+    /// </summary>
+    /// <param name="messages">The messages to add</param>
+    /// <returns>The builder instance for method chaining</returns>
+    public AIAgentBuilder WithMessages(IEnumerable<LlmMessage> messages)
+    {
+        if (messages != null)
+        {
+            _additionalMessages.AddRange(messages.Where(m => m != null && !string.IsNullOrWhiteSpace(m.Content)));
+        }
+        return this;
+    }
+
+    /// <summary>
+    /// Configures additional messages using a fluent action.
+    /// </summary>
+    /// <param name="configureMessages">Action to configure additional messages</param>
+    /// <returns>The builder instance for method chaining</returns>
+    public AIAgentBuilder WithMessages(Action<MessageCollectionBuilder> configureMessages)
+    {
+        var messageBuilder = new MessageCollectionBuilder();
+        configureMessages(messageBuilder);
+        _additionalMessages.AddRange(messageBuilder.Messages);
         return this;
     }
 
@@ -197,7 +281,8 @@ public class AIAgentBuilder
             ReasoningType = _reasoningType,
             TreeExplorationStrategy = _explorationStrategy,
             MaxTreeDepth = _maxDepth,
-            UseFunctionCalling = !_enableStreaming
+            UseFunctionCalling = !_enableStreaming,
+            AdditionalMessages = _additionalMessages
         };
 
         // Create agent
@@ -255,6 +340,85 @@ public class AIAgentBuilder
         }
 
         return agent;
+    }
+}
+
+/// <summary>
+/// Builder for configuring message collections.
+/// </summary>
+public class MessageCollectionBuilder
+{
+    public List<LlmMessage> Messages { get; } = new();
+
+    /// <summary>
+    /// Adds a system message to the collection.
+    /// </summary>
+    /// <param name="content">The content of the system message</param>
+    /// <returns>The builder instance for method chaining</returns>
+    public MessageCollectionBuilder AddSystemMessage(string content)
+    {
+        if (!string.IsNullOrWhiteSpace(content))
+        {
+            Messages.Add(new LlmMessage { Role = "system", Content = content });
+        }
+        return this;
+    }
+
+    /// <summary>
+    /// Adds a user message to the collection.
+    /// </summary>
+    /// <param name="content">The content of the user message</param>
+    /// <returns>The builder instance for method chaining</returns>
+    public MessageCollectionBuilder AddUserMessage(string content)
+    {
+        if (!string.IsNullOrWhiteSpace(content))
+        {
+            Messages.Add(new LlmMessage { Role = "user", Content = content });
+        }
+        return this;
+    }
+
+    /// <summary>
+    /// Adds an assistant message to the collection.
+    /// </summary>
+    /// <param name="content">The content of the assistant message</param>
+    /// <returns>The builder instance for method chaining</returns>
+    public MessageCollectionBuilder AddAssistantMessage(string content)
+    {
+        if (!string.IsNullOrWhiteSpace(content))
+        {
+            Messages.Add(new LlmMessage { Role = "assistant", Content = content });
+        }
+        return this;
+    }
+
+    /// <summary>
+    /// Adds a message to the collection.
+    /// </summary>
+    /// <param name="role">The role of the message (system, user, assistant)</param>
+    /// <param name="content">The content of the message</param>
+    /// <returns>The builder instance for method chaining</returns>
+    public MessageCollectionBuilder AddMessage(string role, string content)
+    {
+        if (!string.IsNullOrWhiteSpace(role) && !string.IsNullOrWhiteSpace(content))
+        {
+            Messages.Add(new LlmMessage { Role = role, Content = content });
+        }
+        return this;
+    }
+
+    /// <summary>
+    /// Adds multiple messages to the collection.
+    /// </summary>
+    /// <param name="messages">The messages to add</param>
+    /// <returns>The builder instance for method chaining</returns>
+    public MessageCollectionBuilder AddMessages(params LlmMessage[] messages)
+    {
+        if (messages != null)
+        {
+            Messages.AddRange(messages.Where(m => m != null && !string.IsNullOrWhiteSpace(m.Content)));
+        }
+        return this;
     }
 }
 

@@ -17,8 +17,19 @@ public sealed class MessageBuilder : IMessageBuilder
 
     public IEnumerable<LlmMessage> BuildMessages(AgentState state, IDictionary<string, ITool> tools)
     {
-        var sys = new LlmMessage { Role = "system", Content = Prompts.LlmSystemPrompt };
+        var messages = new List<LlmMessage>();
 
+        // Add the AIAgentSharp system prompt (always first)
+        var sys = new LlmMessage { Role = "system", Content = Prompts.LlmSystemPrompt };
+        messages.Add(sys);
+
+        // Add additional messages from configuration (if any)
+        if (state.AdditionalMessages != null && state.AdditionalMessages.Count > 0)
+        {
+            messages.AddRange(state.AdditionalMessages);
+        }
+
+        // Build the main content with goal and tools
         var sb = new StringBuilder();
         sb.AppendLine("You will receive your GOAL, TOOL CATALOG, and HISTORY. Respond ONLY with a single JSON object per the MODEL OUTPUT CONTRACT.");
         sb.AppendLine();
@@ -200,7 +211,8 @@ public sealed class MessageBuilder : IMessageBuilder
             "IMPORTANT: Reply with JSON only. No prose or markdown. When a tool call fails, read the validation_error details in HISTORY and immediately retry with corrected parameters. Avoid repeating identical failing calls. You can call multiple tools in sequence using action:\"multi_tool_call\" with a tool_calls array. Use the exact format: {\"tool_calls\": [{\"tool\": \"tool_name\", \"params\": {...}}]}. REMEMBER: Use tool names WITHOUT the \"functions.\" prefix. DO NOT include comments (// or /* */) in the JSON - it must be valid JSON.");
 
         var user = new LlmMessage { Role = "user", Content = sb.ToString() };
-        return new[] { sys, user };
+        messages.Add(user);
+        return messages;
     }
 
     private static string TruncateString(string? input, int maxLength)

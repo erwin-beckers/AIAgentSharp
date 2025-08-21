@@ -373,12 +373,20 @@ public sealed class Agent : IAgent
         {
             AgentId = agentId,
             Goal = goal,
-            Turns = new List<AgentTurn>()
+            Turns = new List<AgentTurn>(),
+            AdditionalMessages = _config.AdditionalMessages ?? new List<LlmMessage>()
         };
         loadStopwatch.Stop();
         _metricsCollector.RecordStateStoreOperation(agentId, "Load", loadStopwatch.ElapsedMilliseconds);
         
         state.Goal = string.IsNullOrWhiteSpace(state.Goal) ? goal : state.Goal;
+        
+        // Ensure additional messages are set from configuration if not already present
+        if (state.AdditionalMessages == null || state.AdditionalMessages.Count == 0)
+        {
+            state.AdditionalMessages = _config.AdditionalMessages ?? new List<LlmMessage>();
+        }
+        
         return state;
     }
 }

@@ -17,6 +17,12 @@ internal class SimpleStreamingTest
         // Configure the agent using the improved fluent API
         var agent = AIAgent.Create(llm)
             .WithStorage(new MemoryAgentStateStore())
+            .WithSystemMessage("You are a creative storyteller with a talent for crafting engaging, imaginative narratives. Use vivid descriptions and emotional depth in your stories.")
+            .WithUserMessage("When telling stories, create memorable characters, build suspense, and include unexpected twists. Make the story come alive with sensory details.")
+            .WithMessages(messages => messages
+                .AddSystemMessage("Focus on creating stories that are both entertaining and meaningful. Use humor and heart to connect with the audience.")
+                .AddAssistantMessage("I will craft an engaging story with rich characters and an imaginative plot that captures the reader's attention.")
+            )
             .WithEventHandling(events => events
                 .OnRunStarted(e => Console.WriteLine($"Starting: {e.Goal} (Agent: {e.AgentId})"))
                 .OnStepStarted(e => Console.WriteLine($"Step {e.TurnIndex + 1} started (Agent: {e.AgentId})"))

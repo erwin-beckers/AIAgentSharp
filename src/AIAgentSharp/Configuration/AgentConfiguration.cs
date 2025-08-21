@@ -689,4 +689,44 @@ public sealed class AgentConfiguration
     /// </code>
     /// </example>
     public double MinReasoningConfidence { get; init; } = 0.7;
+
+    /// <summary>
+    /// Gets additional messages to be included in the conversation context.
+    /// </summary>
+    /// <value>
+    /// A list of additional messages to include alongside the existing system prompt and goal.
+    /// Default is an empty list.
+    /// </value>
+    /// <remarks>
+    /// <para>
+    /// These messages will be included in the conversation context alongside the existing
+    /// AIAgentSharp system prompt and the user's goal. This allows you to add custom
+    /// system prompts, user messages, or assistant messages without replacing the
+    /// core AIAgentSharp functionality.
+    /// </para>
+    /// <para>
+    /// The messages are added in the order they appear in this list, after the
+    /// AIAgentSharp system prompt but before the goal and conversation history.
+    /// </para>
+    /// <para>
+    /// This is useful for:
+    /// - Adding domain-specific instructions or context
+    /// - Including custom system prompts for specific use cases
+    /// - Providing additional context or examples
+    /// - Setting tone or style preferences
+    /// </para>
+    /// </remarks>
+    /// <example>
+    /// <code>
+    /// var config = new AgentConfiguration 
+    /// { 
+    ///     AdditionalMessages = new List&lt;LlmMessage&gt;
+    ///     {
+    ///         new LlmMessage { Role = "system", Content = "You are a helpful travel assistant." },
+    ///         new LlmMessage { Role = "user", Content = "Please provide detailed recommendations." }
+    ///     }
+    /// };
+    /// </code>
+    /// </example>
+    public List<LlmMessage> AdditionalMessages { get; init; } = new();
 }

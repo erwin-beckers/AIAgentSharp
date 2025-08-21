@@ -26,11 +26,50 @@ internal class ReactExample
             new CalculateTripCostTool()
         };
 
+        // Example of different ways to add custom messages using the fluent API:
+        // 
+        // 1. Simple system message:
+        // .WithSystemMessage("You are an expert travel planner.")
+        //
+        // 2. Simple user message:
+        // .WithUserMessage("Please provide detailed recommendations.")
+        //
+        // 3. Simple assistant message:
+        // .WithAssistantMessage("I understand you want detailed travel recommendations.")
+        //
+        // 4. Multiple messages at once:
+        // .WithMessages(
+        //     new LlmMessage { Role = "system", Content = "You are a helpful assistant." },
+        //     new LlmMessage { Role = "user", Content = "Please be concise." }
+        // )
+        //
+        // 5. Using the fluent message builder:
+        // .WithMessages(messages => messages
+        //     .AddSystemMessage("You are an expert in the domain.")
+        //     .AddUserMessage("Please provide detailed analysis.")
+        //     .AddAssistantMessage("I will provide comprehensive analysis.")
+        //     .AddMessage("user", "Additional context here.")
+        // )
+        //
+        // 6. Combining multiple approaches:
+        // .WithSystemMessage("Base system instruction")
+        // .WithUserMessage("Base user instruction")
+        // .WithMessages(messages => messages
+        //     .AddSystemMessage("Additional system context")
+        //     .AddUserMessage("Additional user context")
+        // )
+
         // Configure the agent using the improved fluent API
         var agent = AIAgent.Create(llm)
             .WithTools(tools)
             .WithStreaming() 
             .WithStorage(new MemoryAgentStateStore())
+            .WithSystemMessage("You are an expert travel planner with deep knowledge of Paris. Always provide detailed, personalized recommendations and consider cultural preferences.")
+            .WithUserMessage("Please focus on authentic local experiences and hidden gems that tourists often miss.")
+            .WithMessages(messages => messages
+                .AddSystemMessage("When planning itineraries, prioritize walking-friendly routes and include time for spontaneous discoveries.")
+                .AddUserMessage("Include budget-friendly options and explain why each recommendation is worth visiting.")
+            )
             .WithEventHandling(events => events
                 .OnRunStarted(e => Console.WriteLine($"Starting: {e.Goal} (Agent: {e.AgentId})"))
                 .OnStepStarted(e => Console.WriteLine($"Step {e.TurnIndex + 1} started (Agent: {e.AgentId})"))
@@ -100,6 +139,9 @@ internal class ReactExample
         Console.WriteLine("AI Travel Planning Agent");
         Console.WriteLine("==========================");
         Console.WriteLine($"Goal: {goal}");
+        Console.WriteLine();
+        Console.WriteLine("Note: This agent has been configured with custom system and user messages");
+        Console.WriteLine("to enhance its travel planning capabilities with domain-specific expertise.");
         Console.WriteLine();
 
         // Run the agent

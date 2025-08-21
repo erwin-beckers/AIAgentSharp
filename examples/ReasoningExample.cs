@@ -48,6 +48,12 @@ public class ChainOfThoughExample
             .WithReasoning(ReasoningType.ChainOfThought, options => options
                 .SetMaxDepth(8)
             )
+            .WithSystemMessage("You are an expert travel analyst with deep knowledge of travel planning and cost optimization. Use systematic reasoning to break down complex travel planning tasks.")
+            .WithUserMessage("When analyzing travel options, consider factors like convenience, cost-effectiveness, and traveler preferences. Always explain your reasoning process step by step.")
+            .WithMessages(messages => messages
+                .AddSystemMessage("Focus on logical step-by-step analysis. Consider multiple alternatives and evaluate trade-offs carefully.")
+                .AddAssistantMessage("I will use systematic reasoning to analyze travel planning challenges and provide well-structured solutions.")
+            )
             .WithEventHandling(events => events
                 .OnRunStarted(e => Console.WriteLine($"Starting: {e.Goal} (Agent: {e.AgentId})"))
                 .OnStepStarted(e => Console.WriteLine($"Step {e.TurnIndex + 1} started (Agent: {e.AgentId})"))
