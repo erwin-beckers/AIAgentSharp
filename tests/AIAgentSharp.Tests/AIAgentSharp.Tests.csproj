@@ -27,9 +27,6 @@
     <IncludeTestAssembly>false</IncludeTestAssembly>
   </PropertyGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\..\src\AIAgentSharp\AIAgentSharp.csproj" />
-  </ItemGroup>
 
   <ItemGroup>
     <Using Include="Microsoft.VisualStudio.TestTools.UnitTesting" />

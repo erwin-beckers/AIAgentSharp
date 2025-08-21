@@ -373,9 +373,36 @@ public static class JsonResponseCleaner
         }
 
     /// <summary>
+    /// Extracts JSON from markdown code blocks and cleans it.
+    /// This method is specifically designed for parsing LLM responses that contain JSON in code blocks.
+    /// </summary>
+    /// <param name="content">The raw content from the LLM response.</param>
+    /// <returns>Cleaned JSON content extracted from code blocks.</returns>
+    public static string ExtractAndCleanJsonFromCodeBlocks(string content)
+    {
+        if (string.IsNullOrEmpty(content))
+            return content;
+
+        // First, try to extract JSON content from the text (including from within code blocks)
+        var jsonContent = ExtractJsonContent(content);
+        
+        // If no JSON was found, remove markdown code blocks and try again
+        if (string.IsNullOrEmpty(jsonContent) || !IsValidJson(jsonContent))
+        {
+            var cleaned = RemoveMarkdownCodeBlocks(content);
+            jsonContent = ExtractJsonContent(cleaned);
+        }
+        
+        // Fix common structural issues
+        var fixedJson = FixJsonStructure(jsonContent);
+        
+        return fixedJson;
+    }
+
+    /// <summary>
     /// Simple JSON validation check.
     /// </summary>
-    private static bool IsValidJson(string json)
+    public static bool IsValidJson(string json)
     {
         try
         {
@@ -385,7 +412,7 @@ public static class JsonResponseCleaner
         catch
         {
             return false;
+        }
     }
-}
 }
 

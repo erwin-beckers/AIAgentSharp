@@ -293,7 +293,7 @@ public static class JsonUtil
     public static ModelMessage ParseChainOfThoughtResponse(string json)
     {
         // Clean the JSON response to handle malformed responses from LLMs
-        var cleanedJson = JsonResponseCleaner.CleanJsonResponse(json);
+        var cleanedJson = JsonResponseCleaner.ExtractAndCleanJsonFromCodeBlocks(json);
         
         using var doc = JsonDocument.Parse(cleanedJson);
         var root = doc.RootElement;
@@ -373,7 +373,7 @@ public static class JsonUtil
     public static ModelMessage ParseTreeOfThoughtsResponse(string json)
     {
         // Clean the JSON response to handle malformed responses from LLMs
-        var cleanedJson = JsonResponseCleaner.CleanJsonResponse(json);
+        var cleanedJson = JsonResponseCleaner.ExtractAndCleanJsonFromCodeBlocks(json);
         
         using var doc = JsonDocument.Parse(cleanedJson);
         var root = doc.RootElement;
