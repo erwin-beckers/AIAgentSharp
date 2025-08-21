@@ -97,7 +97,18 @@ public static class JsonUtil
 
         if (actionInput.TryGetProperty("summary", out var summaryProp))
         {
-            var summary = summaryProp.GetString();
+            string? summary = null;
+            
+            // Handle both string and object types for summary
+            if (summaryProp.ValueKind == JsonValueKind.String)
+            {
+                summary = summaryProp.GetString();
+            }
+            else if (summaryProp.ValueKind == JsonValueKind.Object)
+            {
+                // Convert object to JSON string for storage
+                summary = summaryProp.GetRawText();
+            }
 
             if (config != null && summary != null && summary.Length > config.MaxSummaryLength)
             {

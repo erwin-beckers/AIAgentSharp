@@ -1,122 +1,391 @@
+using System.Diagnostics;
+using System.Text;
+
 namespace AIAgentSharp.Utils;
 
 /// <summary>
-/// Utility class for cleaning malformed JSON responses from LLMs.
+/// State-based JSON cleaner that safely fixes common LLM JSON errors without breaking valid JSON.
+/// Handles complex nested structures, JSON-in-JSON, and missing brackets.
 /// </summary>
 public static class JsonResponseCleaner
 {
+    private enum ParserState
+    {
+        LookingForStart,
+        InObject,
+        InArray,
+        InString,
+        InEscape,
+        LookingForProperty,
+        LookingForColon,
+        LookingForValue,
+        InNumber,
+        InBoolean,
+        InNull,
+        AfterValue
+    }
+
     /// <summary>
-    /// Cleans malformed JSON responses by extracting the first valid JSON object.
-    /// Removes markdown code blocks and handles duplicate JSON objects.
+    /// Cleans malformed JSON responses using a state-based parser.
+    /// Safely handles complex nested structures and JSON-in-JSON scenarios.
     /// </summary>
     /// <param name="content">The raw content from the LLM response.</param>
-    /// <returns>Cleaned JSON content containing only the first valid JSON object.</returns>
+    /// <returns>Cleaned JSON content with common errors fixed.</returns>
     public static string CleanJsonResponse(string content)
     {
         if (string.IsNullOrEmpty(content))
             return content;
 
-        // Remove markdown code blocks
-        var cleaned = content.Trim();
-        if (cleaned.StartsWith("```json"))
-        {
-            cleaned = cleaned.Substring(7);
-        }
-        if (cleaned.StartsWith("```"))
-        {
-            cleaned = cleaned.Substring(3);
-        }
-        if (cleaned.EndsWith("```"))
-        {
-            cleaned = cleaned.Substring(0, cleaned.Length - 3);
-        }
-        cleaned = cleaned.Trim();
+        // First, remove markdown code blocks
+        var cleaned = RemoveMarkdownCodeBlocks(content);
+        
+        // Find the JSON content using state-based parsing
+        var jsonContent = ExtractJsonContent(cleaned);
+        
+        // Fix common structural issues
+        var fixedJson = FixJsonStructure(jsonContent);
+        
+        return fixedJson;
+    }
 
-        // Check for duplicate JSON objects (common LLM issue)
-        var jsonObjects = new List<string>();
+    /// <summary>
+    /// Removes markdown code blocks from the content.
+    /// </summary>
+    private static string RemoveMarkdownCodeBlocks(string content)
+    {
+        var lines = content.Split('\n');
+        var result = new StringBuilder();
+        var inCodeBlock = false;
+        var codeBlockStart = -1;
+
+        for (int i = 0; i < lines.Length; i++)
+        {
+            var line = lines[i];
+            
+            // Check for code block markers
+            if (line.Trim().StartsWith("```"))
+            {
+                if (!inCodeBlock)
+        {
+                    // Start of code block
+                    inCodeBlock = true;
+                    codeBlockStart = i;
+        }
+                else
+        {
+                    // End of code block
+                    inCodeBlock = false;
+                    codeBlockStart = -1;
+        }
+                continue;
+            }
+
+            if (!inCodeBlock)
+        {
+                result.AppendLine(line);
+            }
+        }
+
+        return result.ToString().Trim();
+        }
+
+    /// <summary>
+    /// Extracts JSON content from the cleaned text using state-based parsing.
+    /// </summary>
+    private static string ExtractJsonContent(string content)
+    {
+        var state = ParserState.LookingForStart;
         var braceCount = 0;
-        var startIndex = -1;
-        var endIndex = -1;
+        var bracketCount = 0;
+        var inString = false;
+        var escapeNext = false;
+        var jsonStart = -1;
+        var jsonEnd = -1;
 
-        for (int i = 0; i < cleaned.Length; i++)
+        for (int i = 0; i < content.Length; i++)
         {
-            if (cleaned[i] == '{')
+            var c = content[i];
+
+            if (escapeNext)
             {
-                if (startIndex == -1)
+                escapeNext = false;
+                continue;
+            }
+
+            if (c == '\\')
+            {
+                escapeNext = true;
+                continue;
+            }
+
+            if (c == '"' && !escapeNext)
+        {
+                inString = !inString;
+                continue;
+            }
+
+            if (!inString)
+            {
+                if (c == '{')
                 {
-                    startIndex = i;
+                    if (state == ParserState.LookingForStart)
+                    {
+                        jsonStart = i;
+                        state = ParserState.InObject;
                 }
                 braceCount++;
             }
-            else if (cleaned[i] == '}')
+                else if (c == '}')
             {
                 braceCount--;
-                if (braceCount == 0 && startIndex != -1)
+                    if (braceCount == 0 && state == ParserState.InObject)
+                    {
+                        jsonEnd = i + 1;
+                        break;
+                    }
+                }
+                else if (c == '[')
                 {
-                    endIndex = i;
-                    var jsonObject = cleaned.Substring(startIndex, endIndex - startIndex + 1);
-                    jsonObjects.Add(jsonObject);
+                    if (state == ParserState.LookingForStart)
+                    {
+                        jsonStart = i;
+                        state = ParserState.InArray;
+                    }
+                    bracketCount++;
+                }
+                else if (c == ']')
+                {
+                    bracketCount--;
+                    if (bracketCount == 0 && state == ParserState.InArray)
+                    {
+                        jsonEnd = i + 1;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (jsonStart >= 0 && jsonEnd > jsonStart)
+        {
+            return content.Substring(jsonStart, jsonEnd - jsonStart);
+        }
+
+        // Fallback: try to find any JSON-like content
+        return FindJsonLikeContent(content);
+    }
+
+    /// <summary>
+    /// Fallback method to find JSON-like content when proper parsing fails.
+    /// </summary>
+    private static string FindJsonLikeContent(string content)
+                {
+        var firstBrace = content.IndexOf('{');
+        var firstBracket = content.IndexOf('[');
                     
-                    // Reset for next object
-                    startIndex = -1;
-                    endIndex = -1;
+        if (firstBrace >= 0 && (firstBracket < 0 || firstBrace < firstBracket))
+        {
+            // Start with object
+            var lastBrace = content.LastIndexOf('}');
+            if (lastBrace > firstBrace)
+            {
+                return content.Substring(firstBrace, lastBrace - firstBrace + 1);
+            }
+        }
+        else if (firstBracket >= 0)
+        {
+            // Start with array
+            var lastBracket = content.LastIndexOf(']');
+            if (lastBracket > firstBracket)
+            {
+                return content.Substring(firstBracket, lastBracket - firstBracket + 1);
                 }
             }
+
+        return content;
         }
 
-        // If we found multiple JSON objects, check if they're duplicates
-        if (jsonObjects.Count > 1)
+    /// <summary>
+    /// Fixes common JSON structural issues using state-based analysis.
+    /// </summary>
+    private static string FixJsonStructure(string json)
         {
-            // Check if all objects are identical (common LLM duplication issue)
-            var firstObject = jsonObjects[0];
-            var allIdentical = jsonObjects.All(obj => obj == firstObject);
+        if (string.IsNullOrEmpty(json))
+            return json;
             
-            if (allIdentical)
+        var state = ParserState.LookingForStart;
+        var braceCount = 0;
+        var bracketCount = 0;
+        var inString = false;
+        var escapeNext = false;
+        var result = new StringBuilder();
+        var lastChar = '\0';
+
+        for (int i = 0; i < json.Length; i++)
             {
-                // Return the first object (they're all the same)
-                return firstObject;
-            }
+            var c = json[i];
             
-            // If they're different, log a warning and return the first one
-            Console.WriteLine($"Warning: Found {jsonObjects.Count} different JSON objects in LLM response. Using the first one.");
-            return firstObject;
-        }
-        else if (jsonObjects.Count == 1)
-        {
-            return jsonObjects[0];
-        }
-
-        // Fallback: try to find just the first complete JSON object
-        braceCount = 0;
-        startIndex = -1;
-        endIndex = -1;
-
-        for (int i = 0; i < cleaned.Length; i++)
-        {
-            if (cleaned[i] == '{')
+            if (escapeNext)
             {
-                if (startIndex == -1)
+                // Handle escaped characters
+                if (c == '\'')
                 {
-                    startIndex = i;
+                    // Fix escaped single quotes - convert to escaped double quotes
+                    result.Append("\\\"");
+        }
+                else
+        {
+                    result.Append(c);
                 }
-                braceCount++;
+                escapeNext = false;
+                lastChar = c;
+                continue;
+        }
+
+            if (c == '\\')
+            {
+                result.Append(c);
+                escapeNext = true;
+                continue;
             }
-            else if (cleaned[i] == '}')
+
+            if (c == '"' && !escapeNext)
+        {
+                inString = !inString;
+                result.Append(c);
+                lastChar = c;
+                continue;
+            }
+
+            if (!inString)
+            {
+                if (c == '{')
+                {
+                    if (state == ParserState.LookingForStart)
+                        state = ParserState.InObject;
+                braceCount++;
+                    result.Append(c);
+            }
+                else if (c == '}')
             {
                 braceCount--;
-                if (braceCount == 0 && startIndex != -1)
+                    result.Append(c);
+                }
+                else if (c == '[')
                 {
-                    endIndex = i;
-                    break;
+                    if (state == ParserState.LookingForStart)
+                        state = ParserState.InArray;
+                    bracketCount++;
+                    result.Append(c);
+                }
+                else if (c == ']')
+                {
+                    bracketCount--;
+                    result.Append(c);
+                }
+                else if (c == ',')
+                {
+                    // Check for trailing comma
+                    var nextNonWhitespace = GetNextNonWhitespace(json, i + 1);
+                    if (nextNonWhitespace == '}' || nextNonWhitespace == ']')
+                    {
+                        // Skip trailing comma
+                        continue;
+                    }
+                    result.Append(c);
+                }
+                else
+                {
+                    result.Append(c);
                 }
             }
+            else
+            {
+                // Inside string - handle common LLM string errors
+                if (c == '\'')
+                {
+                    // Convert unescaped single quotes to escaped double quotes
+                    result.Append("\\\"");
+                }
+                else
+                {
+                    result.Append(c);
+                }
+            }
+
+            lastChar = c;
         }
 
-        if (startIndex != -1 && endIndex != -1)
+        // Add missing closing brackets/braces
+        var fixedJson = result.ToString();
+        
+        if (state == ParserState.InObject && braceCount > 0)
         {
-            return cleaned.Substring(startIndex, endIndex - startIndex + 1);
+            fixedJson += new string('}', braceCount);
+        }
+        else if (state == ParserState.InArray && bracketCount > 0)
+        {
+            fixedJson += new string(']', bracketCount);
         }
 
-        return cleaned;
+        return fixedJson;
+    }
+
+    /// <summary>
+    /// Gets the next non-whitespace character from the specified position.
+    /// </summary>
+    private static char GetNextNonWhitespace(string text, int startPos)
+                {
+        for (int i = startPos; i < text.Length; i++)
+        {
+            var c = text[i];
+            if (!char.IsWhiteSpace(c))
+                return c;
+                }
+        return '\0';
+            }
+
+    /// <summary>
+    /// Test method to debug JSON parsing issues.
+    /// </summary>
+    public static string TestJsonParsing(string json)
+    {
+        var result = CleanJsonResponse(json);
+        System.Diagnostics.Debug.WriteLine($"Original: {json}");
+        System.Diagnostics.Debug.WriteLine($"Cleaned:  {result}");
+        return result;
+        }
+
+    /// <summary>
+    /// Comprehensive test method for the JSON cleaner.
+    /// </summary>
+    public static void RunTests()
+        {
+        // Test the problematic JSON from the user
+        var testJson = "{\"thoughts\":\"The strategy has been validated successfully, and the components are structured as follows: 1) Indicators: the \\'Bollinger Bands\\' and the \\'Chandelier Exit\\'. 2) Entry Rule: Enter a long position when the price closes above the upper Bollinger Band and the Chandelier Exit indicates a bullish trend. 3) Exit Rule: Exit the position when the price hits the Chandelier Exit trailing stop or when a profit target of $1500 is reached. 4) Position sizing is set to 1 contract with a max stop distance of 100 ticks. 5) Daily trading limits specify a maximum of 3 trades per day and a limit of 3 consecutive losses. I am now ready to backtest this strategy to evaluate its performance against historical data.\",\"action\":\"tool_call\",\"action_input\":{\"tool\":\"backtest_strategy\",\"params\":{\"strategy\":{\"name\":\"TrendFollowingStrategy\",\"indicators\":[{\"name\":\"Bollinger Bands\",\"parameters\":{\"period\":20,\"deviation\":2}},{\"name\":\"Chandelier Exit\",\"parameters\":{\"length\":22,\"multiplier\":3}}],\"entryRules\":[{\"condition\":\"Price closes above upper Bollinger Band and Chandelier Exit is bullish\",\"action\":\"Enter Long\"}],\"exitRules\":[{\"condition\":\"Price hits Chandelier Exit trailing stop\",\"action\":\"Exit\"},{\"condition\":\"Achieves $1500 profit target\",\"action\":\"Exit\"}],\"atmSettings\":{\"positionSize\":1,\"maxStopDistance\":100,\"tradeLimit\":3,\"consecutiveLosersLimit\":3}}}},\"reasoning_confidence\":0.95,\"reasoning_type\":\"Analysis\"}";
+        
+        var cleaned = CleanJsonResponse(testJson);
+        
+        System.Diagnostics.Debug.WriteLine("=== JSON Cleaner Test ===");
+        System.Diagnostics.Debug.WriteLine($"Original length: {testJson.Length}");
+        System.Diagnostics.Debug.WriteLine($"Cleaned length:  {cleaned.Length}");
+        System.Diagnostics.Debug.WriteLine($"Is valid JSON: {IsValidJson(cleaned)}");
+        System.Diagnostics.Debug.WriteLine("=== End Test ===");
+        }
+
+    /// <summary>
+    /// Simple JSON validation check.
+    /// </summary>
+    private static bool IsValidJson(string json)
+    {
+        try
+        {
+            System.Text.Json.JsonDocument.Parse(json);
+            return true;
+        }
+        catch
+        {
+            return false;
     }
 }
+}
+
