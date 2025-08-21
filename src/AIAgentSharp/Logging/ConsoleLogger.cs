@@ -1,3 +1,5 @@
+using System.Diagnostics;
+
 namespace AIAgentSharp;
 
 /// <summary>
@@ -12,6 +14,7 @@ public class ConsoleLogger : ILogger
     public void LogInformation(string message)
     {
         Console.WriteLine($"[INFO] {message}");
+        Trace.WriteLine($"[INFO] {message}");
     }
 
     /// <summary>
@@ -21,6 +24,7 @@ public class ConsoleLogger : ILogger
     public void LogWarning(string message)
     {
         Console.WriteLine($"[WARN] {message}");
+        Trace.WriteLine($"[WARN] {message}");
     }
 
     /// <summary>
@@ -30,6 +34,7 @@ public class ConsoleLogger : ILogger
     public void LogError(string message)
     {
         Console.WriteLine($"[ERROR] {message}");
+        Trace.WriteLine($"[ERROR] {message}");
     }
 
     /// <summary>
@@ -39,5 +44,6 @@ public class ConsoleLogger : ILogger
     public void LogDebug(string message)
     {
         Console.WriteLine($"[DEBUG] {message}");
+        Trace.WriteLine($"[DEBUG] {message}");
     }
 }

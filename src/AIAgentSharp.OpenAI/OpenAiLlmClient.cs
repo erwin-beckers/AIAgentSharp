@@ -1,6 +1,7 @@
 using OpenAI;
 using OpenAI.Chat;
 using System.ClientModel;
+using System.Diagnostics;
 
 namespace AIAgentSharp.OpenAI;
 
@@ -108,6 +109,8 @@ public sealed class OpenAiLlmClient : ILlmClient
 
         foreach (var m in request.Messages)
         {
+           // Console.WriteLine($"LLM: snd {m.Role}:{m.Content}");
+           // Trace.WriteLine($"LLM: snd {m.Role}:{m.Content}");
             switch (m.Role)
             {
                 case "system":
@@ -246,7 +249,7 @@ public sealed class OpenAiLlmClient : ILlmClient
                             // Final chunk with complete content
                             yield return new LlmStreamingChunk
                             {
-                                Content = contentBuilder.ToString(),
+                                Content = string.Empty, // Don't send duplicate content
                                 IsFinal = true,
                                 FinishReason = "stop",
                                 ActualResponseType = LlmResponseType.Text,
@@ -257,7 +260,7 @@ public sealed class OpenAiLlmClient : ILlmClient
                         case ChatFinishReason.Length:
                             yield return new LlmStreamingChunk
                             {
-                                Content = contentBuilder.ToString(),
+                                Content = string.Empty, // Don't send duplicate content
                                 IsFinal = true,
                                 FinishReason = "length",
                                 ActualResponseType = LlmResponseType.Text,
@@ -268,7 +271,7 @@ public sealed class OpenAiLlmClient : ILlmClient
                         case ChatFinishReason.ContentFilter:
                             yield return new LlmStreamingChunk
                             {
-                                Content = contentBuilder.ToString(),
+                                Content = string.Empty, // Don't send duplicate content
                                 IsFinal = true,
                                 FinishReason = "content_filter",
                                 ActualResponseType = LlmResponseType.Text,

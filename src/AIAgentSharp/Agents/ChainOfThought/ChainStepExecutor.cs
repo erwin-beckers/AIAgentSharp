@@ -1,4 +1,5 @@
 using AIAgentSharp.Agents.Interfaces;
+using System.Diagnostics;
 using System.Linq;
 
 namespace AIAgentSharp.Agents.ChainOfThought;
@@ -214,6 +215,7 @@ public sealed class ChainStepExecutor
         }
         catch (Exception ex)
         {
+            Trace.WriteLine($"Error {ex} in PerformEvaluationStepAsync() content={content}");
             Console.WriteLine($"Error {ex} in PerformEvaluationStepAsync() content={content}");
             return new ChainEvaluationExecutionResult
             {

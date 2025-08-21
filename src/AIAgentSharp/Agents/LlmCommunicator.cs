@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using AIAgentSharp.Agents.Interfaces;
 using AIAgentSharp.Metrics;
@@ -264,6 +265,8 @@ public sealed class LlmCommunicator : ILlmCommunicator
         }
         catch (Exception ex)
         {
+            Trace.WriteLine(llmRaw);
+            Trace.WriteLine($"Error: {ex.Message}");
             var err = $"Invalid LLM JSON: {ex.Message}";
             _logger.LogError(err);
 
