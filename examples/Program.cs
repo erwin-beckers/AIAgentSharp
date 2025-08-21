@@ -18,12 +18,15 @@ internal class Program
         await SimpleStreamingTest.RunAsync(apiKey);
 
         Console.WriteLine("---------------------------- RE/ACT EXAMPLE --------------------------");
-         await ReactExample.RunAsync(apiKey);
+        await ReactExample.RunAsync(apiKey);
 
         Console.WriteLine("---------------------------- CHAIN OF THOUGHTS EXAMPLE --------------------------");
         await ChainOfThoughExample.RunAsync(apiKey);
 
         Console.WriteLine("---------------------------- TREE OF THOUGHTS EXAMPLE --------------------------");
         await TreeOfThoughsExample.RunAsync(apiKey);
+
+        Console.WriteLine("---------------------------- CUSTOM SCHEMA EXAMPLE --------------------------");
+        await CustomSchemaExample.RunAsync(apiKey);
     }
 }

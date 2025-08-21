@@ -9,6 +9,7 @@ All notable changes to AIAgentSharp will be documented in this file.
 - **Multiple Tool Calls Support** - Agents can now call multiple tools in a single turn 
 - **Fluent API** - Intuitive agent configuration with method chaining
 - **Custom Messages Support** - Add custom system prompts and messages alongside the AIAgentSharp system prompt using fluent API
+- **Custom Schema Override** - Override auto-generated schemas with custom schemas for complex domain-specific types using `[ToolSchema]` attribute
 
 
 

@@ -22,6 +22,39 @@ public sealed class PropertySchemaGenerator
     /// </summary>
     public object? GeneratePropertySchema(PropertyInfo property, HashSet<Type> visited)
     {
+        // Check for custom schema override on the property first
+        var customSchemaAttr = property.GetCustomAttribute<Schema.ToolSchemaAttribute>();
+        if (customSchemaAttr != null)
+        {
+            try
+            {
+                var customSchema = JsonSerializer.Deserialize<Dictionary<string, object>>(customSchemaAttr.Schema, JsonUtil.JsonOptions);
+                if (customSchema != null)
+                {
+                    // Add additional rules if provided
+                    if (!string.IsNullOrEmpty(customSchemaAttr.AdditionalRules))
+                    {
+                        if (!customSchema.ContainsKey("description"))
+                        {
+                            customSchema["description"] = customSchemaAttr.AdditionalRules;
+                        }
+                        else
+                        {
+                            // Append additional rules to existing description
+                            var existingDesc = customSchema["description"].ToString();
+                            customSchema["description"] = $"{existingDesc}\n\n{customSchemaAttr.AdditionalRules}";
+                        }
+                    }
+                    return customSchema;
+                }
+            }
+            catch (JsonException ex)
+            {
+                // Log error and fall back to auto-generation
+                System.Diagnostics.Debug.WriteLine($"Failed to parse custom schema for property {property.Name}: {ex.Message}");
+            }
+        }
+
         var baseSchema = _typeSchemaGenerator.GenerateSchema(property.PropertyType, visited);
         var schemaDict = ConvertToDictionary(baseSchema);
 

@@ -12,6 +12,7 @@ A comprehensive, production-ready .NET 8.0 framework for building LLM-powered ag
 - **🔄 Re/Act Pattern**: Full implementation of the Reasoning and Acting pattern for LLM agents
 - **🔧 Advanced Tool Calling**: Support for OpenAI-style function calling with multi-tool execution
 - **🛠️ Rich Tool Framework**: Strongly-typed tools with automatic schema generation and validation
+- **🎨 Custom Schema Override**: Override auto-generated schemas with domain-specific schemas for complex types
 - **⚡ Multi-Tool Calling**: Execute multiple tools simultaneously in a single LLM response
 - **💾 State Persistence**: Multiple state store implementations (in-memory, file-based)
 - **📊 Real-time Monitoring**: Comprehensive event system and metrics collection
