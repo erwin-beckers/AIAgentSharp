@@ -30,12 +30,12 @@ internal sealed class TreeOfThoughtsCommunicator
 
         try
         {
-            return JsonUtil.ParseTreeOfThoughtsResponse(content);
+            var result = JsonUtil.ParseTreeOfThoughtsResponse(content);
+            return result;
         }
         catch (Exception ex)
         {
             // Log the error but don't throw, let the caller handle it
-            Trace.WriteLine($"Failed to parse Tree of Thoughts response: {ex.Message}");
             Console.WriteLine($"Failed to parse Tree of Thoughts response: {ex.Message}");
             return null;
         }

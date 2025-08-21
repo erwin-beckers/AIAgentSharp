@@ -15,6 +15,7 @@ public class AIAgentBuilder
     private ReasoningType _reasoningType = ReasoningType.None;
     private ExplorationStrategy _explorationStrategy = ExplorationStrategy.DepthFirst;
     private int _maxDepth = 3;
+    private int _maxTreeNodes = 50;
     private IAgentStateStore? _stateStore;
     private IMetricsCollector? _metricsCollector;
     private readonly List<Action<AgentStepCompletedEventArgs>> _stepCompletedHandlers = new();
@@ -199,6 +200,7 @@ public class AIAgentBuilder
         
         _explorationStrategy = optionsBuilder.ExplorationStrategy;
         _maxDepth = optionsBuilder.MaxDepth;
+        _maxTreeNodes = optionsBuilder.MaxTreeNodes;
         
         return this;
     }
@@ -281,6 +283,7 @@ public class AIAgentBuilder
             ReasoningType = _reasoningType,
             TreeExplorationStrategy = _explorationStrategy,
             MaxTreeDepth = _maxDepth,
+            MaxTreeNodes = _maxTreeNodes,
             UseFunctionCalling = !_enableStreaming,
             AdditionalMessages = _additionalMessages
         };
@@ -461,6 +464,7 @@ public class ReasoningOptionsBuilder
 {
     public ExplorationStrategy ExplorationStrategy { get; set; } = ExplorationStrategy.DepthFirst;
     public int MaxDepth { get; set; } = 3;
+    public int MaxTreeNodes { get; set; } = 50;
 
     /// <summary>
     /// Sets the exploration strategy.
@@ -481,6 +485,17 @@ public class ReasoningOptionsBuilder
     public ReasoningOptionsBuilder SetMaxDepth(int maxDepth)
     {
         MaxDepth = maxDepth;
+        return this;
+    }
+
+    /// <summary>
+    /// Sets the maximum number of tree nodes for Tree of Thoughts reasoning.
+    /// </summary>
+    /// <param name="maxTreeNodes">The maximum number of tree nodes</param>
+    /// <returns>The builder instance for method chaining</returns>
+    public ReasoningOptionsBuilder SetMaxTreeNodes(int maxTreeNodes)
+    {
+        MaxTreeNodes = maxTreeNodes;
         return this;
     }
 }

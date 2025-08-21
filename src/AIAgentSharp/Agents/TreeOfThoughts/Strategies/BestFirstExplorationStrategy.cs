@@ -53,6 +53,13 @@ internal sealed class BestFirstExplorationStrategy : ITreeExplorationStrategy
             {
                 bestScore = score;
                 bestPath = treeOperations.GetPathToNode(tree, nodeId);
+                
+                // Early termination: if we found a very good solution (score > 0.8), stop exploring
+                if (bestScore > 0.8)
+                {
+                    statusManager.EmitStatus("reasoning", "Found excellent solution", $"Score: {bestScore:F2}", "Terminating exploration early");
+                    break;
+                }
             }
 
             // Generate children after evaluation
@@ -64,6 +71,13 @@ internal sealed class BestFirstExplorationStrategy : ITreeExplorationStrategy
                     var childNode = treeOperations.AddChild(tree, nodeId, child.Thought, child.ThoughtType);
                     queue.Enqueue(childNode.NodeId, child.EstimatedScore);
                 }
+            }
+            
+            // Early termination: if we've explored enough nodes and have a reasonable solution
+            if (nodesExplored >= 15 && bestScore > 0.6)
+            {
+                statusManager.EmitStatus("reasoning", "Found good solution", $"Score: {bestScore:F2}", "Terminating exploration");
+                break;
             }
         }
 

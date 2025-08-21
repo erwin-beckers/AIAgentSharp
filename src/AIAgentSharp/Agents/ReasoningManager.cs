@@ -1,6 +1,7 @@
 using AIAgentSharp.Agents.Interfaces;
 using AIAgentSharp.Agents.TreeOfThoughts;
 using AIAgentSharp.Agents.ChainOfThought;
+using AIAgentSharp.Agents.Hybrid;
 using AIAgentSharp.Metrics;
 
 namespace AIAgentSharp.Agents;
@@ -38,7 +39,8 @@ public sealed class ReasoningManager : IReasoningManager
         _reasoningEngines = new Dictionary<ReasoningType, IReasoningEngine>
         {
             [ReasoningType.ChainOfThought] = new ChainOfThoughtEngine(_llm, _config, _logger, _eventManager, _statusManager, _metricsCollector, llmCommunicator),
-            [ReasoningType.TreeOfThoughts] = new TreeOfThoughtsEngine(_llm, _config, _logger, _eventManager, _statusManager, _metricsCollector, llmCommunicator)
+            [ReasoningType.TreeOfThoughts] = new TreeOfThoughtsEngine(_llm, _config, _logger, _eventManager, _statusManager, _metricsCollector, llmCommunicator),
+            [ReasoningType.Hybrid] = new HybridEngine(_llm, _config, _logger, _eventManager, _statusManager, _metricsCollector, llmCommunicator)
         };
     }
 

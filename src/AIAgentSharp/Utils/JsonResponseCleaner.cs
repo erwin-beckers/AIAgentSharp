@@ -57,6 +57,7 @@ public static class JsonResponseCleaner
         var result = new StringBuilder();
         var inCodeBlock = false;
         var codeBlockStart = -1;
+        var hasCodeBlocks = false;
 
         for (int i = 0; i < lines.Length; i++)
         {
@@ -65,29 +66,36 @@ public static class JsonResponseCleaner
             // Check for code block markers
             if (line.Trim().StartsWith("```"))
             {
+                hasCodeBlocks = true;
                 if (!inCodeBlock)
-        {
+                {
                     // Start of code block
                     inCodeBlock = true;
                     codeBlockStart = i;
-        }
+                }
                 else
-        {
+                {
                     // End of code block
                     inCodeBlock = false;
                     codeBlockStart = -1;
-        }
+                }
                 continue;
             }
 
             if (!inCodeBlock)
-        {
+            {
                 result.AppendLine(line);
             }
         }
 
-        return result.ToString().Trim();
+        // If no code blocks were found, return the original content unchanged
+        if (!hasCodeBlocks)
+        {
+            return content;
         }
+
+        return result.ToString().Trim();
+    }
 
     /// <summary>
     /// Extracts JSON content from the cleaned text using state-based parsing.
@@ -293,6 +301,11 @@ public static class JsonResponseCleaner
                     }
                     result.Append(c);
                 }
+                else if (c == '\r' || c == '\n')
+                {
+                    // Skip structural newlines and carriage returns
+                    continue;
+                }
                 else
                 {
                     result.Append(c);
@@ -305,6 +318,16 @@ public static class JsonResponseCleaner
                 {
                     // Convert unescaped single quotes to escaped double quotes
                     result.Append("\\\"");
+                }
+                else if (c == '\r')
+                {
+                    // Convert carriage returns to escaped newlines
+                    result.Append("\\n");
+                }
+                else if (c == '\n')
+                {
+                    // Convert newlines to escaped newlines
+                    result.Append("\\n");
                 }
                 else
                 {
@@ -386,15 +409,16 @@ public static class JsonResponseCleaner
         // First, try to extract JSON content from the text (including from within code blocks)
         var jsonContent = ExtractJsonContent(content);
         
-        // If no JSON was found, remove markdown code blocks and try again
-        if (string.IsNullOrEmpty(jsonContent) || !IsValidJson(jsonContent))
+        // Fix common structural issues first (including newline escaping)
+        var fixedJson = FixJsonStructure(jsonContent);
+        
+        // If the fixed JSON is still not valid, try removing markdown code blocks
+        if (string.IsNullOrEmpty(fixedJson) || !IsValidJson(fixedJson))
         {
             var cleaned = RemoveMarkdownCodeBlocks(content);
             jsonContent = ExtractJsonContent(cleaned);
+            fixedJson = FixJsonStructure(jsonContent);
         }
-        
-        // Fix common structural issues
-        var fixedJson = FixJsonStructure(jsonContent);
         
         return fixedJson;
     }

@@ -479,6 +479,69 @@ This concludes my analysis.";
         Assert.AreEqual(@"{""mixed_array"":[""string"",123,true,null,{""nested"":""object""},[""nested_array""]]}", result);
     }
 
+
+
+    [TestMethod]
+    public void ExtractAndCleanJsonFromCodeBlocks_Should_HandleJsonInCodeBlocks_When_InputIsWrappedInCodeBlocks()
+    {
+        // Arrange
+        var input = @"Here is the JSON response:
+
+```json
+{
+  ""reasoning"": ""Test reasoning"",
+  ""confidence"": 0.85,
+  ""insights"": [
+    ""Insight 1"",
+    ""Insight 2""
+  ]
+}
+```
+
+This is the end.";
+
+        // Act
+        var result = JsonResponseCleaner.ExtractAndCleanJsonFromCodeBlocks(input);
+
+        // Assert
+        Assert.IsFalse(string.IsNullOrEmpty(result), "Result should not be empty");
+        Assert.IsTrue(IsValidJson(result), "Result should be valid JSON");
+        
+        // Debug output
+        System.Diagnostics.Debug.WriteLine($"Input length: {input.Length}");
+        System.Diagnostics.Debug.WriteLine($"Result length: {result.Length}");
+        System.Diagnostics.Debug.WriteLine($"Result: {result}");
+    }
+
+            [TestMethod]
+        public void ExtractAndCleanJsonFromCodeBlocks_Should_HandleNewlinesInJsonStrings_When_InputContainsUnescapedNewlines()
+    {
+        // Arrange
+        var jsonWithNewlines = @"{
+  ""reasoning"": ""To successfully expand into the European market, the mid-sized technology company must understand several core components that will drive their strategy. First, they need to identify a suitable market entry strategy; potential options include direct entry, partnerships with established local firms, or acquisitions of local entities. Each option comes with its unique implications for speed, investment, and integration requirements. Additionally, a thorough competitive landscape analysis is essential. The company must identify existing competitors, their market share, and their strategic advantages to carve out its niche in the European market. Compliance with regulations such as GDPR is critical in operating within Europe. Understanding local laws will help mitigate legal risks and foster operational transparency.
+
+Resource allocation and timeline must also be defined. This involves budgeting for market research, marketing and sales initiatives, local talent acquisition, and technology localization efforts over a specified timeline. Furthermore, conducting a comprehensive risk assessment will shed light on potential obstacles, such as market fluctuations, political instability, or technological integration challenges, and help develop mitigation strategies accordingly. Finally, establishing clear success metrics and KPIs will be fundamental in assessing the effectiveness of the expansion efforts over time. This may include user acquisition rates, customer satisfaction scores, and revenue growth in the new market."",
+  ""confidence"": 0.85,
+  ""insights"": [
+    ""A partnership strategy could allow for reduced risk and shared resources while providing local market knowledge."",
+    ""Compliance with GDPR is non-negotiable and must be integrated into every aspect of the company's operations in Europe from the outset."",
+    ""Establishing clear KPIs early on will facilitate agile adjustments to the strategy based on real-time feedback and market conditions.""
+  ]
+}";
+
+        // Act
+        var result = JsonResponseCleaner.ExtractAndCleanJsonFromCodeBlocks(jsonWithNewlines);
+
+        // Assert
+        Assert.IsNotNull(result);
+        Assert.IsTrue(JsonResponseCleaner.IsValidJson(result), "Result should be valid JSON");
+        
+        // Verify that newlines are properly escaped
+        Assert.IsTrue(result.Contains("\\n"), "Newlines should be escaped as \\n");
+        Assert.IsFalse(result.Contains("\n"), "Raw newlines should not be present in the result");
+    }
+
+
     private static bool IsValidJson(string json)
     {
         try
