@@ -7,9 +7,8 @@ namespace example;
 
 internal class SimpleStreamingTest
 {
-    public static async Task RunAsync(string apiKey)
+    public static async Task RunAsync(ILlmClient llm)
     {
-        var llm = new OpenAiLlmClient(apiKey);
         // Test 2: Agent with function calling disabled
         Console.WriteLine("Streaming example");
         Console.WriteLine("----------------------------------------------");

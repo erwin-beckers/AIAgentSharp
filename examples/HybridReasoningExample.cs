@@ -13,12 +13,9 @@ namespace example;
 /// </summary>
 public class HybridReasoningExample
 {
-    public static async Task RunAsync(string apiKey)
+    public static async Task RunAsync(ILlmClient llm)
     {
         Console.WriteLine("=== AIAgentSharp Hybrid Reasoning Example ===\n");
-
-        // Create LLM client
-        var llm = new OpenAiLlmClient(apiKey);
 
         // Create tools
         var tools = new List<ITool>

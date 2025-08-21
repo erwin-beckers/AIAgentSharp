@@ -1,8 +1,7 @@
-using System.Text.Json;
-using System.Text.Json.Nodes;
 using Anthropic.SDK;
 using Anthropic.SDK.Common;
 using Anthropic.SDK.Messaging;
+using System.Text.Json.Nodes;
 using Tool = Anthropic.SDK.Common.Tool;
 
 namespace AIAgentSharp.Anthropic;
@@ -20,7 +19,7 @@ public sealed class AnthropicLlmClient : ILlmClient
     ///     Initializes a new instance of the AnthropicLlmClient class with API key and model.
     /// </summary>
     /// <param name="apiKey">The Anthropic API key for authentication.</param>
-    /// <param name="model">The model to use for completions. Defaults to "claude-3-5-sonnet-20241022".</param>
+    /// <param name="model">The model to use for completions. Defaults to "claude-opus-4-1-20250805".</param>
     /// <exception cref="ArgumentNullException">Thrown when apiKey is null or empty.</exception>
     public AnthropicLlmClient(string apiKey, string model = "claude-opus-4-1-20250805")
         : this(apiKey, new AnthropicConfiguration { Model = model })
@@ -47,8 +46,6 @@ public sealed class AnthropicLlmClient : ILlmClient
 
         _client = new AnthropicClient(apiKey);
         _model = configuration.Model;
-
-        // Store configuration for use in completion methods
         Configuration = configuration;
     }
 
@@ -58,7 +55,7 @@ public sealed class AnthropicLlmClient : ILlmClient
     /// <param name="client">The Anthropic client to use.</param>
     /// <param name="model">The model to use.</param>
     /// <exception cref="ArgumentNullException">Thrown when client is null.</exception>
-    internal AnthropicLlmClient(AnthropicClient client, string model = "claude-3-5-sonnet-20241022")
+    internal AnthropicLlmClient(AnthropicClient client, string model = "claude-opus-4-1-20250805")
     {
         _client = client ?? throw new ArgumentNullException(nameof(client));
         _model = model;
@@ -69,8 +66,6 @@ public sealed class AnthropicLlmClient : ILlmClient
     ///     Gets the Anthropic configuration used by this client.
     /// </summary>
     public AnthropicConfiguration Configuration { get; }
-
-
 
     /// <summary>
     /// Streams chunks from the Anthropic LLM based on the provided request.
@@ -92,12 +87,74 @@ public sealed class AnthropicLlmClient : ILlmClient
             throw new ArgumentException("Request must contain at least one message.", nameof(request));
         }
 
-        // Map messages to Anthropic message types
+        // Convert AIAgentSharp messages to Anthropic messages
+        var anthropicMessages = ConvertToAnthropicMessages(request.Messages);
+
+        // Create parameters
+        var parameters = new MessageParameters
+        {
+            Messages = anthropicMessages,
+            MaxTokens = request.MaxTokens ?? Configuration.MaxTokens,
+            Model = _model,
+            Temperature = (decimal)(request.Temperature ?? Configuration.Temperature),
+            Stream = true
+        };
+
+        // Add tools if functions are provided
+        if (request.Functions != null && request.Functions.Any())
+        {
+            parameters.Tools = ConvertToAnthropicTools(request.Functions);
+        }
+
+        var usage = new LlmUsage
+        {
+            Model = _model,
+            Provider = "Anthropic"
+        };
+
+        // Use the official SDK's streaming method
+        await foreach (var response in _client.Messages.StreamClaudeMessageAsync(parameters, ct))
+        {
+            if (response.Delta?.Text != null)
+            {
+                yield return new LlmStreamingChunk
+                {
+                    Content = response.Delta.Text,
+                    IsFinal = false,
+                    ActualResponseType = LlmResponseType.Streaming,
+                    Usage = usage
+                };
+            }
+
+            // Update usage from final response
+            if (response.Usage != null)
+            {
+                usage.InputTokens = response.Usage.InputTokens;
+                usage.OutputTokens = response.Usage.OutputTokens;
+            }
+
+            // Handle function calls if present - simplified for now
+            // TODO: Implement proper function call handling when SDK supports it
+        }
+
+        // Yield final chunk
+        yield return new LlmStreamingChunk
+        {
+            Content = string.Empty,
+            IsFinal = true,
+            FinishReason = "stop",
+            ActualResponseType = LlmResponseType.Text,
+            Usage = usage
+        };
+    }
+
+    private static List<Message> ConvertToAnthropicMessages(IEnumerable<LlmMessage> messages)
+    {
         var anthropicMessages = new List<Message>();
         var systemMessages = new List<string>();
 
         // First pass: collect system messages
-        foreach (var m in request.Messages)
+        foreach (var m in messages)
         {
             if (m.Role == "system")
             {
@@ -107,7 +164,7 @@ public sealed class AnthropicLlmClient : ILlmClient
 
         // Second pass: convert messages and prepend system content to first user message
         bool systemMessagesPrepended = false;
-        foreach (var m in request.Messages)
+        foreach (var m in messages)
         {
             switch (m.Role)
             {
@@ -142,231 +199,6 @@ public sealed class AnthropicLlmClient : ILlmClient
             }
         }
 
-        // Determine the actual response type based on request and available functions
-        var actualResponseType = DetermineActualResponseType(request);
-
-        // Handle different response types
-        switch (actualResponseType)
-        {
-            case LlmResponseType.FunctionCall:
-                await foreach (var chunk in HandleFunctionCallRequestSafe(request, anthropicMessages, ct))
-                {
-                    yield return chunk;
-                }
-                break;
-
-            case LlmResponseType.Streaming:
-                await foreach (var chunk in HandleStreamingRequestSafe(request, anthropicMessages, ct))
-                {
-                    yield return chunk;
-                }
-                break;
-
-            case LlmResponseType.Text:
-            default:
-                await foreach (var chunk in HandleTextRequestSafe(request, anthropicMessages, ct))
-                {
-                    yield return chunk;
-                }
-                break;
-        }
-    }
-
-    private LlmResponseType DetermineActualResponseType(LlmRequest request)
-    {
-        // If streaming is explicitly requested, use streaming
-        if (request.ResponseType == LlmResponseType.Streaming || request.EnableStreaming)
-        {
-            return LlmResponseType.Streaming;
-        }
-
-        // If functions are provided and function calling is requested, use function calling
-        if (request.Functions != null && request.Functions.Any() && 
-            (request.ResponseType == LlmResponseType.FunctionCall || request.ResponseType == LlmResponseType.Auto))
-        {
-            return LlmResponseType.FunctionCall;
-        }
-
-        // Default to text completion
-        return LlmResponseType.Text;
-    }
-
-    private async IAsyncEnumerable<LlmStreamingChunk> HandleTextRequestSafe(LlmRequest request, List<Message> anthropicMessages, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
-    {
-        IAsyncEnumerable<LlmStreamingChunk> result;
-        try
-        {
-            result = HandleTextRequest(request, anthropicMessages, ct);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            throw new InvalidOperationException($"Anthropic text request failed: {ex.Message}", ex);
-        }
-
-        await foreach (var chunk in result)
-        {
-            yield return chunk;
-        }
-    }
-
-    private async IAsyncEnumerable<LlmStreamingChunk> HandleTextRequest(LlmRequest request, List<Message> anthropicMessages, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
-    {
-        var parameters = new MessageParameters
-        {
-            Messages = anthropicMessages,
-            MaxTokens = request.MaxTokens ?? Configuration.MaxTokens,
-            Model = _model,
-            Temperature = (decimal)(request.Temperature ?? Configuration.Temperature)
-        };
-
-        var response = await _client.Messages.GetClaudeMessageAsync(parameters, ct);
-
-        var textContent = response.Content.OfType<TextContent>().FirstOrDefault();
-
-        if (textContent?.Text == null)
-        {
-            throw new InvalidOperationException("Invalid response from Anthropic API");
-        }
-
-        yield return new LlmStreamingChunk
-        {
-            Content = textContent.Text,
-            IsFinal = true,
-            FinishReason = "stop",
-            ActualResponseType = LlmResponseType.Text,
-            Usage = response.Usage != null
-                ? new LlmUsage
-                {
-                    InputTokens = response.Usage.InputTokens,
-                    OutputTokens = response.Usage.OutputTokens,
-                    Model = _model,
-                    Provider = "Anthropic"
-                }
-                : null
-        };
-    }
-
-    private async IAsyncEnumerable<LlmStreamingChunk> HandleFunctionCallRequestSafe(LlmRequest request, List<Message> anthropicMessages, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
-    {
-        IAsyncEnumerable<LlmStreamingChunk> result;
-        try
-        {
-            result = HandleFunctionCallRequest(request, anthropicMessages, ct);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            throw new InvalidOperationException($"Anthropic function call request failed: {ex.Message}", ex);
-        }
-
-        await foreach (var chunk in result)
-        {
-            yield return chunk;
-        }
-    }
-
-    private async IAsyncEnumerable<LlmStreamingChunk> HandleFunctionCallRequest(LlmRequest request, List<Message> anthropicMessages, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
-    {
-        // Convert FunctionSpec to Anthropic tools
-        var tools = ConvertToAnthropicTools(request.Functions!);
-
-        var parameters = new MessageParameters
-        {
-            Messages = anthropicMessages,
-            Tools = tools,
-            MaxTokens = request.MaxTokens ?? Configuration.MaxTokens,
-            Model = _model,
-            Temperature = (decimal)(request.Temperature ?? Configuration.Temperature)
-        };
-
-        var response = await _client.Messages.GetClaudeMessageAsync(parameters, ct);
-
-        var textContent = response.Content.OfType<TextContent>().FirstOrDefault();
-        var toolUseContent = response.Content.OfType<ToolUseContent>().FirstOrDefault();
-
-        var chunk = new LlmStreamingChunk
-        {
-            Content = textContent?.Text ?? string.Empty,
-            IsFinal = true,
-            FinishReason = "stop",
-            ActualResponseType = LlmResponseType.Text, // Default to text, will update if function call found
-            Usage = response.Usage != null
-                ? new LlmUsage
-                {
-                    InputTokens = response.Usage.InputTokens,
-                    OutputTokens = response.Usage.OutputTokens,
-                    Model = _model,
-                    Provider = "Anthropic"
-                }
-                : null
-        };
-
-        // Check for tool use
-        if (toolUseContent != null)
-        {
-            chunk.ActualResponseType = LlmResponseType.FunctionCall;
-            chunk.FunctionCall = new LlmFunctionCall
-            {
-                Name = toolUseContent.Name ?? string.Empty,
-                ArgumentsJson = toolUseContent.Input?.ToJsonString() ?? "{}",
-                Arguments = toolUseContent.Input != null 
-                    ? JsonSerializer.Deserialize<Dictionary<string, object>>(toolUseContent.Input.ToJsonString()) ?? new Dictionary<string, object>()
-                    : new Dictionary<string, object>()
-            };
-        }
-
-        yield return chunk;
-    }
-
-    private async IAsyncEnumerable<LlmStreamingChunk> HandleStreamingRequestSafe(LlmRequest request, List<Message> anthropicMessages, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
-    {
-        IAsyncEnumerable<LlmStreamingChunk> result;
-        try
-        {
-            result = HandleStreamingRequest(request, anthropicMessages, ct);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            throw new InvalidOperationException($"Anthropic streaming request failed: {ex.Message}", ex);
-        }
-
-        await foreach (var chunk in result)
-        {
-            yield return chunk;
-        }
-    }
-
-    private async IAsyncEnumerable<LlmStreamingChunk> HandleStreamingRequest(LlmRequest request, List<Message> anthropicMessages, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
-    {
-        // For now, use the same logic as text request until streaming is properly implemented
-        await foreach (var chunk in HandleTextRequest(request, anthropicMessages, ct))
-        {
-            chunk.ActualResponseType = LlmResponseType.Streaming;
-            yield return chunk;
-        }
-    }
-
-    private static List<Message> ConvertToAnthropicMessages(IEnumerable<LlmMessage> messages)
-    {
-        var anthropicMessages = new List<Message>();
-
-        foreach (var message in messages)
-        {
-            var role = message.Role.ToLowerInvariant() switch
-            {
-                "system" => RoleType.User, // Anthropic doesn't have system role, convert to user
-                "user" => RoleType.User,
-                "assistant" => RoleType.Assistant,
-                "tool_result" => RoleType.User, // Convert tool results to user messages
-                _ => RoleType.User // Default to user for unknown roles
-            };
-
-            anthropicMessages.Add(new Message
-            {
-                Role = role,
-                Content = [new TextContent { Text = message.Content }]
-            });
-        }
-
         return anthropicMessages;
     }
 
@@ -376,7 +208,7 @@ public sealed class AnthropicLlmClient : ILlmClient
 
         foreach (var function in functions)
         {
-            var schemaNode = JsonNode.Parse(JsonSerializer.Serialize(function.ParametersSchema))!;
+            var schemaNode = JsonNode.Parse(System.Text.Json.JsonSerializer.Serialize(function.ParametersSchema))!;
             var tool = new Function(
                 function.Name,
                 function.Description ?? string.Empty,

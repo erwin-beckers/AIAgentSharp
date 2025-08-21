@@ -69,11 +69,9 @@ public class AnthropicLlmClientExtendedTests
             BindingFlags.NonPublic | BindingFlags.Static);
         var result = (List<Message>)convertMethod!.Invoke(null, new object[] { messages })!;
 
-        Assert.AreEqual(2, result.Count);
+        Assert.AreEqual(1, result.Count);
         Assert.AreEqual(RoleType.User, result[0].Role);
-        Assert.AreEqual(RoleType.User, result[1].Role);
-        Assert.AreEqual("You are a helpful assistant", ((TextContent)result[0].Content[0]).Text);
-        Assert.AreEqual("Hello", ((TextContent)result[1].Content[0]).Text);
+        Assert.AreEqual("You are a helpful assistant\n\nHello", ((TextContent)result[0].Content[0]).Text);
     }
 
     [TestMethod]

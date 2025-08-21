@@ -15,9 +15,8 @@ namespace example;
 /// </summary>
 internal class CustomSchemaExample
 {
-    public static async Task RunAsync(string apiKey)
+    public static async Task RunAsync(ILlmClient llm)
     {
-        var llm = new OpenAiLlmClient(apiKey);
 
         Console.WriteLine("Custom Schema Override Example");
         Console.WriteLine("=============================");

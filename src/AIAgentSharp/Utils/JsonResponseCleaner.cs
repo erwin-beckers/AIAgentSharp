@@ -53,48 +53,9 @@ public static class JsonResponseCleaner
     /// </summary>
     private static string RemoveMarkdownCodeBlocks(string content)
     {
-        var lines = content.Split('\n');
-        var result = new StringBuilder();
-        var inCodeBlock = false;
-        var codeBlockStart = -1;
-        var hasCodeBlocks = false;
-
-        for (int i = 0; i < lines.Length; i++)
-        {
-            var line = lines[i];
-            
-            // Check for code block markers
-            if (line.Trim().StartsWith("```"))
-            {
-                hasCodeBlocks = true;
-                if (!inCodeBlock)
-                {
-                    // Start of code block
-                    inCodeBlock = true;
-                    codeBlockStart = i;
-                }
-                else
-                {
-                    // End of code block
-                    inCodeBlock = false;
-                    codeBlockStart = -1;
-                }
-                continue;
-            }
-
-            if (!inCodeBlock)
-            {
-                result.AppendLine(line);
-            }
-        }
-
-        // If no code blocks were found, return the original content unchanged
-        if (!hasCodeBlocks)
-        {
-            return content;
-        }
-
-        return result.ToString().Trim();
+        content = content.Replace("```json", "");
+        content = content.Replace("```", "");
+        return content.Trim();
     }
 
     /// <summary>

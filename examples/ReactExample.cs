@@ -11,13 +11,9 @@ namespace example;
 
 internal class ReactExample
 {
-    public static async Task RunAsync(string apiKey)
+    public static async Task RunAsync(ILlmClient llm)
     {
-        // Create LLM client and travel planning tools
-        // var llm = new AnthropicLlmClient(apiKey); // For Anthropic
-        // var llm = new GeminiLlmClient(apiKey); // For Google Gemini
-        // var llm = new MistralLlmClient(apiKey); // for Mistral
-        var llm = new OpenAiLlmClient(apiKey);
+        // Create travel planning tools
         var tools = new List<ITool>
         {
             new SearchFlightsTool(),
