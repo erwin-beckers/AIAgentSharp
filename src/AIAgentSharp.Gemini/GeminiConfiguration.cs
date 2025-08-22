@@ -21,7 +21,7 @@ public sealed class GeminiConfiguration
     /// Gets or sets the Google Gemini model to use for completions.
     /// </summary>
     /// <value>
-    /// The model name. Default is "gemini-1.5-flash".
+    /// The model name. Default is "gemini-2.5-flash".
     /// </value>
     /// <remarks>
     /// Common models include:
@@ -30,7 +30,7 @@ public sealed class GeminiConfiguration
     /// - gemini-1.0-pro: Legacy model, still effective
     /// - gemini-1.5-flash-exp: Experimental version with extended capabilities
     /// </remarks>
-    public string Model { get; init; } = "gemini-1.5-flash";
+    public string Model { get; init; } = "gemini-2.5-flash";
 
     /// <summary>
     /// Gets or sets the maximum number of tokens to generate.
@@ -143,7 +143,7 @@ public sealed class GeminiConfiguration
     {
         return new GeminiConfiguration
         {
-            Model = "gemini-1.5-flash",
+            Model = "gemini-2.5-flash",
             Temperature = 0.1f,
             MaxTokens = 4000,
             EnableFunctionCalling = true,

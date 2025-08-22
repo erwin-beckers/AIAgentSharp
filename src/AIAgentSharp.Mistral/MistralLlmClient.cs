@@ -1,6 +1,8 @@
 using System.Text;
 using System.Text.Json;
 using System.Diagnostics.CodeAnalysis;
+using System.Net.Http;
+using System.Net.Http.Headers;
 
 namespace AIAgentSharp.Mistral;
 
@@ -95,21 +97,12 @@ public class MistralLlmClient : ILlmClient
 
     private LlmResponseType DetermineActualResponseType(LlmRequest request)
     {
-        // If streaming is explicitly requested, use streaming
-        if (request.ResponseType == LlmResponseType.Streaming || request.EnableStreaming)
-        {
-            return LlmResponseType.Streaming;
-        }
-
-        // If functions are provided and function calling is requested, use function calling
-        if (request.Functions != null && request.Functions.Any() && 
-            (request.ResponseType == LlmResponseType.FunctionCall || request.ResponseType == LlmResponseType.Auto))
+        // Stream by default for plain text (matches OpenAI/Anthropic/Gemini behavior)
+        if (request.Functions != null && request.Functions.Any())
         {
             return LlmResponseType.FunctionCall;
         }
-
-        // Default to text completion
-        return LlmResponseType.Text;
+        return LlmResponseType.Streaming;
     }
 
     private async IAsyncEnumerable<LlmStreamingChunk> HandleTextRequestSafe(LlmRequest request, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
@@ -304,11 +297,126 @@ public class MistralLlmClient : ILlmClient
 
     private async IAsyncEnumerable<LlmStreamingChunk> HandleStreamingRequest(LlmRequest request, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
     {
-        // For now, use the same logic as text request until streaming is properly implemented
-        await foreach (var chunk in HandleTextRequest(request, ct))
+        var usage = new LlmUsage { Model = _configuration.Model, Provider = "Mistral" };
+
+        var mistralRequest = new
         {
-            chunk.ActualResponseType = LlmResponseType.Streaming;
-            yield return chunk;
+            model = _configuration.Model,
+            messages = ConvertToMistralMessages(request.Messages),
+            max_tokens = request.MaxTokens ?? _configuration.MaxTokens,
+            temperature = request.Temperature ?? _configuration.Temperature,
+            top_p = request.TopP ?? _configuration.TopP,
+            stream = true
+        };
+
+        var json = JsonSerializer.Serialize(mistralRequest, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower });
+        using var httpRequest = new HttpRequestMessage(HttpMethod.Post, "chat/completions")
+        {
+            Content = new StringContent(json, Encoding.UTF8, "application/json")
+        };
+        httpRequest.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
+
+        using var response = await _httpClient.SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead, ct);
+        response.EnsureSuccessStatusCode();
+
+        await using var stream = await response.Content.ReadAsStreamAsync(ct);
+        using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: false, bufferSize: 1024, leaveOpen: false);
+
+        var frameBuilder = new StringBuilder();
+        string? line;
+        while ((line = await reader.ReadLineAsync()) != null)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            // End of one SSE event
+            if (line.Length == 0)
+            {
+                if (frameBuilder.Length == 0) continue;
+                var payload = frameBuilder.ToString();
+                frameBuilder.Clear();
+
+                // Collect data: lines in the frame into a single JSON string
+                var dataBuilder = new StringBuilder();
+                using (var sr = new StringReader(payload))
+                {
+                    string? l;
+                    while ((l = sr.ReadLine()) != null)
+                    {
+                        if (!l.StartsWith("data:", StringComparison.OrdinalIgnoreCase)) continue;
+                        var data = l.Substring(5).TrimStart();
+                        if (data.Length == 0) continue;
+                        if (string.Equals(data, "[DONE]", StringComparison.Ordinal))
+                        {
+                            // Final chunk
+                            yield return new LlmStreamingChunk
+                            {
+                                Content = string.Empty,
+                                IsFinal = true,
+                                FinishReason = "stop",
+                                ActualResponseType = LlmResponseType.Text,
+                                Usage = usage
+                            };
+                            yield break;
+                        }
+                        dataBuilder.Append(data);
+                    }
+                }
+
+                var dataJson = dataBuilder.ToString();
+                if (string.IsNullOrWhiteSpace(dataJson)) continue;
+
+                using (var doc = JsonDocument.Parse(dataJson))
+                {
+                    var root = doc.RootElement;
+
+                    // Update usage if present (usually only in final event)
+                    if (root.TryGetProperty("usage", out var usageElem) && usageElem.ValueKind == JsonValueKind.Object)
+                    {
+                        if (usageElem.TryGetProperty("prompt_tokens", out var pt) && pt.TryGetInt32(out var promptTokens))
+                            usage.InputTokens = promptTokens;
+                        if (usageElem.TryGetProperty("completion_tokens", out var ctokens) && ctokens.TryGetInt32(out var completionTokens))
+                            usage.OutputTokens = completionTokens;
+                    }
+
+                    // Extract incremental content: choices[0].delta.content (preferred), fallback to choices[0].message.content
+                    if (root.TryGetProperty("choices", out var choices) && choices.ValueKind == JsonValueKind.Array && choices.GetArrayLength() > 0)
+                    {
+                        var choice0 = choices[0];
+                        string? deltaText = null;
+
+                        if (choice0.TryGetProperty("delta", out var delta) && delta.ValueKind == JsonValueKind.Object)
+                        {
+                            if (delta.TryGetProperty("content", out var contentElem) && contentElem.ValueKind == JsonValueKind.String)
+                            {
+                                deltaText = contentElem.GetString();
+                            }
+                        }
+                        else if (choice0.TryGetProperty("message", out var message) && message.ValueKind == JsonValueKind.Object)
+                        {
+                            if (message.TryGetProperty("content", out var contentElem) && contentElem.ValueKind == JsonValueKind.String)
+                            {
+                                deltaText = contentElem.GetString();
+                            }
+                        }
+
+                        if (!string.IsNullOrEmpty(deltaText))
+                        {
+                            yield return new LlmStreamingChunk
+                            {
+                                Content = deltaText!,
+                                IsFinal = false,
+                                ActualResponseType = LlmResponseType.Streaming,
+                                Usage = usage
+                            };
+                        }
+                    }
+                }
+
+                continue;
+            }
+
+            // Accumulate frame lines
+            frameBuilder.AppendLine(line);
         }
     }
 

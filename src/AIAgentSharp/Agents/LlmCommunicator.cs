@@ -111,8 +111,9 @@ public sealed class LlmCommunicator : ILlmCommunicator
             var cleaner = new StreamingContentCleaner(); // New instance per streaming session
             await foreach (var chunk in _llm.StreamAsync(request, timeoutCts.Token))
             {
+             //   Console.WriteLine("CallLlmWithStreamingAsync:" + content);
                 content += chunk.Content;
-                
+
                 // Process chunk with stateful cleaner
                 var cleanedContent = cleaner.ProcessChunk(chunk.Content);
                 if (!string.IsNullOrEmpty(cleanedContent))
@@ -128,12 +129,12 @@ public sealed class LlmCommunicator : ILlmCommunicator
                         ActualResponseType = chunk.ActualResponseType,
                         AdditionalMetadata = chunk.AdditionalMetadata
                     };
-                    
+
                     // Emit streaming chunk event with cleaned content
                     _eventManager.RaiseLlmChunkReceived(agentId, turnIndex, cleanedChunk);
                 }
             }
-            
+
             // Flush any remaining content
             var remainingContent = cleaner.Flush();
             if (!string.IsNullOrEmpty(remainingContent))
@@ -172,7 +173,7 @@ public sealed class LlmCommunicator : ILlmCommunicator
         {
             // Use streaming for consistent behavior
             var content = await CallLlmWithStreamingAsync(messages, agentId, turnIndex, ct);
-            
+
             // Parse the content (without raising duplicate events)
             return await ParseJsonResponseInternal(content, turnIndex, turnId, state, ct);
         }
@@ -269,6 +270,7 @@ public sealed class LlmCommunicator : ILlmCommunicator
             Trace.WriteLine($"Error: {ex.Message}");
             var err = $"Invalid LLM JSON: {ex.Message}";
             _logger.LogError(err);
+            Environment.Exit(1);
 
             // Emit status for JSON parse failure
             _statusManager.EmitStatus(state.AgentId, "Invalid model output", "JSON parsing failed", "Will retry with corrected format");

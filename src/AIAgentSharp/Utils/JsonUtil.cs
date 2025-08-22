@@ -33,6 +33,7 @@ public static class JsonUtil
     /// <exception cref="ArgumentException">Thrown when the JSON is invalid or required fields are missing.</exception>
     public static ModelMessage ParseStrict(string json, AgentConfiguration? config = null)
     {
+        Console.WriteLine("ParseStrict:"+json);
         // Clean the JSON response to handle malformed responses from LLMs
         var cleanedJson = JsonResponseCleaner.CleanJsonResponse(json);
         

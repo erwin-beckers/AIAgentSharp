@@ -6,6 +6,13 @@ using AIAgentSharp.Gemini;
 using AIAgentSharp.Mistral;
 using AIAgentSharp.OpenAI;
 
+public enum LLMType
+{
+    OpenAi,
+    Antrophic,
+    Gemini,
+    Mistral
+}
 /// <summary>
 ///     Main program demonstrating the usage of the Agent framework.
 ///     This example shows how to create an agent, configure it, subscribe to events,
@@ -15,11 +22,8 @@ internal class Program
 {
     private static async Task Main(string[] args)
     {
-        // Get API key from environment variable
-        var apiKey = Environment.GetEnvironmentVariable("API_KEY") ?? throw new InvalidOperationException("Set LLM_API_KEY env var.");
-
         // Create LLM client - change this line to switch between providers
-        ILlmClient llm = CreateLlmClient(apiKey);
+        var llm = CreateLlmClient(LLMType.OpenAi);
 
         Console.WriteLine("---------------------------- SIMPLE STREAMING TEST --------------------------");
         await SimpleStreamingTest.RunAsync(llm);
@@ -44,22 +48,34 @@ internal class Program
     /// Creates an LLM client based on the specified provider.
     /// Change the return statement to switch between different LLM providers.
     /// </summary>
-    /// <param name="apiKey">The API key for the LLM provider</param>
     /// <returns>An LLM client instance</returns>
-    private static ILlmClient CreateLlmClient(string apiKey)
+    private static ILlmClient CreateLlmClient(LLMType llmType)
     {
-        // Uncomment the provider you want to use:
+        switch (llmType)
+        {
 
-        // OpenAI (GPT-4, GPT-3.5, etc.)
-        return new OpenAiLlmClient(apiKey);
+            case LLMType.Antrophic:
+                {
+                    var apiKey = Environment.GetEnvironmentVariable("ANTROPHIC_API_KEY") ?? throw new InvalidOperationException("Set ANTROPHIC_API_KEY env var.");
 
-        // Anthropic (Claude)
-        // return new AnthropicLlmClient(apiKey);
-
-        // Google Gemini
-        //  return new GeminiLlmClient(apiKey);
-
-        // Mistral AI
-        // return new MistralLlmClient(apiKey);
+                    return new AnthropicLlmClient(apiKey);
+                }
+            case LLMType.Gemini:
+                {
+                    var apiKey = Environment.GetEnvironmentVariable("GEMINI_API_KEY") ?? throw new InvalidOperationException("Set GEMINI_API_KEY env var.");
+                    return new GeminiLlmClient(apiKey);
+                }
+            case LLMType.Mistral:
+                {
+                    var apiKey = Environment.GetEnvironmentVariable("MISTRAL_API_KEY") ?? throw new InvalidOperationException("Set MISTRAL_API_KEY env var.");
+                    return new MistralLlmClient(apiKey);
+                }
+            case LLMType.OpenAi:
+            default:
+                {
+                    var apiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY") ?? throw new InvalidOperationException("Set OPENAI_API_KEY env var.");
+                    return new OpenAiLlmClient(apiKey);
+                }
+        }
     }
 }
