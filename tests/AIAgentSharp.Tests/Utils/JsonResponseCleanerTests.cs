@@ -169,8 +169,8 @@ This is the end.";
 
         // Assert
         Assert.IsTrue(IsValidJson(result));
-        // The cleaner converts single quotes to escaped double quotes
-        Assert.AreEqual(@"{""thoughts"":""I\""m thinking about this"",""action"":""plan""}", result);
+        // The cleaner preserves apostrophes and removes invalid backslashes
+        Assert.AreEqual(@"{""thoughts"":""I'm thinking about this"",""action"":""plan""}", result);
     }
 
     [TestMethod]
@@ -183,8 +183,8 @@ This is the end.";
         var result = JsonResponseCleaner.CleanJsonResponse(input);
 
         // Assert
-        // The cleaner converts escaped single quotes to double-escaped double quotes
-        Assert.AreEqual(@"{""thoughts"":""I\\""m thinking about this"",""action"":""plan""}", result);
+        // The cleaner drops the invalid escape and keeps the apostrophe
+        Assert.AreEqual(@"{""thoughts"":""I'm thinking about this"",""action"":""plan""}", result);
     }
 
     [TestMethod]
@@ -389,8 +389,8 @@ This concludes my analysis.";
 
         // Assert
         Assert.IsTrue(IsValidJson(result));
-        // The cleaner converts single quotes to escaped double quotes
-        Assert.AreEqual(@"{""thoughts"":""I\""m analyzing the problem"",""action"":""plan"",""reasoning"":""Step by step analysis""}", result);
+        // The cleaner preserves apostrophes in strings
+        Assert.AreEqual(@"{""thoughts"":""I'm analyzing the problem"",""action"":""plan"",""reasoning"":""Step by step analysis""}", result);
     }
 
     [TestMethod]

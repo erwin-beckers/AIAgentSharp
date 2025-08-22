@@ -198,17 +198,21 @@ public static class JsonResponseCleaner
                 // Handle escaped characters
                 if (c == '\'')
                 {
-                    // Fix escaped single quotes - convert to escaped double quotes
-                    result.Append("\\\"");
-        }
+                    // JSON does not define \' escape. Drop the backslash and keep the apostrophe.
+                    if (result.Length > 0 && result[result.Length - 1] == '\\')
+                    {
+                        result.Length -= 1; // remove previously appended backslash
+                    }
+                    result.Append('\'');
+                }
                 else
-        {
+                {
                     result.Append(c);
                 }
                 escapeNext = false;
                 lastChar = c;
                 continue;
-        }
+            }
 
             if (c == '\\')
             {
@@ -275,12 +279,7 @@ public static class JsonResponseCleaner
             else
             {
                 // Inside string - handle common LLM string errors
-                if (c == '\'')
-                {
-                    // Convert unescaped single quotes to escaped double quotes
-                    result.Append("\\\"");
-                }
-                else if (c == '\r')
+                if (c == '\r')
                 {
                     // Convert carriage returns to escaped newlines
                     result.Append("\\n");
