@@ -49,7 +49,7 @@ public class JsonResponseCleanerTests
     }
 
     [TestMethod]
-    public void CleanJsonResponse_Should_RemoveMarkdownCodeBlocks_When_JsonIsWrappedInCodeBlocks()
+    public void CleanJsonResponse_Should_ExtractJson_When_JsonIsWrappedInCodeBlocks()
     {
         // Arrange
         var input = @"Here is the JSON response:
@@ -63,16 +63,13 @@ This is the end.";
         // Act
         var result = JsonResponseCleaner.CleanJsonResponse(input);
 
-        // Assert
-        // The cleaner removes code blocks but doesn't extract JSON from them
-        Assert.IsTrue(result.Contains("Here is the JSON response:"));
-        Assert.IsTrue(result.Contains("This is the end."));
-        Assert.IsFalse(result.Contains("```json"));
-        Assert.IsFalse(result.Contains(@"{""thoughts"":""test"",""action"":""plan""}"));
+        // Assert: cleaner extracts JSON from code block and returns it
+        Assert.IsTrue(IsValidJson(result));
+        Assert.AreEqual(@"{""thoughts"":""test"",""action"":""plan""}", result);
     }
 
     [TestMethod]
-    public void CleanJsonResponse_Should_RemoveMarkdownCodeBlocks_When_JsonIsWrappedInCodeBlocksWithoutLanguage()
+    public void CleanJsonResponse_Should_ExtractJson_When_JsonIsWrappedInCodeBlocksWithoutLanguage()
     {
         // Arrange
         var input = @"Here is the JSON response:
@@ -86,12 +83,9 @@ This is the end.";
         // Act
         var result = JsonResponseCleaner.CleanJsonResponse(input);
 
-        // Assert
-        // The cleaner removes code blocks but doesn't extract JSON from them
-        Assert.IsTrue(result.Contains("Here is the JSON response:"));
-        Assert.IsTrue(result.Contains("This is the end."));
-        Assert.IsFalse(result.Contains("```"));
-        Assert.IsFalse(result.Contains(@"{""thoughts"":""test"",""action"":""plan""}"));
+        // Assert: cleaner extracts JSON from code block and returns it
+        Assert.IsTrue(IsValidJson(result));
+        Assert.AreEqual(@"{""thoughts"":""test"",""action"":""plan""}", result);
     }
 
     [TestMethod]
@@ -335,7 +329,7 @@ This is the end.";
     }
 
     [TestMethod]
-    public void CleanJsonResponse_Should_HandleMultipleCodeBlocks_When_ContentHasMultipleCodeBlocks()
+    public void CleanJsonResponse_Should_ExtractFirstJson_When_ContentHasMultipleCodeBlocks()
     {
         // Arrange
         var input = @"First code block:
@@ -356,19 +350,13 @@ Third code block:
         // Act
         var result = JsonResponseCleaner.CleanJsonResponse(input);
 
-        // Assert
-        // The cleaner removes all code blocks
-        Assert.IsTrue(result.Contains("First code block:"));
-        Assert.IsTrue(result.Contains("Second code block:"));
-        Assert.IsTrue(result.Contains("Third code block:"));
-        Assert.IsFalse(result.Contains("```json"));
-        Assert.IsFalse(result.Contains(@"{""thoughts"":""first""}"));
-        Assert.IsFalse(result.Contains(@"{""thoughts"":""second""}"));
-        Assert.IsFalse(result.Contains(@"{""thoughts"":""third""}"));
+        // Assert: cleaner extracts the first JSON block by design
+        Assert.IsTrue(IsValidJson(result));
+        Assert.AreEqual(@"{""thoughts"":""first""}", result);
     }
 
     [TestMethod]
-    public void CleanJsonResponse_Should_HandleIncompleteCodeBlocks_When_CodeBlockIsNotClosed()
+    public void CleanJsonResponse_Should_ExtractJson_When_CodeBlockIsNotClosed()
     {
         // Arrange
         var input = @"Here is the JSON:
@@ -378,11 +366,9 @@ Third code block:
         // Act
         var result = JsonResponseCleaner.CleanJsonResponse(input);
 
-        // Assert
-        // The cleaner removes incomplete code blocks
-        Assert.IsTrue(result.Contains("Here is the JSON:"));
-        Assert.IsFalse(result.Contains("```json"));
-        Assert.IsFalse(result.Contains(@"{""thoughts"":""test"",""action"":""plan""}"));
+        // Assert: cleaner extracts JSON even if code block fences are incomplete
+        Assert.IsTrue(IsValidJson(result));
+        Assert.AreEqual(@"{""thoughts"":""test"",""action"":""plan""}", result);
     }
 
     [TestMethod]

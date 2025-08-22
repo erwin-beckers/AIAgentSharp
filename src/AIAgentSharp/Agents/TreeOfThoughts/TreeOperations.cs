@@ -3,7 +3,7 @@ namespace AIAgentSharp.Agents.TreeOfThoughts;
 /// <summary>
 /// Handles tree manipulation operations for Tree of Thoughts reasoning.
 /// </summary>
-internal sealed class TreeOperations
+public sealed class TreeOperations
 {
     /// <summary>
     /// Creates a root node for the reasoning tree.

@@ -3,7 +3,7 @@ namespace AIAgentSharp.Agents.TreeOfThoughts;
 /// <summary>
 /// Handles LLM communication for generating thoughts in Tree of Thoughts reasoning.
 /// </summary>
-internal sealed class TreeThoughtGenerator
+public class TreeThoughtGenerator
 {
     private readonly TreeOfThoughtsCommunicator _communicator;
 
@@ -23,12 +23,12 @@ internal sealed class TreeThoughtGenerator
     /// <summary>
     /// Generates child thoughts from a parent node.
     /// </summary>
-    public async Task<List<ChildThought>> GenerateChildThoughtsAsync(ThoughtNode parentNode, CancellationToken cancellationToken)
+    public virtual async Task<List<ChildThought>> GenerateChildThoughtsAsync(ThoughtNode parentNode, CancellationToken cancellationToken)
     {
         return await _communicator.GenerateChildThoughtsAsync(parentNode, cancellationToken);
     }
 
-    internal class ChildThought
+    public class ChildThought
     {
         public string Thought { get; set; } = "";
         public ThoughtType ThoughtType { get; set; } = ThoughtType.Hypothesis;

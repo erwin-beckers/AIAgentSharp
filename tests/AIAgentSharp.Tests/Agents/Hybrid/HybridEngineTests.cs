@@ -189,6 +189,48 @@ public class HybridEngineTests
     }
 
     [TestMethod]
+    public void CalculateCombinedConfidence_Should_WeightChainHigher()
+    {
+        var combined = typeof(HybridEngine)
+            .GetMethod("CalculateCombinedConfidence", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public)
+            !.Invoke(_hybridEngine, new object[] { 0.9, 0.5 });
+        var value = (double)combined!;
+        Assert.IsTrue(value > 0.7 && value < 0.9);
+    }
+
+    [TestMethod]
+    public void CombineConclusions_Should_Combine_When_BothProvided()
+    {
+        var combined = (string)typeof(HybridEngine)
+            .GetMethod("CombineConclusions", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public)
+            !.Invoke(_hybridEngine, new object[] { "chain", "tree" })!;
+        Assert.IsTrue(combined.Contains("Analysis:"));
+        Assert.IsTrue(combined.Contains("Exploration:"));
+    }
+
+    [TestMethod]
+    public void CombineConclusions_Should_Handle_Empty()
+    {
+        var combined = (string)typeof(HybridEngine)
+            .GetMethod("CombineConclusions", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public)
+            !.Invoke(_hybridEngine, new object[] { string.Empty, string.Empty })!;
+        Assert.IsTrue(combined.Contains("no specific conclusions"));
+    }
+
+    [TestMethod]
+    public void EnhanceContextWithChainInsights_Should_Append_Insights()
+    {
+        var chain = new ReasoningChain { Steps = new List<ReasoningStep> { new ReasoningStep { Reasoning = "x", Confidence = 0.9 } } };
+        var rr = new ReasoningResult { Conclusion = "c", Chain = chain };
+        var result = (string)typeof(HybridEngine)
+            .GetMethod("EnhanceContextWithChainInsights", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public)
+            !.Invoke(_hybridEngine, new object[] { "ctx", rr })!;
+        Assert.IsTrue(result.Contains("ctx"));
+        Assert.IsTrue(result.Contains("Chain of Thought Analysis: c"));
+        Assert.IsTrue(result.Contains("Key Insights"));
+    }
+
+    [TestMethod]
     public void CurrentChain_Should_ReturnChainFromChainEngine()
     {
         // Act

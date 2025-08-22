@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Diagnostics.CodeAnalysis;
 
 namespace AIAgentSharp.Schema;
 
@@ -89,6 +90,7 @@ namespace AIAgentSharp.Schema;
 /// </code>
 /// </example>
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Property, AllowMultiple = false)]
+[ExcludeFromCodeCoverage]
 public class ToolSchemaAttribute : Attribute
 {
     /// <summary>

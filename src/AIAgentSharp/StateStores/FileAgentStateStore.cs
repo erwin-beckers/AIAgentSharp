@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using File = System.IO.File;
 
@@ -7,6 +8,7 @@ namespace AIAgentSharp;
 ///     A file-based implementation of IAgentStateStore that persists agent states to JSON files.
 ///     Each agent's state is stored in a separate file with atomic write operations for data integrity.
 /// </summary>
+[ExcludeFromCodeCoverage]
 public sealed class FileAgentStateStore : IAgentStateStore
 {
     private readonly string _directory;

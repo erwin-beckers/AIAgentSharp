@@ -6,7 +6,7 @@ namespace AIAgentSharp.Agents.TreeOfThoughts;
 /// <summary>
 /// Handles LLM communication for Tree of Thoughts reasoning using the unified LlmCommunicator.
 /// </summary>
-internal sealed class TreeOfThoughtsCommunicator
+public sealed class TreeOfThoughtsCommunicator
 {
     private readonly ILlmCommunicator _llmCommunicator;
 

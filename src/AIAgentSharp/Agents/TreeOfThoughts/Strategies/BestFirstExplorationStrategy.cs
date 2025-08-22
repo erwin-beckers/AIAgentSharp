@@ -7,7 +7,7 @@ namespace AIAgentSharp.Agents.TreeOfThoughts.Strategies;
 /// <summary>
 /// Implements best-first exploration strategy for Tree of Thoughts.
 /// </summary>
-internal sealed class BestFirstExplorationStrategy : ITreeExplorationStrategy
+public sealed class BestFirstExplorationStrategy : ITreeExplorationStrategy
 {
     [ExcludeFromCodeCoverage]
     public async Task<ExplorationResult> ExploreAsync(
