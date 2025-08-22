@@ -218,9 +218,10 @@ public sealed class OpenAiLlmClient : ILlmClient
         }
         else
         {
-            // Use streaming API for text responses
-            
-            var completionUpdates = chatClient.CompleteChatStreamingAsync(chatMessages, options);
+            // Respect EnableStreaming flag; default to streaming when true, otherwise non-streaming
+            if (request.EnableStreaming)
+            {
+                var completionUpdates = chatClient.CompleteChatStreamingAsync(chatMessages, options);
             var contentBuilder = new System.Text.StringBuilder();
 
             await foreach (var completionUpdate in completionUpdates.WithCancellation(ct))
@@ -280,6 +281,23 @@ public sealed class OpenAiLlmClient : ILlmClient
                             break;
                     }
                 }
+            }
+            }
+            else
+            {
+                var response = await chatClient.CompleteChatAsync(chatMessages, options, ct);
+                var completion = response.Value;
+                var content = completion.Content.Count > 0 ? completion.Content[0].Text : string.Empty;
+                usage.InputTokens = completion.Usage.InputTokenCount;
+                usage.OutputTokens = completion.Usage.OutputTokenCount;
+                yield return new LlmStreamingChunk
+                {
+                    Content = content,
+                    IsFinal = true,
+                    FinishReason = completion.FinishReason.ToString().ToLowerInvariant(),
+                    ActualResponseType = LlmResponseType.Text,
+                    Usage = usage
+                };
             }
         }
     }

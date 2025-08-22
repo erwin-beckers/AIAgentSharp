@@ -297,6 +297,16 @@ public class MistralLlmClient : ILlmClient
 
     private async IAsyncEnumerable<LlmStreamingChunk> HandleStreamingRequest(LlmRequest request, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
     {
+        // Respect EnableStreaming; if false, call non-streaming path
+        if (!request.EnableStreaming)
+        {
+            await foreach (var chunk in HandleTextRequestNonStreaming(request, ct))
+            {
+                yield return chunk;
+            }
+            yield break;
+        }
+
         var usage = new LlmUsage { Model = _configuration.Model, Provider = "Mistral" };
 
         var mistralRequest = new
@@ -418,6 +428,45 @@ public class MistralLlmClient : ILlmClient
             // Accumulate frame lines
             frameBuilder.AppendLine(line);
         }
+    }
+
+    private async IAsyncEnumerable<LlmStreamingChunk> HandleTextRequestNonStreaming(LlmRequest request, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
+    {
+        var mistralRequest = new
+        {
+            model = _configuration.Model,
+            messages = ConvertToMistralMessages(request.Messages),
+            max_tokens = request.MaxTokens ?? _configuration.MaxTokens,
+            temperature = request.Temperature ?? _configuration.Temperature,
+            top_p = request.TopP ?? _configuration.TopP,
+            stream = false
+        };
+
+        var json = JsonSerializer.Serialize(mistralRequest, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower });
+        var content = new StringContent(json, Encoding.UTF8, "application/json");
+        var response = await _httpClient.PostAsync("chat/completions", content, ct);
+        response.EnsureSuccessStatusCode();
+
+        var responseContent = await response.Content.ReadAsStringAsync(ct);
+        var mistralResponse = JsonSerializer.Deserialize<MistralChatCompletionResponse>(responseContent, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower });
+
+        var text = mistralResponse?.Choices?.FirstOrDefault()?.Message?.Content ?? string.Empty;
+        var usage = mistralResponse?.Usage != null ? new LlmUsage
+        {
+            InputTokens = mistralResponse.Usage.PromptTokens,
+            OutputTokens = mistralResponse.Usage.CompletionTokens,
+            Model = _configuration.Model,
+            Provider = "Mistral"
+        } : null;
+
+        yield return new LlmStreamingChunk
+        {
+            Content = text,
+            IsFinal = true,
+            FinishReason = "stop",
+            ActualResponseType = LlmResponseType.Text,
+            Usage = usage
+        };
     }
 
     [ExcludeFromCodeCoverage]

@@ -134,10 +134,36 @@ public sealed class GeminiLlmClient : ILlmClient
             yield break;
         }
 
-        // Text => SSE streaming
-        await foreach (var chunk in StreamSseAsync(geminiRequest, usage, ct))
+        // Text => respect EnableStreaming; SSE when true, otherwise non-streaming
+        if (request.EnableStreaming)
         {
-            yield return chunk;
+            await foreach (var chunk in StreamSseAsync(geminiRequest, usage, ct))
+            {
+                yield return chunk;
+            }
+        }
+        else
+        {
+            var resp = await _httpClient.PostAsJsonAsync(
+                $"https://generativelanguage.googleapis.com/v1beta/models/{_model}:generateContent?key={_apiKey}",
+                geminiRequest,
+                cancellationToken: ct);
+            resp.EnsureSuccessStatusCode();
+            var body = await resp.Content.ReadFromJsonAsync<GeminiGenerateContentResponse>(cancellationToken: ct);
+            var text = body?.Candidates?.FirstOrDefault()?.Content?.Parts?.FirstOrDefault()?.Text ?? string.Empty;
+            if (body?.UsageMetadata != null)
+            {
+                usage.InputTokens = body.UsageMetadata.PromptTokenCount ?? 0;
+                usage.OutputTokens = body.UsageMetadata.CandidatesTokenCount ?? 0;
+            }
+            yield return new LlmStreamingChunk
+            {
+                Content = text,
+                IsFinal = true,
+                FinishReason = "stop",
+                ActualResponseType = LlmResponseType.Text,
+                Usage = usage
+            };
         }
     }
 

@@ -16,7 +16,7 @@ internal class SimpleStreamingTest
         // Configure the agent using the improved fluent API
         var agent = AIAgent.Create(llm)
             .WithStorage(new MemoryAgentStateStore())
-            .WithStreaming()
+            .WithStreaming(true)
             .WithSystemMessage("You are a creative storyteller with a talent for crafting engaging, imaginative narratives. Use vivid descriptions and emotional depth in your stories.")
             .WithUserMessage("When telling stories, create memorable characters, build suspense, and include unexpected twists. Make the story come alive with sensory details.")
             .WithMessages(messages => messages

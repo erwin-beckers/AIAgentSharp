@@ -104,7 +104,8 @@ public sealed class LlmCommunicator : ILlmCommunicator
             var request = new LlmRequest
             {
                 Messages = messages,
-                ResponseType = LlmResponseType.Text
+                ResponseType = LlmResponseType.Text,
+                EnableStreaming = !_config.UseFunctionCalling
             };
 
             var content = "";
