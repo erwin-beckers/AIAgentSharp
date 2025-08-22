@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <PackageId>AIAgentSharp.Gemini</PackageId>
-    <Version>1.0.9</Version>
+    <Version>1.0.10</Version>
     <Authors>AIAgentSharp Contributors</Authors>
     <Description>Google Gemini integration for AIAgentSharp - LLM-powered agents with Google Gemini models.</Description>
     <PackageTags>ai,agent,llm,gemini,google,automation</PackageTags>
