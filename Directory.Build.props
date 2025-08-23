@@ -4,7 +4,7 @@
     <UseLocalPackages Condition="'$(UseLocalPackages)' == ''">true</UseLocalPackages>
     
     <!-- Set the AIAgentSharp version - you can override this via command line -->
-    <AIAgentSharpVersion Condition="'$(AIAgentSharpVersion)' == ''">1.0.10</AIAgentSharpVersion>
+    <AIAgentSharpVersion Condition="'$(AIAgentSharpVersion)' == ''">1.0.11</AIAgentSharpVersion>
   </PropertyGroup>
 
   <!-- When UseLocalPackages is false, use the NuGet package reference -->

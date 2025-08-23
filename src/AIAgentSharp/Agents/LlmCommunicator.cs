@@ -112,7 +112,7 @@ public sealed class LlmCommunicator : ILlmCommunicator
             var cleaner = new StreamingContentCleaner(); // New instance per streaming session
             await foreach (var chunk in _llm.StreamAsync(request, timeoutCts.Token))
             {
-             //   Console.WriteLine("CallLlmWithStreamingAsync:" + content);
+             //   //Console.WriteLine("CallLlmWithStreamingAsync:" + content);
                 content += chunk.Content;
 
                 // Process chunk with stateful cleaner
@@ -267,11 +267,10 @@ public sealed class LlmCommunicator : ILlmCommunicator
         }
         catch (Exception ex)
         {
-            Trace.WriteLine(llmRaw);
-            Trace.WriteLine($"Error: {ex.Message}");
+            //Trace.WriteLine(llmRaw);
+            //Trace.WriteLine($"Error: {ex.Message}");
             var err = $"Invalid LLM JSON: {ex.Message}";
             _logger.LogError(err);
-            Environment.Exit(1);
 
             // Emit status for JSON parse failure
             _statusManager.EmitStatus(state.AgentId, "Invalid model output", "JSON parsing failed", "Will retry with corrected format");

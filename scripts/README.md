@@ -23,7 +23,7 @@ Switches back to local project references for development.
 #### `switch-to-nuget.ps1 [version]`
 Switches to NuGet package references for publishing.
 ```powershell
-.\scripts\switch-to-nuget.ps1 1.0.8
+.\scripts\switch-to-nuget.ps1 1.0.11
 ```
 
 #### `publish-all.ps1 [version]`
@@ -35,7 +35,7 @@ Complete automated publishing workflow:
 5. Switches back to local references
 
 ```powershell
-.\scripts\publish-all.ps1 1.0.8
+.\scripts\publish-all.ps1 1.0.11
 ```
 
 ## Manual Usage

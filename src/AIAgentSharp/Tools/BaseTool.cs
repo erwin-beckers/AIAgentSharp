@@ -303,19 +303,19 @@ public abstract class BaseTool<TParams, TResult> : ITool, IToolIntrospect, IFunc
         }
         catch (JsonException ex)
         {
-            Trace.WriteLine(JsonSerializer.Serialize(parameters, JsonUtil.JsonOptions));
-            Trace.WriteLine(ex);
-            Console.WriteLine(JsonSerializer.Serialize(parameters, JsonUtil.JsonOptions));
-            Console.WriteLine(ex);
+            //Trace.WriteLine(JsonSerializer.Serialize(parameters, JsonUtil.JsonOptions));
+            //Trace.WriteLine(ex);
+            //Console.WriteLine(JsonSerializer.Serialize(parameters, JsonUtil.JsonOptions));
+            //Console.WriteLine(ex);
             var missing = GetMissingRequiredFields<TParams>(parameters);
             throw new ToolValidationException($"Failed to deserialize parameters: {ex.Message}", missing.ToList());
         }
         catch(Exception ex)
         {
-            Trace.WriteLine(JsonSerializer.Serialize(parameters, JsonUtil.JsonOptions));
-            Trace.WriteLine(ex);
-            Console.WriteLine(JsonSerializer.Serialize(parameters, JsonUtil.JsonOptions));
-            Console.WriteLine(ex);
+            //Trace.WriteLine(JsonSerializer.Serialize(parameters, JsonUtil.JsonOptions));
+            //Trace.WriteLine(ex);
+            //Console.WriteLine(JsonSerializer.Serialize(parameters, JsonUtil.JsonOptions));
+            //Console.WriteLine(ex);
             throw ;
         }
     }

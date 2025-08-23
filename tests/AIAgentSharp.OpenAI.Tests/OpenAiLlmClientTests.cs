@@ -6,7 +6,7 @@ namespace AIAgentSharp.OpenAI.Tests;
 public class OpenAiLlmClientTests
 {
     private const string TestApiKey = "test-api-key";
-    private const string TestModel = "gpt-4o-mini";
+    private const string TestModel = "gpt-5-nano";
 
     [TestMethod]
     public void Constructor_WithApiKey_ShouldCreateClient()
@@ -82,7 +82,7 @@ public class OpenAiLlmClientTests
         var config = OpenAiConfiguration.CreateForAgentReasoning();
 
         // Assert
-        Assert.AreEqual("gpt-4o-mini", config.Model);
+        Assert.AreEqual("gpt-5-nano", config.Model);
         Assert.AreEqual(0.1f, config.Temperature);
         Assert.AreEqual(4000, config.MaxTokens);
         Assert.IsTrue(config.EnableFunctionCalling);
@@ -127,7 +127,7 @@ public class OpenAiLlmClientTests
         var config = new OpenAiConfiguration();
 
         // Assert
-        Assert.AreEqual("gpt-4o-mini", config.Model);
+        Assert.AreEqual("gpt-5-nano", config.Model);
         Assert.AreEqual(4000, config.MaxTokens);
         Assert.AreEqual(0.1f, config.Temperature);
         Assert.AreEqual(1.0f, config.TopP);

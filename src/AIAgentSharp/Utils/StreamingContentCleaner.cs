@@ -33,7 +33,7 @@ public class StreamingContentCleaner
     {
         if (string.IsNullOrEmpty(chunk))
             return string.Empty;
-        //Console.WriteLine($"ProcessChunk:{chunk}");
+        ////Console.WriteLine($"ProcessChunk:{chunk}");
         var result = new StringBuilder();
         
         foreach (char c in chunk)

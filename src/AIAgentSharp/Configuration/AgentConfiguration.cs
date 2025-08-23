@@ -481,7 +481,7 @@ public sealed class AgentConfiguration
     /// // Subscribe to status updates
     /// agent.StatusUpdate += (sender, e) => 
     /// {
-    ///     Console.WriteLine($"Status: {e.StatusTitle} - Progress: {e.ProgressPct}%");
+    ///     //Console.WriteLine($"Status: {e.StatusTitle} - Progress: {e.ProgressPct}%");
     /// };
     /// </code>
     /// </example>

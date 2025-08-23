@@ -111,12 +111,12 @@ public interface IAgentStateStore
     /// var state = await stateStore.LoadAsync("travel-agent-123", ct);
     /// if (state != null)
     /// {
-    ///     Console.WriteLine($"Resuming agent with {state.Turns.Count} previous turns");
+    ///     //Console.WriteLine($"Resuming agent with {state.Turns.Count} previous turns");
     ///     // Continue from where the agent left off
     /// }
     /// else
     /// {
-    ///     Console.WriteLine("Starting new agent session");
+    ///     //Console.WriteLine("Starting new agent session");
     ///     // Create new state for the agent
     /// }
     /// </code>
@@ -184,7 +184,7 @@ public interface IAgentStateStore
     /// state.LastModifiedUtc = DateTimeOffset.UtcNow;
     /// 
     /// await stateStore.SaveAsync("travel-agent-123", state, ct);
-    /// Console.WriteLine("Agent state saved successfully");
+    /// //Console.WriteLine("Agent state saved successfully");
     /// </code>
     /// </example>
     Task SaveAsync(string agentId, AgentState state, CancellationToken ct = default);

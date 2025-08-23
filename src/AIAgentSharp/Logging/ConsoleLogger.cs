@@ -13,8 +13,8 @@ public class ConsoleLogger : ILogger
     /// <param name="message">The message to log.</param>
     public void LogInformation(string message)
     {
-        Console.WriteLine($"[INFO] {message}");
-        Trace.WriteLine($"[INFO] {message}");
+        //Console.WriteLine($"[INFO] {message}");
+        //Trace.WriteLine($"[INFO] {message}");
     }
 
     /// <summary>
@@ -23,8 +23,8 @@ public class ConsoleLogger : ILogger
     /// <param name="message">The message to log.</param>
     public void LogWarning(string message)
     {
-        Console.WriteLine($"[WARN] {message}");
-        Trace.WriteLine($"[WARN] {message}");
+        //Console.WriteLine($"[WARN] {message}");
+        //Trace.WriteLine($"[WARN] {message}");
     }
 
     /// <summary>
@@ -33,8 +33,8 @@ public class ConsoleLogger : ILogger
     /// <param name="message">The message to log.</param>
     public void LogError(string message)
     {
-        Console.WriteLine($"[ERROR] {message}");
-        Trace.WriteLine($"[ERROR] {message}");
+        //Console.WriteLine($"[ERROR] {message}");
+        //Trace.WriteLine($"[ERROR] {message}");
     }
 
     /// <summary>
@@ -43,7 +43,7 @@ public class ConsoleLogger : ILogger
     /// <param name="message">The message to log.</param>
     public void LogDebug(string message)
     {
-        Console.WriteLine($"[DEBUG] {message}");
-        Trace.WriteLine($"[DEBUG] {message}");
+        //Console.WriteLine($"[DEBUG] {message}");
+        //Trace.WriteLine($"[DEBUG] {message}");
     }
 }

@@ -35,7 +35,7 @@ public interface ILlmClient
     ///     Console.Write(chunk.Content); // Real-time output
     ///     if (chunk.IsFinal)
     ///     {
-    ///         Console.WriteLine($"\nFinished: {chunk.FinishReason}");
+    ///         //Console.WriteLine($"\nFinished: {chunk.FinishReason}");
     ///     }
     /// }
     /// </code>
@@ -53,8 +53,8 @@ public interface ILlmClient
     /// {
     ///     if (chunk.FunctionCall != null)
     ///     {
-    ///         Console.WriteLine($"Function: {chunk.FunctionCall.Name}");
-    ///         Console.WriteLine($"Arguments: {chunk.FunctionCall.ArgumentsJson}");
+    ///         //Console.WriteLine($"Function: {chunk.FunctionCall.Name}");
+    ///         //Console.WriteLine($"Arguments: {chunk.FunctionCall.ArgumentsJson}");
     ///     }
     ///     Console.Write(chunk.Content);
     /// }

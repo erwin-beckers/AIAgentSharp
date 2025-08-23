@@ -9,16 +9,16 @@ public sealed class OpenAiConfiguration
     /// Gets or sets the OpenAI model to use for completions.
     /// </summary>
     /// <value>
-    /// The model name. Default is "gpt-4o-mini".
+    /// The model name. Default is "gpt-5-nano".
     /// </value>
     /// <remarks>
     /// Common models include:
-    /// - gpt-4o-mini: Fast and cost-effective
+    /// - gpt-5-nano: Fast and cost-effective
     /// - gpt-4o: More capable but more expensive
     /// - gpt-4-turbo: Good balance of capability and cost
     /// - gpt-3.5-turbo: Legacy model, still effective for simple tasks
     /// </remarks>
-    public string Model { get; init; } = "gpt-4o-mini";
+    public string Model { get; init; } = "gpt-5-nano";
 
     /// <summary>
     /// Gets or sets the maximum number of tokens to generate.
@@ -164,7 +164,7 @@ public sealed class OpenAiConfiguration
     {
         return new OpenAiConfiguration
         {
-            Model = "gpt-4o-mini",
+            Model = "gpt-5-nano",
             Temperature = 0.1f,
             MaxTokens = 4000,
             EnableFunctionCalling = true,

@@ -128,7 +128,7 @@ internal class ReactExample
             .Build();
 
         // Define the travel planning goal for the agent
-        var goal = "Plan a 3-day trip to Paris for a couple with a budget of $2000. " +
+        var goal = "Plan a 3-day trip to Paris at 18 september for a couple with a budget of $2000. " +
                    "Search for flights from JFK to CDG, find a hotel for 3 nights, and suggest activities. " +
                    "Create a complete itinerary with costs and ensure it stays within budget.";
 

@@ -33,7 +33,7 @@ public static class JsonUtil
     /// <exception cref="ArgumentException">Thrown when the JSON is invalid or required fields are missing.</exception>
     public static ModelMessage ParseStrict(string json, AgentConfiguration? config = null)
     {
-        Console.WriteLine("ParseStrict:"+json);
+       // //Console.WriteLine("ParseStrict:"+json);
         // Clean the JSON response to handle malformed responses from LLMs
         var cleanedJson = JsonResponseCleaner.CleanJsonResponse(json);
         
@@ -45,9 +45,25 @@ public static class JsonUtil
             throw new ArgumentException("JSON must be an object");
         }
 
-        var thoughts = root.GetProperty("thoughts").GetString() ?? string.Empty;
-        var actionRaw = root.GetProperty("action").GetString() ?? string.Empty;
-        var actionInput = root.GetProperty("action_input");
+
+string thoughts = string.Empty;
+string actionRaw = string.Empty;
+JsonElement actionInput = default;
+
+if (root.TryGetProperty("thoughts", out var thoughtsProp) && thoughtsProp.ValueKind == JsonValueKind.String)
+{
+    thoughts = thoughtsProp.GetString() ?? string.Empty;
+}
+
+if (root.TryGetProperty("action", out var actionProp) && actionProp.ValueKind == JsonValueKind.String)
+{
+    actionRaw = actionProp.GetString() ?? string.Empty;
+}
+
+if (root.TryGetProperty("action_input", out var actionInputProp))
+{
+    actionInput = actionInputProp;
+}
 
         // Apply size limits if config is provided
         if (config != null)

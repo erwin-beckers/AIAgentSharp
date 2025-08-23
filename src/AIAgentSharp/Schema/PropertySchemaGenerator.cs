@@ -55,7 +55,8 @@ public sealed class PropertySchemaGenerator
             }
         }
 
-        var baseSchema = _typeSchemaGenerator.GenerateSchema(property.PropertyType, visited);
+        // Use the top-level SchemaGenerator so type-level [ToolSchema] overrides are honored
+        var baseSchema = AIAgentSharp.SchemaGenerator.GenerateSchema(property.PropertyType, visited);
         var schemaDict = ConvertToDictionary(baseSchema);
 
         // Handle nullability based on property requirements and default values

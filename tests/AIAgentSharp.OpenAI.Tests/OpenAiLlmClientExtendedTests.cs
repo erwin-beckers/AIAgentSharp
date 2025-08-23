@@ -12,7 +12,7 @@ public class OpenAiLlmClientExtendedTests
     {
         _configuration = new OpenAiConfiguration
         {
-            Model = "gpt-4o-mini",
+            Model = "gpt-5-nano",
             MaxTokens = 1000,
             Temperature = 0.1f,
             EnableFunctionCalling = true,
@@ -60,7 +60,7 @@ public class OpenAiLlmClientExtendedTests
     public void OpenAiLlmClient_Configuration_DefaultValues_AreCorrect()
     {
         var config = new OpenAiConfiguration();
-        Assert.AreEqual("gpt-4o-mini", config.Model);
+        Assert.AreEqual("gpt-5-nano", config.Model);
         Assert.AreEqual(4000, config.MaxTokens);
         Assert.AreEqual(0.1f, config.Temperature);
         Assert.AreEqual(1.0f, config.TopP);
@@ -111,7 +111,7 @@ public class OpenAiLlmClientExtendedTests
         var creativeConfig = OpenAiConfiguration.CreateForCreativeTasks();
         var costConfig = OpenAiConfiguration.CreateForCostEfficiency();
 
-        Assert.AreEqual("gpt-4o-mini", agentConfig.Model);
+        Assert.AreEqual("gpt-5-nano", agentConfig.Model);
         Assert.AreEqual("gpt-4o", creativeConfig.Model);
         Assert.AreEqual("gpt-3.5-turbo", costConfig.Model);
 

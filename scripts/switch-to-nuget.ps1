@@ -3,7 +3,7 @@
 # Note: This only works if the specified version exists on NuGet
 
 param(
-    [string]$Version = "1.0.8"
+    [string]$Version = "1.0.11"
 )
 
 Write-Host "Testing build with NuGet package references..." -ForegroundColor Green

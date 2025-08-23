@@ -30,6 +30,16 @@ public class AIAgentBuilder
     private readonly List<Action<AgentLlmChunkReceivedEventArgs>> _llmChunkReceivedHandlers = new();
     private bool _enableStreaming = false;
     private readonly List<LlmMessage> _additionalMessages = new();
+    // Configuration overrides
+    private int? _maxRecentTurns;
+    private bool? _enableHistorySummarization;
+    private int? _maxToolOutputSize;
+    private int? _maxThoughtsLength;
+    private int? _maxFinalLength;
+    private int? _maxSummaryLength;
+    private TimeSpan? _llmTimeout;
+    private TimeSpan? _toolTimeout;
+    private bool? _emitPublicStatus;
 
     /// <summary>
     /// Sets the LLM client for the agent.
@@ -263,6 +273,58 @@ public class AIAgentBuilder
     }
 
     /// <summary>
+    /// Configures history retention and summarization behavior.
+    /// </summary>
+    /// <param name="maxRecentTurns">Number of recent turns to keep in full detail.</param>
+    /// <param name="enableSummarization">Whether to summarize older history.</param>
+    public AIAgentBuilder WithHistory(int maxRecentTurns, bool enableSummarization = true)
+    {
+        if (maxRecentTurns <= 0) throw new ArgumentOutOfRangeException(nameof(maxRecentTurns));
+        _maxRecentTurns = maxRecentTurns;
+        _enableHistorySummarization = enableSummarization;
+        return this;
+    }
+
+    /// <summary>
+    /// Sets maximum character limits for various output sections.
+    /// Any null parameter will leave the default as-is.
+    /// </summary>
+    public AIAgentBuilder WithOutputLimits(int? maxThoughtsLength = null, int? maxFinalLength = null, int? maxSummaryLength = null, int? maxToolOutputSize = null)
+    {
+        if (maxThoughtsLength.HasValue && maxThoughtsLength.Value <= 0) throw new ArgumentOutOfRangeException(nameof(maxThoughtsLength));
+        if (maxFinalLength.HasValue && maxFinalLength.Value <= 0) throw new ArgumentOutOfRangeException(nameof(maxFinalLength));
+        if (maxSummaryLength.HasValue && maxSummaryLength.Value <= 0) throw new ArgumentOutOfRangeException(nameof(maxSummaryLength));
+        if (maxToolOutputSize.HasValue && maxToolOutputSize.Value <= 0) throw new ArgumentOutOfRangeException(nameof(maxToolOutputSize));
+
+        _maxThoughtsLength = maxThoughtsLength ?? _maxThoughtsLength;
+        _maxFinalLength = maxFinalLength ?? _maxFinalLength;
+        _maxSummaryLength = maxSummaryLength ?? _maxSummaryLength;
+        _maxToolOutputSize = maxToolOutputSize ?? _maxToolOutputSize;
+        return this;
+    }
+
+    /// <summary>
+    /// Overrides default timeouts for LLM and tools.
+    /// </summary>
+    public AIAgentBuilder WithTimeouts(TimeSpan? llmTimeout = null, TimeSpan? toolTimeout = null)
+    {
+        if (llmTimeout.HasValue && llmTimeout.Value <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(llmTimeout));
+        if (toolTimeout.HasValue && toolTimeout.Value <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(toolTimeout));
+        _llmTimeout = llmTimeout ?? _llmTimeout;
+        _toolTimeout = toolTimeout ?? _toolTimeout;
+        return this;
+    }
+
+    /// <summary>
+    /// Enables or disables emission of public status updates.
+    /// </summary>
+    public AIAgentBuilder WithStatusUpdates(bool enable)
+    {
+        _emitPublicStatus = enable;
+        return this;
+    }
+
+    /// <summary>
     /// Gets the tools configured for this agent.
     /// </summary>
     public IEnumerable<ITool> Tools => _tools.AsReadOnly();
@@ -277,7 +339,8 @@ public class AIAgentBuilder
         if (_llmClient == null)
             throw new InvalidOperationException("LLM client must be configured using WithLlm()");
 
-        // Create configuration
+        // Create configuration using defaults with selective overrides
+        var defaults = new AgentConfiguration();
         var configuration = new AgentConfiguration
         {
             ReasoningType = _reasoningType,
@@ -285,7 +348,16 @@ public class AIAgentBuilder
             MaxTreeDepth = _maxDepth,
             MaxTreeNodes = _maxTreeNodes,
             UseFunctionCalling = !_enableStreaming,
-            AdditionalMessages = _additionalMessages
+            AdditionalMessages = _additionalMessages,
+            MaxRecentTurns = _maxRecentTurns ?? defaults.MaxRecentTurns,
+            EnableHistorySummarization = _enableHistorySummarization ?? defaults.EnableHistorySummarization,
+            MaxToolOutputSize = _maxToolOutputSize ?? defaults.MaxToolOutputSize,
+            MaxThoughtsLength = _maxThoughtsLength ?? defaults.MaxThoughtsLength,
+            MaxFinalLength = _maxFinalLength ?? defaults.MaxFinalLength,
+            MaxSummaryLength = _maxSummaryLength ?? defaults.MaxSummaryLength,
+            LlmTimeout = _llmTimeout ?? defaults.LlmTimeout,
+            ToolTimeout = _toolTimeout ?? defaults.ToolTimeout,
+            EmitPublicStatus = _emitPublicStatus ?? defaults.EmitPublicStatus
         };
 
         // Create agent

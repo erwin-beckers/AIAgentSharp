@@ -36,7 +36,7 @@ public sealed class TreeOfThoughtsCommunicator
         catch (Exception ex)
         {
             // Log the error but don't throw, let the caller handle it
-            Console.WriteLine($"Failed to parse Tree of Thoughts response: {ex.Message}");
+            //Console.WriteLine($"Failed to parse Tree of Thoughts response: {ex.Message}");
             return null;
         }
     }

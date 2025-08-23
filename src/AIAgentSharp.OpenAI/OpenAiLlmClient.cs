@@ -14,7 +14,7 @@ public sealed class OpenAiLlmClient : ILlmClient
     private readonly OpenAIClient _client;
     private readonly string _model;
     private readonly ILogger _logger;
-    
+
     /// <summary>
     /// Gets the OpenAI configuration used by this client.
     /// </summary>
@@ -24,10 +24,10 @@ public sealed class OpenAiLlmClient : ILlmClient
     /// Initializes a new instance of the OpenAiLlmClient class with API key and model.
     /// </summary>
     /// <param name="apiKey">The OpenAI API key for authentication.</param>
-    /// <param name="model">The model to use for completions. Defaults to "gpt-4o-mini".</param>
+    /// <param name="model">The model to use for completions. Defaults to "gpt-5-nano".</param>
     /// <param name="logger">Optional logger for debugging and monitoring.</param>
     /// <exception cref="ArgumentNullException">Thrown when apiKey is null or empty.</exception>
-    public OpenAiLlmClient(string apiKey, string model = "gpt-4o-mini", ILogger? logger = null)
+    public OpenAiLlmClient(string apiKey, string model = "gpt-5-nano", ILogger? logger = null)
         : this(apiKey, new OpenAiConfiguration { Model = model }, logger)
     {
     }
@@ -53,7 +53,7 @@ public sealed class OpenAiLlmClient : ILlmClient
 
         // Create client options
         var options = new OpenAIClientOptions();
-        
+
         if (!string.IsNullOrEmpty(configuration.ApiBaseUrl))
         {
             options.Endpoint = new Uri(configuration.ApiBaseUrl);
@@ -62,7 +62,7 @@ public sealed class OpenAiLlmClient : ILlmClient
         _client = new OpenAIClient(new ApiKeyCredential(apiKey), options);
         _model = configuration.Model;
         _logger = logger ?? new ConsoleLogger();
-        
+
         // Store configuration for use in completion methods
         Configuration = configuration;
     }
@@ -74,7 +74,7 @@ public sealed class OpenAiLlmClient : ILlmClient
     /// <param name="model">The model to use.</param>
     /// <param name="logger">Optional logger.</param>
     /// <exception cref="ArgumentNullException">Thrown when client is null.</exception>
-    internal OpenAiLlmClient(OpenAIClient client, string model = "gpt-4o-mini", ILogger? logger = null)
+    internal OpenAiLlmClient(OpenAIClient client, string model = "gpt-5-nano", ILogger? logger = null)
     {
         _client = client ?? throw new ArgumentNullException(nameof(client));
         _model = model;
@@ -107,10 +107,13 @@ public sealed class OpenAiLlmClient : ILlmClient
         // Map messages to OpenAI.Chat message types
         var chatMessages = new List<ChatMessage>();
 
+        Trace.WriteLine("");
+        Trace.WriteLine("");
+        Trace.WriteLine("---------------------------------------------------------------------------");
         foreach (var m in request.Messages)
         {
-           // Console.WriteLine($"LLM: snd {m.Role}:{m.Content}");
-           // Trace.WriteLine($"LLM: snd {m.Role}:{m.Content}");
+            Console.WriteLine($"LLM: snd {m.Role}:{m.Content}");
+            Trace.WriteLine($"LLM: snd {m.Role}:{m.Content}");
             switch (m.Role)
             {
                 case "system":
@@ -131,29 +134,19 @@ public sealed class OpenAiLlmClient : ILlmClient
                     break;
             }
         }
-
+        // Removed early process termination to allow tool schemas to be sent to the API
         // Create chat completion options
         var options = new ChatCompletionOptions();
-        
+
         // Set temperature and top_p if provided
         if (request.Temperature.HasValue)
         {
             options.Temperature = (float)request.Temperature.Value;
         }
-        
+
         if (request.TopP.HasValue)
         {
             options.TopP = (float)request.TopP.Value;
-        }
-
-        // Convert functions to tools if provided
-        if (request.Functions != null && request.Functions.Any())
-        {
-            var tools = ConvertToOpenAiTools(request.Functions);
-            foreach (var tool in tools)
-            {
-                options.Tools.Add(tool);
-            }
         }
 
         var chatClient = _client.GetChatClient(_model);
@@ -163,65 +156,10 @@ public sealed class OpenAiLlmClient : ILlmClient
             Provider = "OpenAI"
         };
 
-        // For function calls, use non-streaming API since they're typically returned as complete objects
-        if (request.Functions != null && request.Functions.Any())
+        // Respect EnableStreaming flag; default to streaming when true, otherwise non-streaming
+        if (request.EnableStreaming)
         {
-            var response = await chatClient.CompleteChatAsync(chatMessages, options, ct);
-            var completion = response.Value;
-            
-            var content = string.Empty;
-            if (completion.Content.Count > 0)
-            {
-                content = completion.Content[0].Text;
-            }
-
-            usage.InputTokens = completion.Usage.InputTokenCount;
-            usage.OutputTokens = completion.Usage.OutputTokenCount;
-
-            // Check if there are tool calls
-            if (completion.ToolCalls != null && completion.ToolCalls.Count > 0)
-            {
-                foreach (var toolCall in completion.ToolCalls)
-                {
-                    var functionCall = new LlmFunctionCall
-                    {
-                        Name = toolCall.FunctionName ?? string.Empty,
-                        ArgumentsJson = toolCall.FunctionArguments?.ToString() ?? "{}",
-                        Arguments = !string.IsNullOrEmpty(toolCall.FunctionArguments?.ToString())
-                            ? System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object>>(toolCall.FunctionArguments.ToString()) ?? new Dictionary<string, object>()
-                            : new Dictionary<string, object>()
-                    };
-
-                    yield return new LlmStreamingChunk
-                    {
-                        Content = content,
-                        IsFinal = true,
-                        FinishReason = "tool_calls",
-                        ActualResponseType = LlmResponseType.FunctionCall,
-                        FunctionCall = functionCall,
-                        Usage = usage
-                    };
-                }
-            }
-            else
-            {
-                // No tool calls, return as text
-                yield return new LlmStreamingChunk
-                {
-                    Content = content,
-                    IsFinal = true,
-                    FinishReason = "stop",
-                    ActualResponseType = LlmResponseType.Text,
-                    Usage = usage
-                };
-            }
-        }
-        else
-        {
-            // Respect EnableStreaming flag; default to streaming when true, otherwise non-streaming
-            if (request.EnableStreaming)
-            {
-                var completionUpdates = chatClient.CompleteChatStreamingAsync(chatMessages, options);
+            var completionUpdates = chatClient.CompleteChatStreamingAsync(chatMessages, options);
             var contentBuilder = new System.Text.StringBuilder();
 
             await foreach (var completionUpdate in completionUpdates.WithCancellation(ct))
@@ -230,7 +168,7 @@ public sealed class OpenAiLlmClient : ILlmClient
                 foreach (var contentPart in completionUpdate.ContentUpdate)
                 {
                     contentBuilder.Append(contentPart.Text);
-                    
+
                     // Yield a chunk for each content update
                     yield return new LlmStreamingChunk
                     {
@@ -282,30 +220,30 @@ public sealed class OpenAiLlmClient : ILlmClient
                     }
                 }
             }
-            }
-            else
+        }
+        else
+        {
+            var response = await chatClient.CompleteChatAsync(chatMessages, options, ct);
+            var completion = response.Value;
+            var content = completion.Content.Count > 0 ? completion.Content[0].Text : string.Empty;
+            Trace.WriteLine($"RECV:{content}");
+            usage.InputTokens = completion.Usage.InputTokenCount;
+            usage.OutputTokens = completion.Usage.OutputTokenCount;
+            yield return new LlmStreamingChunk
             {
-                var response = await chatClient.CompleteChatAsync(chatMessages, options, ct);
-                var completion = response.Value;
-                var content = completion.Content.Count > 0 ? completion.Content[0].Text : string.Empty;
-                usage.InputTokens = completion.Usage.InputTokenCount;
-                usage.OutputTokens = completion.Usage.OutputTokenCount;
-                yield return new LlmStreamingChunk
-                {
-                    Content = content,
-                    IsFinal = true,
-                    FinishReason = completion.FinishReason.ToString().ToLowerInvariant(),
-                    ActualResponseType = LlmResponseType.Text,
-                    Usage = usage
-                };
-            }
+                Content = content,
+                IsFinal = true,
+                FinishReason = completion.FinishReason.ToString().ToLowerInvariant(),
+                ActualResponseType = LlmResponseType.Text,
+                Usage = usage
+            };
         }
     }
 
     private static List<ChatTool> ConvertToOpenAiTools(IEnumerable<FunctionSpec> functions)
     {
         var tools = new List<ChatTool>();
-        
+
         foreach (var function in functions)
         {
             string? parametersJson = null;
@@ -313,17 +251,17 @@ public sealed class OpenAiLlmClient : ILlmClient
             {
                 parametersJson = System.Text.Json.JsonSerializer.Serialize(function.ParametersSchema);
             }
-            
+
             var tool = ChatTool.CreateFunctionTool(
                 functionName: function.Name,
                 functionDescription: function.Description ?? string.Empty,
-                functionParameters: !string.IsNullOrEmpty(parametersJson) 
+                functionParameters: !string.IsNullOrEmpty(parametersJson)
                     ? BinaryData.FromBytes(System.Text.Encoding.UTF8.GetBytes(parametersJson))
                     : null
             );
             tools.Add(tool);
         }
-        
+
         return tools;
     }
 }

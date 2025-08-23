@@ -2,7 +2,7 @@
 # Usage: .\scripts\publish-all.ps1 [version]
 
 param(
-    [string]$Version = "1.0.10"
+    [string]$Version = "1.0.11"
 )
 
 Write-Host "Starting complete publishing workflow..." -ForegroundColor Green
