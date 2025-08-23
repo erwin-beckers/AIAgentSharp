@@ -520,6 +520,17 @@ public sealed class AgentConfiguration
     public int MaxToolOutputSize { get; init; } = 2000;
 
     /// <summary>
+    /// Gets a value indicating whether to centralize custom schemas and rules in the prompt
+    /// instead of inlining full schemas per tool in the tool catalog.
+    /// </summary>
+    /// <remarks>
+    /// When enabled, the prompt will contain a single GLOBAL SCHEMAS section and SCHEMA RULES section
+    /// listing each referenced custom schema once. Tool parameter shapes will reference these schemas
+    /// by identifier, reducing duplication and improving clarity for the LLM.
+    /// </remarks>
+    public bool UseCentralizedSchemas { get; init; } = true;
+
+    /// <summary>
     /// Gets the type of reasoning to use for agent decision making.
     /// </summary>
     /// <value>

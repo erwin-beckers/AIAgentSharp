@@ -216,9 +216,52 @@ public static class JsonResponseCleaner
 
             if (c == '\\')
             {
-                result.Append(c);
-                escapeNext = true;
-                continue;
+                // Handle backslash escapes primarily inside strings; outside strings, keep as-is
+                if (inString)
+                {
+                    var hasNext = (i + 1) < json.Length;
+                    var next = hasNext ? json[i + 1] : '\0';
+
+                    if (!hasNext)
+                    {
+                        // Trailing backslash at end of input – drop it
+                        continue;
+                    }
+
+                    // Valid JSON escapes: " \\ \/ \b \f \n \r \t or \uXXXX
+                    bool isValidSimpleEscape = next == '"' || next == '\\' || next == '/' ||
+                                               next == 'b' || next == 'f' || next == 'n' ||
+                                               next == 'r' || next == 't';
+
+                    if (next == 'u' || isValidSimpleEscape)
+                    {
+                        // Preserve valid escape; let next char be processed in escapeNext branch
+                        result.Append('\\');
+                        escapeNext = true;
+                        continue;
+                    }
+
+                    if (next == '\'')
+                    {
+                        // Non-standard \' → keep apostrophe, drop backslash
+                        result.Append('\'');
+                        i++; // consume next
+                        lastChar = '\'';
+                        continue;
+                    }
+
+                    // Invalid escape (e.g., \$, \–). Drop backslash, keep the next char.
+                    result.Append(next);
+                    i++; // consume next
+                    lastChar = next;
+                    continue;
+                }
+                else
+                {
+                    // Outside string – keep backslash
+                    result.Append(c);
+                    continue;
+                }
             }
 
             if (c == '"' && !escapeNext)

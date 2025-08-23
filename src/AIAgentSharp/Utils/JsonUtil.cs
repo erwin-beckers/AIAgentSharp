@@ -16,9 +16,10 @@ public static class JsonUtil
     /// </summary>
     public static readonly JsonSerializerOptions JsonOptions = new()
     {
+        PropertyNameCaseInsensitive =true,
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         ReadCommentHandling = JsonCommentHandling.Skip,
-        AllowTrailingCommas = false,
+        AllowTrailingCommas = true,
         WriteIndented = false,
         DefaultIgnoreCondition = JsonIgnoreCondition.Never,
         Converters = { new JsonStringEnumConverter(JsonNamingPolicy.SnakeCaseLower) }

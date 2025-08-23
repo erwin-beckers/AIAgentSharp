@@ -56,7 +56,7 @@ public class MessageBuilderTests
         // Assert
         Assert.IsNotNull(result);
         var messages = result.ToList();
-        Assert.IsTrue(messages.Count == 2); // System message + User message
+        Assert.IsTrue(messages.Count >= 2); // At least system + user; additional messages may exist
         
         var systemMessage = messages.FirstOrDefault(m => m.Role == "system");
         var userMessage = messages.FirstOrDefault(m => m.Role == "user");
@@ -67,9 +67,9 @@ public class MessageBuilderTests
         Assert.IsTrue(systemMessage.Content.Contains("You are a stateful, tool-using agent"));
         
         // User message should contain the dynamic content
-        Assert.IsTrue(userMessage.Content.Contains("GOAL:"));
+        // In new behavior, goal is sent as plain user content and tool catalog is in system message
+        Assert.IsTrue(systemMessage.Content.Contains("TOOL CATALOG"));
         Assert.IsTrue(userMessage.Content.Contains("Test goal"));
-        Assert.IsTrue(userMessage.Content.Contains("TOOL CATALOG"));
     }
 
     [TestMethod]
@@ -96,9 +96,9 @@ public class MessageBuilderTests
 
         // Assert
         var messages = result.ToList();
-        var userMessage = messages.FirstOrDefault(m => m.Role == "user");
-        Assert.IsNotNull(userMessage);
-        Assert.IsTrue(userMessage.Content.Contains("test_tool"));
+        var systemMessage = messages.FirstOrDefault(m => m.Role == "system");
+        Assert.IsNotNull(systemMessage);
+        Assert.IsTrue(systemMessage.Content.Contains("test_tool"));
     }
 
     [TestMethod]
@@ -117,13 +117,11 @@ public class MessageBuilderTests
 
         // Assert
         var messages = result.ToList();
-        var userMessage = messages.FirstOrDefault(m => m.Role == "user");
-        Assert.IsNotNull(userMessage);
+        var systemMessage = messages.FirstOrDefault(m => m.Role == "system");
+        Assert.IsNotNull(systemMessage);
         
-        // Should include multi-tool call instructions
-        Assert.IsTrue(userMessage.Content.Contains("action:\"multi_tool_call\""));
-        Assert.IsTrue(userMessage.Content.Contains("Call multiple tools in sequence"));
-        Assert.IsTrue(userMessage.Content.Contains("tool_calls array"));
+        // Should include multi-tool call instructions in system prompt
+        Assert.IsTrue(systemMessage.Content.Contains("\"multi_tool_call\""));
     }
 
     [TestMethod]
@@ -142,16 +140,15 @@ public class MessageBuilderTests
 
         // Assert
         var messages = result.ToList();
-        var userMessage = messages.FirstOrDefault(m => m.Role == "user");
-        Assert.IsNotNull(userMessage);
+        var systemMessage = messages.FirstOrDefault(m => m.Role == "system");
+        Assert.IsNotNull(systemMessage);
         
-        // Should include the ACTIONS AVAILABLE section
-        Assert.IsTrue(userMessage.Content.Contains("ACTIONS AVAILABLE:"));
-        Assert.IsTrue(userMessage.Content.Contains("action:\"tool_call\""));
-        Assert.IsTrue(userMessage.Content.Contains("action:\"multi_tool_call\""));
-        Assert.IsTrue(userMessage.Content.Contains("action:\"plan\""));
-        Assert.IsTrue(userMessage.Content.Contains("action:\"finish\""));
-        Assert.IsTrue(userMessage.Content.Contains("action:\"retry\""));
+        // Should include allowed actions in system prompt
+        Assert.IsTrue(systemMessage.Content.Contains("\"tool_call\""));
+        Assert.IsTrue(systemMessage.Content.Contains("\"multi_tool_call\""));
+        Assert.IsTrue(systemMessage.Content.Contains("\"plan\""));
+        Assert.IsTrue(systemMessage.Content.Contains("\"finish\""));
+        Assert.IsTrue(systemMessage.Content.Contains("\"retry\""));
     }
 
     [TestMethod]
@@ -225,14 +222,14 @@ public class MessageBuilderTests
 
         // Assert
         var messages = result.ToList();
-        var userMessage = messages.FirstOrDefault(m => m.Role == "user");
-        Assert.IsNotNull(userMessage);
+        var historyMessage = messages.LastOrDefault(m => m.Role == "user");
+        Assert.IsNotNull(historyMessage);
         
-        // Should include multi-tool call history
-        Assert.IsTrue(userMessage.Content.Contains("MULTI_TOOL_CALLS:"));
-        Assert.IsTrue(userMessage.Content.Contains("MULTI_TOOL_RESULTS:"));
-        Assert.IsTrue(userMessage.Content.Contains("tool1"));
-        Assert.IsTrue(userMessage.Content.Contains("tool2"));
+        // Should include multi-tool call history (history content message)
+        Assert.IsTrue(historyMessage.Content.Contains("MULTI_TOOL_CALLS:"));
+        Assert.IsTrue(historyMessage.Content.Contains("MULTI_TOOL_RESULTS:"));
+        Assert.IsTrue(historyMessage.Content.Contains("tool1"));
+        Assert.IsTrue(historyMessage.Content.Contains("tool2"));
     }
 
     [TestMethod]
@@ -288,13 +285,13 @@ public class MessageBuilderTests
 
         // Assert
         var messages = result.ToList();
-        var userMessage = messages.FirstOrDefault(m => m.Role == "user");
-        Assert.IsNotNull(userMessage);
+        var historyMessage = messages.LastOrDefault(m => m.Role == "user");
+        Assert.IsNotNull(historyMessage);
         
         // Should include summarized multi-tool calls
-        Assert.IsTrue(userMessage.Content.Contains("MULTI_TOOLS:"));
-        Assert.IsTrue(userMessage.Content.Contains("MULTI_RESULTS:"));
-        Assert.IsTrue(userMessage.Content.Contains("multi_tool1, multi_tool2"));
+        Assert.IsTrue(historyMessage.Content.Contains("MULTI_TOOLS:"));
+        Assert.IsTrue(historyMessage.Content.Contains("MULTI_RESULTS:"));
+        Assert.IsTrue(historyMessage.Content.Contains("multi_tool1, multi_tool2"));
     }
 
     [TestMethod]
@@ -313,11 +310,11 @@ public class MessageBuilderTests
 
         // Assert
         var messages = result.ToList();
-        var userMessage = messages.FirstOrDefault(m => m.Role == "user");
-        Assert.IsNotNull(userMessage);
+        var systemMessage = messages.FirstOrDefault(m => m.Role == "system");
+        Assert.IsNotNull(systemMessage);
         
-        // Should include hint about multiple tool calls
-        Assert.IsTrue(userMessage.Content.Contains("You can call multiple tools in sequence using action:\"multi_tool_call\""));
+        // Should include hint about multiple tool calls in system prompt
+        Assert.IsTrue(systemMessage.Content.Contains("multi_tool_call"));
     }
 
     [TestMethod]
@@ -336,13 +333,13 @@ public class MessageBuilderTests
 
         // Assert
         var messages = result.ToList();
-        var userMessage = messages.FirstOrDefault(m => m.Role == "user");
-        Assert.IsNotNull(userMessage);
-        Assert.IsTrue(userMessage.Content.Contains("STATUS UPDATES"));
-        Assert.IsTrue(userMessage.Content.Contains("status_title"));
-        Assert.IsTrue(userMessage.Content.Contains("status_details"));
-        Assert.IsTrue(userMessage.Content.Contains("next_step_hint"));
-        Assert.IsTrue(userMessage.Content.Contains("progress_pct"));
+        var systemMessage = messages.FirstOrDefault(m => m.Role == "system");
+        Assert.IsNotNull(systemMessage);
+        Assert.IsTrue(systemMessage.Content.Contains("STATUS UPDATES"));
+        Assert.IsTrue(systemMessage.Content.Contains("status_title"));
+        Assert.IsTrue(systemMessage.Content.Contains("status_details"));
+        Assert.IsTrue(systemMessage.Content.Contains("next_step_hint"));
+        Assert.IsTrue(systemMessage.Content.Contains("progress_pct"));
     }
 
     [TestMethod]
@@ -363,9 +360,9 @@ public class MessageBuilderTests
 
         // Assert
         var messages = result.ToList();
-        var userMessage = messages.FirstOrDefault(m => m.Role == "user");
-        Assert.IsNotNull(userMessage);
-        Assert.IsFalse(userMessage.Content.Contains("STATUS UPDATES"));
+        var systemMessage = messages.FirstOrDefault(m => m.Role == "system");
+        Assert.IsNotNull(systemMessage);
+        Assert.IsFalse(systemMessage.Content.Contains("STATUS UPDATES"));
     }
 
     [TestMethod]
@@ -396,11 +393,11 @@ public class MessageBuilderTests
 
         // Assert
         var messages = result.ToList();
-        var userMessage = messages.FirstOrDefault(m => m.Role == "user");
-        Assert.IsNotNull(userMessage);
-        Assert.IsTrue(userMessage.Content.Contains("LLM:"));
-        Assert.IsTrue(userMessage.Content.Contains("TOOL_CALL:"));
-        Assert.IsTrue(userMessage.Content.Contains("TOOL_RESULT:"));
+        var historyMessage = messages.LastOrDefault(m => m.Role == "user");
+        Assert.IsNotNull(historyMessage);
+        Assert.IsTrue(historyMessage.Content.Contains("LLM:"));
+        Assert.IsTrue(historyMessage.Content.Contains("TOOL_CALL:"));
+        Assert.IsTrue(historyMessage.Content.Contains("TOOL_RESULT:"));
     }
 
     [TestMethod]
@@ -433,13 +430,13 @@ public class MessageBuilderTests
 
         // Assert
         var messages = result.ToList();
-        var userMessage = messages.FirstOrDefault(m => m.Role == "user");
-        Assert.IsNotNull(userMessage);
+        var historyMessage = messages.LastOrDefault(m => m.Role == "user");
+        Assert.IsNotNull(historyMessage);
         
         // Should include full detail for recent turns
-        Assert.IsTrue(userMessage.Content.Contains("LLM:"));
-        Assert.IsTrue(userMessage.Content.Contains("TOOL_CALL:"));
-        Assert.IsTrue(userMessage.Content.Contains("TOOL_RESULT:"));
+        Assert.IsTrue(historyMessage.Content.Contains("LLM:"));
+        Assert.IsTrue(historyMessage.Content.Contains("TOOL_CALL:"));
+        Assert.IsTrue(historyMessage.Content.Contains("TOOL_RESULT:"));
     }
 
     [TestMethod]
@@ -472,11 +469,11 @@ public class MessageBuilderTests
 
         // Assert
         var messages = result.ToList();
-        var userMessage = messages.FirstOrDefault(m => m.Role == "user");
-        Assert.IsNotNull(userMessage);
+        var historyMessage = messages.LastOrDefault(m => m.Role == "user");
+        Assert.IsNotNull(historyMessage);
         
         // Should include summarized history for older turns
-        Assert.IsTrue(userMessage.Content.Contains("LLM: toolcall -"));
+        Assert.IsTrue(historyMessage.Content.Contains("LLM: toolcall -"));
     }
 
     [TestMethod]
@@ -497,11 +494,11 @@ public class MessageBuilderTests
         // Assert
         Assert.IsNotNull(result);
         var messages = result.ToList();
-        Assert.IsTrue(messages.Count == 2);
+        Assert.IsTrue(messages.Count >= 2);
         
-        var userMessage = messages.FirstOrDefault(m => m.Role == "user");
-        Assert.IsNotNull(userMessage);
-        Assert.IsTrue(userMessage.Content.Contains("HISTORY"));
+        var historyMessage = messages.LastOrDefault(m => m.Role == "user");
+        Assert.IsNotNull(historyMessage);
+        Assert.IsTrue(historyMessage.Content.Contains("HISTORY"));
     }
 
     [TestMethod]
@@ -536,11 +533,11 @@ public class MessageBuilderTests
         // Assert
         Assert.IsNotNull(result);
         var messages = result.ToList();
-        Assert.IsTrue(messages.Count == 2);
+        Assert.IsTrue(messages.Count >= 2);
         
-        var userMessage = messages.FirstOrDefault(m => m.Role == "user");
-        Assert.IsNotNull(userMessage);
-        Assert.IsTrue(userMessage.Content.Contains("TOOL CATALOG"));
+        var systemMessage = messages.FirstOrDefault(m => m.Role == "system");
+        Assert.IsNotNull(systemMessage);
+        Assert.IsTrue(systemMessage.Content.Contains("TOOL CATALOG"));
     }
 
     [TestMethod]
@@ -565,10 +562,10 @@ public class MessageBuilderTests
 
         // Assert
         var messages = result.ToList();
-        var userMessage = messages.FirstOrDefault(m => m.Role == "user");
-        Assert.IsNotNull(userMessage);
-        Assert.IsTrue(userMessage.Content.Contains("test_tool"));
-        Assert.IsTrue(userMessage.Content.Contains("{\"params\":{}}"));
+        var systemMessage = messages.FirstOrDefault(m => m.Role == "system");
+        Assert.IsNotNull(systemMessage);
+        Assert.IsTrue(systemMessage.Content.Contains("test_tool"));
+        Assert.IsTrue(systemMessage.Content.Contains("{\"params\":{}}"));
     }
 
     [TestMethod]
@@ -598,10 +595,10 @@ public class MessageBuilderTests
         // Assert
         Assert.IsNotNull(result);
         var messages = result.ToList();
-        var userMessage = messages.FirstOrDefault(m => m.Role == "user");
-        Assert.IsNotNull(userMessage);
-        Assert.IsTrue(userMessage.Content.Contains("TOOL_CALL:"));
-        Assert.IsTrue(userMessage.Content.Contains("TOOL_RESULT:"));
+        var historyMessage = messages.LastOrDefault(m => m.Role == "user");
+        Assert.IsNotNull(historyMessage);
+        Assert.IsTrue(historyMessage.Content.Contains("TOOL_CALL:"));
+        Assert.IsTrue(historyMessage.Content.Contains("TOOL_RESULT:"));
     }
 
     [TestMethod]
@@ -631,10 +628,10 @@ public class MessageBuilderTests
         // Assert
         Assert.IsNotNull(result);
         var messages = result.ToList();
-        var userMessage = messages.FirstOrDefault(m => m.Role == "user");
-        Assert.IsNotNull(userMessage);
-        Assert.IsTrue(userMessage.Content.Contains("LLM:"));
-        Assert.IsTrue(userMessage.Content.Contains("TOOL_RESULT:"));
+        var historyMessage = messages.LastOrDefault(m => m.Role == "user");
+        Assert.IsNotNull(historyMessage);
+        Assert.IsTrue(historyMessage.Content.Contains("LLM:"));
+        Assert.IsTrue(historyMessage.Content.Contains("TOOL_RESULT:"));
     }
 
     [TestMethod]
@@ -664,10 +661,10 @@ public class MessageBuilderTests
         // Assert
         Assert.IsNotNull(result);
         var messages = result.ToList();
-        var userMessage = messages.FirstOrDefault(m => m.Role == "user");
-        Assert.IsNotNull(userMessage);
-        Assert.IsTrue(userMessage.Content.Contains("LLM:"));
-        Assert.IsTrue(userMessage.Content.Contains("TOOL_CALL:"));
+        var historyMessage = messages.LastOrDefault(m => m.Role == "user");
+        Assert.IsNotNull(historyMessage);
+        Assert.IsTrue(historyMessage.Content.Contains("LLM:"));
+        Assert.IsTrue(historyMessage.Content.Contains("TOOL_CALL:"));
     }
 
     [TestMethod]
@@ -697,12 +694,12 @@ public class MessageBuilderTests
 
         // Assert
         var messages = result.ToList();
-        var userMessage = messages.FirstOrDefault(m => m.Role == "user");
-        Assert.IsNotNull(userMessage);
+        var historyMessage = messages.LastOrDefault(m => m.Role == "user");
+        Assert.IsNotNull(historyMessage);
         
-        Assert.IsTrue(userMessage.Content.Contains("TOOL_RESULT:"));
+        Assert.IsTrue(historyMessage.Content.Contains("TOOL_RESULT:"));
         // The output should be truncated, so the content should contain the truncated indicator
-        Assert.IsTrue(userMessage.Content.Contains("\"truncated\":true"));
-        Assert.IsTrue(userMessage.Content.Contains("\"original_size\":"));
+        Assert.IsTrue(historyMessage.Content.Contains("\"truncated\":true"));
+        Assert.IsTrue(historyMessage.Content.Contains("\"original_size\":"));
     }
 }

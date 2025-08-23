@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using AIAgentSharp.Agents.Interfaces;
 
@@ -58,6 +61,51 @@ public sealed class MessageBuilder : IMessageBuilder
         sb.AppendLine("IMPORTANT: Reply with JSON only. No prose or markdown.");
         sb.AppendLine();
 
+        if (_config.UseCentralizedSchemas)
+        {
+            // Build centralized schema registry from tools' parameter types
+            var schemaRegistry = BuildSchemaRegistry(tools);
+
+            if (schemaRegistry.Schemas.Count > 0)
+            {
+                sb.AppendLine("GLOBAL SCHEMAS:");
+                foreach (var kv in schemaRegistry.Schemas)
+                {
+                    sb.AppendLine($"{kv.Key}: {JsonUtil.ToJson(kv.Value)}");
+                }
+                sb.AppendLine();
+            }
+
+            if (schemaRegistry.Rules.Count > 0)
+            {
+                sb.AppendLine("SCHEMA RULES:");
+                foreach (var kv in schemaRegistry.Rules)
+                {
+                    if (!string.IsNullOrWhiteSpace(kv.Value))
+                    {
+                        sb.AppendLine($"{kv.Key}: {kv.Value}");
+                    }
+                }
+                sb.AppendLine();
+            }
+
+            sb.AppendLine("TOOL CATALOG:");
+
+            foreach (var t in tools.Values)
+            {
+                if (t is IToolIntrospect ti)
+                {
+                    var compact = BuildCompactToolDescription(ti);
+                    sb.AppendLine($"{ti.Name}: {compact}");
+                }
+                else
+                {
+                    sb.AppendLine($"{t.Name}: {{\"params\":{{}}}} ");
+                }
+            }
+        }
+        else
+        {
         sb.AppendLine("TOOL CATALOG:");
 
         foreach (var t in tools.Values)
@@ -70,6 +118,7 @@ public sealed class MessageBuilder : IMessageBuilder
             {
                 sb.AppendLine($"{t.Name}: {{\"params\":{{}}}}");
             }
+        }
         }
 
         var user = new LlmMessage { Role = "system", Content = sb.ToString() };
@@ -104,6 +153,141 @@ public sealed class MessageBuilder : IMessageBuilder
         return messages;
     }
 
+    private static (Dictionary<string, object> Schemas, Dictionary<string, string> Rules) BuildSchemaRegistry(IDictionary<string, ITool> tools)
+    {
+        var schemas = new Dictionary<string, object>();
+        var rules = new Dictionary<string, string>();
+
+        foreach (var tool in tools.Values)
+        {
+            var toolType = tool.GetType();
+            var genericBase = toolType.BaseType;
+            if (genericBase == null || !genericBase.IsGenericType)
+            {
+                continue;
+            }
+
+            var args = genericBase.GetGenericArguments();
+            if (args.Length < 1)
+            {
+                continue;
+            }
+
+            var paramsType = args[0];
+
+            // Walk parameter properties to find any ToolSchema on property types
+            foreach (var prop in paramsType.GetProperties())
+            {
+                var propType = prop.PropertyType;
+
+                // Type-level ToolSchema
+                var typeAttr = propType.GetCustomAttributes(typeof(AIAgentSharp.Schema.ToolSchemaAttribute), false).FirstOrDefault() as AIAgentSharp.Schema.ToolSchemaAttribute;
+                if (typeAttr != null)
+                {
+                    var key = propType.FullName ?? propType.Name;
+                    if (!schemas.ContainsKey(key))
+                    {
+                        schemas[key] = SchemaGenerator.Generate(propType);
+                        if (!string.IsNullOrWhiteSpace(typeAttr.AdditionalRules))
+                        {
+                            rules[key] = typeAttr.AdditionalRules!;
+                        }
+                    }
+                }
+
+                // Property-level ToolSchema
+                var propAttr = prop.GetCustomAttributes(typeof(AIAgentSharp.Schema.ToolSchemaAttribute), false).FirstOrDefault() as AIAgentSharp.Schema.ToolSchemaAttribute;
+                if (propAttr != null)
+                {
+                    var key = (paramsType.FullName ?? paramsType.Name) + "." + prop.Name;
+                    if (!schemas.ContainsKey(key))
+                    {
+                        schemas[key] = SchemaGenerator.GenerateSchema(prop.PropertyType, new HashSet<Type>());
+                        if (!string.IsNullOrWhiteSpace(propAttr.AdditionalRules))
+                        {
+                            rules[key] = propAttr.AdditionalRules!;
+                        }
+                    }
+                }
+            }
+        }
+
+        return (schemas, rules);
+    }
+
+    private static string BuildCompactToolDescription(IToolIntrospect ti)
+    {
+        // Build a compact descriptor referencing GLOBAL SCHEMAS for any known custom-typed properties named like 'strategy'
+        // Fallback to original description if not available
+        try
+        {
+            var t = ti.GetType();
+            var baseType = t.BaseType;
+            if (baseType == null || !baseType.IsGenericType) return ti.Describe();
+
+            var args = baseType.GetGenericArguments();
+            var paramsType = args[0];
+            var props = paramsType.GetProperties().OrderBy(p => p.Name).ToList();
+
+            var compact = new Dictionary<string, object?>
+            {
+                ["name"] = ti.Name,
+                ["description"] = (t.GetProperty("Description")?.GetValue(ti) as string) ?? "",
+            };
+
+            var paramShape = new Dictionary<string, object?>
+            {
+                ["type"] = "object",
+                ["properties"] = new Dictionary<string, object?>(),
+                ["additionalProperties"] = false
+            };
+
+            var propDict = (Dictionary<string, object?>)paramShape["properties"]!;
+            var required = new List<string>();
+
+            foreach (var p in props)
+            {
+                var propName = System.Text.Json.JsonNamingPolicy.CamelCase.ConvertName(p.Name);
+                var schemaAttr = p.GetCustomAttributes(typeof(AIAgentSharp.Schema.ToolSchemaAttribute), false).FirstOrDefault() as AIAgentSharp.Schema.ToolSchemaAttribute;
+                var typeAttr = p.PropertyType.GetCustomAttributes(typeof(AIAgentSharp.Schema.ToolSchemaAttribute), false).FirstOrDefault() as AIAgentSharp.Schema.ToolSchemaAttribute;
+
+                if (schemaAttr != null)
+                {
+                    // property-level custom schema
+                    var refId = (paramsType.FullName ?? paramsType.Name) + "." + p.Name;
+                    propDict[propName] = new Dictionary<string, object?> { ["$ref"] = $"GLOBAL_SCHEMAS:{refId}" };
+                }
+                else if (typeAttr != null)
+                {
+                    // type-level custom schema
+                    var refId = p.PropertyType.FullName ?? p.PropertyType.Name;
+                    propDict[propName] = new Dictionary<string, object?> { ["$ref"] = $"GLOBAL_SCHEMAS:{refId}" };
+                }
+                else
+                {
+                    // fallback minimal schema for primitive/object
+                    propDict[propName] = SchemaGenerator.GenerateSchema(p.PropertyType, new HashSet<Type>());
+                }
+
+                if (RequiredFieldHelper.IsPropertyRequired(p))
+                {
+                    required.Add(propName);
+                }
+            }
+
+            if (required.Count > 0)
+            {
+                paramShape["required"] = required.ToArray();
+            }
+
+            compact["params"] = paramShape;
+            return JsonUtil.ToJson(compact);
+        }
+        catch
+        {
+            return ti.Describe();
+        }
+    }
     private void AddHistory(AgentState state, List<LlmMessage> messages, out StringBuilder sb, out LlmMessage user)
     {
         sb = new StringBuilder();

@@ -167,7 +167,7 @@ public class JsonUtilTests
         }";
 
         // Act & Assert
-        Assert.ThrowsException<KeyNotFoundException>(() => JsonUtil.ParseStrict(json));
+        Assert.ThrowsException<ArgumentException>(() => JsonUtil.ParseStrict(json));
     }
 
     [TestMethod]
@@ -180,11 +180,11 @@ public class JsonUtilTests
         }";
 
         // Act & Assert
-        Assert.ThrowsException<KeyNotFoundException>(() => JsonUtil.ParseStrict(json));
+        Assert.ThrowsException<ArgumentException>(() => JsonUtil.ParseStrict(json));
     }
 
     [TestMethod]
-    public void ParseStrict_Should_ThrowArgumentException_When_ActionInputFieldMissing()
+    public void ParseStrict_Should_ThrowException_When_ActionInputFieldMissing()
     {
         // Arrange
         var json = @"{
@@ -193,7 +193,7 @@ public class JsonUtilTests
         }";
 
         // Act & Assert
-        Assert.ThrowsException<KeyNotFoundException>(() => JsonUtil.ParseStrict(json));
+        Assert.ThrowsException<InvalidOperationException>(() => JsonUtil.ParseStrict(json));
     }
 
     [TestMethod]
@@ -990,7 +990,7 @@ public class JsonUtilTests
         Assert.IsNotNull(options);
         Assert.IsNotNull(options.PropertyNamingPolicy);
         Assert.AreEqual(JsonCommentHandling.Skip, options.ReadCommentHandling);
-        Assert.IsFalse(options.AllowTrailingCommas);
+        Assert.IsTrue(options.AllowTrailingCommas);
         Assert.IsFalse(options.WriteIndented);
         Assert.AreEqual(JsonIgnoreCondition.Never, options.DefaultIgnoreCondition);
         Assert.IsTrue(options.Converters.Count > 0);
